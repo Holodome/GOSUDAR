@@ -1,13 +1,14 @@
 @echo off
 
+cls
 if not exist .\build mkdir build 
 pushd build 
 
-set "DisabledErrors=-Wall -Wno-writable-strings -Wno-unused-function -Wparentheses -Wswitch"
-set "LinkedLibraries= -L./ -luser32 -lkernel32 -lgdi32"
-set "CompilerSwitches=-D_CRT_SECURE_NO_WARNINGS"
-set "BuildOptions= %CompilerSwitches% -gcodeview -O0 -I../src %DisabledErrors% %LinkedLibraries% -x c -std=c11 -fno-exceptions -fno-math-errno -Wno-c99-designator"
+where cl /q
+if %ERRORLEVEL% neq 0 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 
-clang -g %BuildOptions% -o minecraft.exe ../src/main.c 
+set "build_options=-nologo -DEBUG -fp:fast -Od -Oi -Zi -FC -I"..\src" -std:c++17 -D_CRT_SECURE_NO_WARNINGS"
+
+cl %build_options% ../src/compile.cc -link -opt:ref gdi32.lib user32.lib kernel32.lib -out:game.exe
 
 popd 

@@ -49,7 +49,7 @@ struct Vec2G {
     };
     
     Vec2G()  {}; 
-    explicit Vec2G(T x, T y) : x(x), y(y) {}
+    Vec2G(T x, T y) : x(x), y(y) {}
     explicit Vec2G(T s) : x(s), y(s) {}
     template <typename S>
     explicit Vec2G(Vec2G<S> v) : x(v.x), y(v.y) {}
@@ -98,6 +98,10 @@ struct Vec2G {
     Vec2G<T> &operator/=(T s) {
         return (*this = *this / v);
     }
+     
+    f32 aspect_ratio() const {
+        return (f32)x / (f32)y;
+    }
 };
 
 using Vec2 = Vec2G<f32>;
@@ -117,7 +121,7 @@ struct Vec3G {
     };
     
     Vec3G()  {};
-    explicit Vec3G(T x, T y, T z) : x(x), y(y), z(z) {}
+    Vec3G(T x, T y, T z) : x(x), y(y), z(z) {}
     explicit Vec3G(T s) : x(s), y(s), z(s) {}
     explicit Vec3G(Vec2G<T> xy, T z = 0) : x(xy.x), y(xy.y), z(z) {}
     
@@ -191,7 +195,7 @@ struct Vec4G {
     };
     
     Vec4G() {};
-    explicit Vec4G(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
+    Vec4G(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
     explicit Vec4G(T s) : x(s), y(s), z(s), w(s) {}
     explicit Vec4G(Vec2G<T> xy, T z = 0, T w = 1) : x(xy.x), y(xy.y), z(z), w(w) {}
     explicit Vec4G(Vec3G<T> xyz, T w = 1) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
@@ -299,6 +303,10 @@ struct Mat4x4 {
         };
     };
     
+    const f32 *value_ptr() const {
+        return &m00;
+    }
+    
     Mat4x4()  {};
     explicit Mat4x4(Vec4 v0, Vec4 v1, Vec4 v2, Vec4 v3) {
         v[0] = v0;
@@ -309,6 +317,7 @@ struct Mat4x4 {
     
     static Mat4x4 identity() {
         Mat4x4 result = {};
+        memset(&result, 0, sizeof(result));
         result.m00 = result.m11 = result.m22 = result.m33 = 1.0f;
         return result;
     }       

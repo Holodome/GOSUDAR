@@ -4,6 +4,8 @@
 
 struct GameState {
     // DevUI ui;
+    Vec3 camera_pos;
+    Vec3 camera_rot;
     
     GameState();
     void init();

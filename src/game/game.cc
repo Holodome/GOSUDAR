@@ -14,6 +14,7 @@ char *skip_to_next_line(char *cursor) {
 }
 
 Game::Game() {
+    logprint("Game", "Is initializing\n");
     game = this;
     
     is_running = true;   
@@ -24,6 +25,7 @@ Game::Game() {
     
     os.prepare_to_start();
     game_state.init();
+    logprint("Game", "Is initialized\n");
 }
 
 void Game::update() {

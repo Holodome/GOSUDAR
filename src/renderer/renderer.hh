@@ -25,14 +25,12 @@ struct Image {
     Vec2i size;
     GLuint id;
     
-    bool is_loaded;
     Image(char *name);
-    void load();
     void bind();
 };
 
 struct ImageLibrary {
-    Array<Image> images;
+    Array<Image *> images;
     Image *white;
     
     ImageLibrary();
@@ -45,17 +43,20 @@ struct Mesh {
     GLuint vao_id;
     GLuint vbo_id;
     GLuint ibo_id;
+    size_t ic;
     
-    bool is_loaded;
     Mesh(char *name);
-    void load();
+    void init(Vertex *v, size_t vc, u32 *i, size_t ic);
+    void bind();
 };
 
 struct MeshLibrary {
-    Array<Mesh> meshes;
+    Array<Mesh *> meshes;
+    Mesh *quad;
     
     MeshLibrary();
     void init();
+    void add(Mesh *mesh);
     Mesh *get(char *name);
 };
 
@@ -63,12 +64,14 @@ struct Renderer {
     ImageLibrary image_lib;
     MeshLibrary mesh_lib;
     GLuint shader;
+    Mat4x4 projection, view;
     
     Renderer();
     void init();      
     
     void begin_frame(Vec2 win_size);
-    void draw_mesh(Mesh *mesh, Vec3 p = Vec3(0), Quat4 ori = Quat4::identity(), Vec3 s = Vec3(1));
+    void set_mats(Mat4x4 projection, Mat4x4 view);
+    void draw_mesh(Mesh *mesh, Image *diffuse, Vec3 p = Vec3(0), Quat4 ori = Quat4::identity(), Vec3 s = Vec3(1));
     void end_frame();
 };
 

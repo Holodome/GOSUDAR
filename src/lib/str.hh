@@ -6,10 +6,11 @@
 const static size_t STR_BASE_ALLOC = 20;
 
 struct Str {
-    
+    // 8
     char *data;
-    u32 size;
-    u32 capacity;
+    // 4
+    u32 size, capacity;
+    // 20
     // @TODO see if this is useful
     char base_buffer[STR_BASE_ALLOC];
     
@@ -20,7 +21,8 @@ struct Str {
         init();
         u32 len = strlen(text);
         ensure_alloced(len + 1);
-        strcpy(data, text);
+        memcpy(data, text, len);
+        data[len] = 0;
         size = len;
     } 
     ~Str() {
@@ -36,18 +38,27 @@ struct Str {
         data = base_buffer;
         data[0] = 0;
     }
-        
+    
+    // Make sure string has enough storage for amount chars
     void ensure_alloced(u32 amount, bool copy_old = true) {
         if (amount > capacity) {
             reallocate(amount, copy_old);
         }
     }
     
-    void reallocate(u32 amount, bool copy_old) {
+    // Change string data storage, either allocate new buffer or use base_buffer
+    void reallocate(u32 amount, bool copy_old = true) {
         assert(amount);
         
         u32 new_capacity = amount;
-        char *new_data = (char *)Mem::alloc(amount);
+        char *new_data;
+        if (new_capacity > STR_BASE_ALLOC) {
+            new_data = (char *)Mem::alloc(amount);
+            capacity = new_capacity;
+        } else {
+            new_data = base_buffer;
+            capacity = STR_BASE_ALLOC;
+        }
         
         if (copy_old) {
             memcpy(new_data, data, size);
@@ -68,13 +79,29 @@ struct Str {
         return data[idx];
     }
     
-    bool cmp(Str &other) {
+    bool cmp(const Str &other) {
         return size == other.size && (strncmp(data, other.data, size) == 0);
     }
     
-    bool cmp(char *other) {
+    bool cmp(const char *other) {
         size_t ol = strlen(other);
-        return ol == size && strncmp(data, other, size);
+        return ol == size && (strncmp(data, other, size) == 0);
+    }
+    
+    void operator=(const Str &other) {
+        size_t l = other.size;
+        ensure_alloced(l + 1, false);
+        memcpy(data, other.data, l);
+        data[l] = 0;
+        size = l;
+    }
+    
+    void operator=(const char *text) {
+        size_t l = strlen(text);
+        ensure_alloced(l + 1, false);
+        memcpy(data, text, l);
+        data[l] = 0;
+        size = l;
     }
     
     // Library funcions placed here  
@@ -86,11 +113,11 @@ struct Str {
         return strncmp(a, b, n);
     }
     
-    static void formatv(char *dst, size_t dst_size, char *format, va_list args) {
+    static void formatv(char *dst, size_t dst_size, const char *format, va_list args) {
         ::vsnprintf(dst, dst_size, format, args);
     }
     
-    static void format(char *dst, size_t dst_size, char *format, ...) {
+    static void format(char *dst, size_t dst_size, const char *format, ...) {
         va_list args;
         va_start(args, format);
         ::vsnprintf(dst, dst_size, format, args);

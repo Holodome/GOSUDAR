@@ -1,5 +1,7 @@
 #include "renderer.hh"
 
+#include "game/game.hh"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
 
@@ -85,12 +87,8 @@ Image::Image(char *name)
     : name(name) {
     size = Vec2i(0, 0);
     id = 0;
-    is_loaded = false;    
-}
-
-void Image::load() {
-    stbi_set_flip_vertically_on_load(true);
-    u8 *data = stbi_load(name.data, &size.x, &size.y, 0, 4);
+    stbi_set_flip_vertically_on_load(false);
+    u8 *data = stbi_load(name, &size.x, &size.y, 0, 4);
     assert(data);
     glCreateTextures(GL_TEXTURE_2D, 1, &id);
     glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -99,16 +97,12 @@ void Image::load() {
     glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTextureStorage2D(id, 1, GL_RGBA8, size.x, size.y);
     glTextureSubImage2D(id, 0, 0, 0, size.x, size.y, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    Mem::free(data);
-    is_loaded = true;
+    stbi_image_free(data);
+    logprint("Image", "Image %s is loaded\n", name);
 }
 
 void Image::bind() {
-    if (!is_loaded) {
-        load();
-    }
-    
-    glActiveTexture(GL_TEXTURE_2D);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, id);
 }
 
@@ -123,18 +117,90 @@ void ImageLibrary::init() {
 Image *ImageLibrary::get(char *name) {
     Image *result = 0;
     for (u32 i = 0; i < images.size; ++i) {
-        Image *test = &images[i];
+        Image *test = images[i];
         if (test->name.cmp(name)) {
             result = test;
         }
     }
     
     if (!result) {
-        Image image = Image(name);
-        image.load();
+        Image *image = new Image(name);
         images.add(image);
+		result = image;
+    }
+    assert(result);
+    return result;
+}
+
+Mesh::Mesh(char *name) 
+    : name(name) {
+    
+}
+
+// Mesh::Mesh(char *name, Vertex *v, size_t vc, u32 *i, size_t ic)
+//     : name(name), ic(ic) {
+//     init(v, vc, i, ic);
+// }
+
+void Mesh::init(Vertex *v, size_t vc, u32 *i, size_t ic) {
+    this->ic = ic;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * vc, v, GL_STATIC_DRAW);
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * ic, i, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, n));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
+    glEnableVertexAttribArray(3);
+    logprint("Mesh", "Mesh %s is initialized\n", name.data);
+}
+
+void Mesh::bind() {
+    glBindVertexArray(vao_id);
+}
+
+MeshLibrary::MeshLibrary() {
+    
+}
+
+void MeshLibrary::init() {
+    Vertex vertices[] = {
+        {{0, 0, 0}, {0, 0}, {0, 0, 1}, {1, 0, 0, 1}},
+        {{1, 0, 0}, {1, 0}, {0, 0, 1}, {0, 1, 0, 1}},
+        {{0, 1, 0}, {0, 1}, {0, 0, 1}, {0, 0, 1, 1}},
+        {{1, 1, 0}, {1, 1}, {0, 0, 1}, {1, 1, 1, 1}},
+    };
+    u32 indices[] = {
+        0, 1, 3,
+        0, 2, 3
+    };
+    Mesh *mesh = new Mesh("quad");
+    mesh->init(vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+    quad = meshes[meshes.add(mesh)];
+}
+
+void MeshLibrary::add(Mesh *mesh) {
+    meshes.add(mesh);
+}
+
+Mesh *MeshLibrary::get(char *name) {
+    Mesh *result = 0;
+    for (u32 i = 0; i < meshes.size; ++i) {
+        Mesh *test = meshes[i];
+        if (test->name.cmp(name)) {
+            result = test;
+        }
     }
     
+    assert(result);
     return result;
 }
 
@@ -153,14 +219,14 @@ layout(location = 1) in vec2 uv;
 layout(location = 2) in vec3 n;
 layout(location = 3) in vec4 c;
 
-out vec2 out_uv;
-out vec4 out_c;
+out vec2 pass_uv;
+out vec4 pass_c;
 uniform mat4 mvp;
 
 void main() {
     gl_Position = mvp * p;
-    out_uv = uv;
-    out_c = c;
+    pass_uv = uv;
+    pass_c = c;
 }
 
 #else
@@ -169,19 +235,19 @@ out vec4 out_c;
 
 uniform sampler2D tex;
 
-in vec2 in_uv;
-in vec4 in_c;
+in vec2 pass_uv;
+in vec4 pass_c;
 
 void main() {
-    out_c = in_c * texture(tex, in_uv);
+    out_c = pass_c * texture(tex, pass_uv);
 }
 
 #endif)FOO";
 
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char * const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", shader_code };
-    const char * const fragment_source[] = { "#version 330\n", "#define FRAGMENT_SHADER\n", shader_code };
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", shader_code };
+    const char *const fragment_source[] = { "#version 330\n", "", shader_code };
     glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
     glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
     glCompileShader(vertex_shader);
@@ -217,6 +283,13 @@ void main() {
     }
  
     image_lib.init();
+    mesh_lib.init();
+    logprint("Renderer", "Initialized\n");
+}
+
+void Renderer::set_mats(Mat4x4 projection, Mat4x4 view) {
+    this->projection = projection;
+    this->view = view;    
 }
 
 void Renderer::begin_frame(Vec2 win_size) {
@@ -236,182 +309,18 @@ void Renderer::begin_frame(Vec2 win_size) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     glUseProgram(shader);
-}
-
-Mesh::Mesh(char *name) {
     
+    Mat4x4 pm = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
+    Mat4x4 vm = Mat4x4::identity();
+    set_mats(pm, vm);
 }
 
-void Mesh::load() {
-    
+void Renderer::draw_mesh(Mesh *mesh, Image *diffuse, Vec3 p, Quat4 ori, Vec3 s) {
+    mesh->bind();
+    diffuse->bind();
+    glUniform1i(glGetUniformLocation(shader, "tex"), 0);
+    Mat4x4 modelm = Mat4x4::identity() * Mat4x4::translate(p) * Quat4::to_mat4x4(ori) * Mat4x4::scale(s);
+    Mat4x4 mvp = projection * view * modelm;
+    glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, false, mvp.value_ptr());
+    glDrawElements(GL_TRIANGLES, mesh->ic, GL_UNSIGNED_INT, 0);
 }
-
-MeshLibrary::MeshLibrary() {
-    
-}
-
-void MeshLibrary::init() {
-    
-}
-
-Mesh *MeshLibrary::get(char *name) {
-    return 0;
-}
-
-
-#if 0 
-void Renderer::render() {
-   
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
-    for (u32 render_quads_index = 0;
-            render_quads_index < render_quads_count;
-            ++render_quads_index) {
-        RenderQuads quads = render_quads[render_quads_index];
-        
-        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads.quad_count, GL_UNSIGNED_SHORT,
-                                    (GLvoid *)(sizeof(u16) * quads.index_array_offset),
-                                    quads.vertex_array_offset);
-    }
-}
-
-RendererTexture Renderer::make_texture(u32 w, u32 h, u8 *pix) {
-    RendererTexture tex = {0};
-    tex.w = w;
-    tex.h = h;
-    tex.index = texture_array_size++;
-    assert(texture_array_size < texture_array_capacity);
-    
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0,
-                    tex.index, w, h, 1, 
-                    GL_RGBA, GL_UNSIGNED_BYTE, pix);
-    
-    return tex;
-}
-
-void Renderer::quad(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 v3, 
-                    Vec4 c0, Vec4 c1, Vec4 c2, Vec4 c3,
-                    Vec2 uv0, Vec2 uv1, Vec2 uv2, Vec2 uv3,
-                    RendererTexture tex) {
-    assert(render_quads_count + 1 <= render_quads_capacity);
-    RenderQuads *quads = render_quads + render_quads_count++;
-    quads->quad_count = 1;
-    quads->index_array_offset = index_buffer_size;
-    quads->vertex_array_offset = vertex_buffer_size;
-    
-    if (tex == EMPTY_TEXTURE) {
-        tex = white_tex;
-    }
-    u32 texture_index = tex.index;
-    // @NOTE(hl): Transpose uvs from normalized space, to texture in texture array space
-    // Vec2 array_size = renderer_settings.texture_size;
-    Vec2 array_texture_size   = Vec2(512, 512);
-    Vec2 current_texture_size = Vec2(tex.w, tex.h);
-    Vec2 uv_scale = current_texture_size / array_texture_size;
-    uv0 = uv0 * uv_scale;
-    uv1 = uv1 * uv_scale;
-    uv2 = uv2 * uv_scale;
-    uv3 = uv3 * uv_scale;
-
-    u32 packed_color0 = pack_rgba_4x8_linear1(c0);
-    u32 packed_color1 = pack_rgba_4x8_linear1(c1);
-    u32 packed_color2 = pack_rgba_4x8_linear1(c2);
-    u32 packed_color3 = pack_rgba_4x8_linear1(c3);
-
-    // Vertex buffer
-    Vertex *vbuf = vertex_buffer + vertex_buffer_size;
-    vbuf[0].pos = v0;
-    vbuf[0].uv  = uv0;
-    vbuf[0].rgba = packed_color0;
-    vbuf[0].texture_index = texture_index;
-
-    vbuf[1].pos = v1;
-    vbuf[1].uv  = uv1;
-    vbuf[1].rgba = packed_color1;
-    vbuf[1].texture_index = texture_index;
-
-    vbuf[2].pos = v2;
-    vbuf[2].uv  = uv2;
-    vbuf[2].rgba = packed_color2;
-    vbuf[2].texture_index = texture_index;
-
-    vbuf[3].pos = v3;
-    vbuf[3].uv  = uv3;
-    vbuf[3].rgba = packed_color3;
-    vbuf[3].texture_index = texture_index;
-
-    // Index buffer
-    u16 *ibuf = index_buffer + index_buffer_size;
-    u16  base_index   = vertex_buffer_size - quads->vertex_array_offset;
-    ibuf[0] = base_index + 0;
-    ibuf[1] = base_index + 2;
-    ibuf[2] = base_index + 3;
-    ibuf[3] = base_index + 0;
-    ibuf[4] = base_index + 1;
-    ibuf[5] = base_index + 3;
-
-    // Update buffer sizes after we are finished.
-    vertex_buffer_size += 4;
-    index_buffer_size  += 6;                    
-}
-
-void Renderer::rect(Rect rect, RendererTexture tex, Vec4 color) {
-    Vec3 rect_pts[4];
-    rect.store_points(rect_pts);
-    quad(rect_pts[0], rect_pts[1], rect_pts[2], rect_pts[3],
-         color, color, color, color, 
-         Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(0, 1),
-         tex);
-}
-
-
-void Renderer::rect_bounds(Vec2 min, Vec2 max, Vec4 color, f32 thickness) {
-    rect(Rect::minmax(min, Vec2(max.x, min.y + thickness)), white_tex, color);
-    rect(Rect::minmax(min, Vec2(min.x + thickness, max.y)), white_tex, color);
-    rect(Rect::minmax(Vec2(min.x, max.y - thickness), max), white_tex, color);
-    rect(Rect::minmax(Vec2(max.x - thickness, min.y), max), white_tex, color);
-}
-
-
-void Renderer::text(Vec2 p, Vec4 c, char *text, Font *font, f32 scale) {
-    f32 line_height = font->height * scale;
-
-	f32 rwidth  = 1.0f / (f32)font->atlas.w;
-	f32 rheight = 1.0f / (f32)font->atlas.h;
-
-	Vec3 offset = Vec3(p, 0);
-	offset.y += line_height;
-
-	for (char *scan = text; *scan; ++scan) {
-		char symbol = *scan;
-
-		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.size)) {
-			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
-
-			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
-			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
-
-
-			f32 y1 = offset.y + glyph->offset1_y * scale;
-			f32 y2 = y1 + glyph_height;
-			f32 x1 = offset.x + glyph->offset1_x * scale;
-			f32 x2 = x1 + glyph_width;
-
-			f32 s1 = glyph->min_x * rwidth;
-			f32 t1 = glyph->min_y * rheight;
-			f32 s2 = glyph->max_x * rwidth;
-			f32 t2 = glyph->max_y * rheight;
-
-			quad(Vec3(x1, y1, 0), Vec3(x1, y2, 0), Vec3(x2, y1, 0), Vec3(x2, y2, 0),
-				 c, c, c, c,
-				 Vec2(s1, t1), Vec2(s1, t2), Vec2(s2, t1), Vec2(s2, t2),
-				 font->atlas);
-
-			f32 char_advance = glyph->x_advance * scale;
-			offset.x += char_advance;
-		}
-	}
-}
-
-#endif 

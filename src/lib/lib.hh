@@ -9,6 +9,7 @@
 #include "str.hh"
 #include "array.hh"
 #include "misc.hh"
+#include "logger.hh"
 
 extern struct Game *game;
 

@@ -1,9 +1,22 @@
-#include "renderer.hh"
+#include "renderer/renderer.hh"
 
 #include "game/game.hh"
 
+#define STBI_MALLOC Mem::alloc
+#define STBI_REALLOC Mem::realloc
+#define STBI_FREE Mem::free
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
+
+#define STBTT_malloc(x,u)  ((void)(u),Mem::alloc(x))
+#define STBTT_free(x,u)    ((void)(u),Mem::free(x))
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "thirdparty/stb_truetype.h"
+
+#define GLPROC(_name, _type) \
+static _type _name;
+#include "renderer/gl_procs.inc"
+#undef GLPROC
 
 static void APIENTRY
 opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
@@ -83,137 +96,176 @@ opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GL
 			source_str, type_str, severity_str, id, message);
 }
 
-Image::Image(char *name) 
-    : name(name) {
-    size = Vec2i(0, 0);
-    id = 0;
+Shader::Shader(const Str &source) {
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source.data };
+    const char *const fragment_source[] = { "#version 330\n", "", source.data };
+    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
+    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
+    glCompileShader(vertex_shader);
+    glCompileShader(fragment_shader);
+    
+    GLint vertex_compiled, fragment_compiled;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
+    
+    bool shader_failed = false;
+    if (!(vertex_compiled && fragment_compiled)) {
+        char shader_log[4096];
+        if (!vertex_compiled) {
+            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+        if (!fragment_compiled) {
+            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+    }
+    
+    id = glCreateProgram();
+    glAttachShader(id, vertex_shader);
+    glAttachShader(id, fragment_shader);
+    glLinkProgram(id);
+    
+    GLint link_success;
+    glGetProgramiv(id, GL_LINK_STATUS, &link_success);
+    if (!link_success) {
+        char program_log[4096];
+        glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
+        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
+        shader_failed = true;
+    }    
+    
+    assert(!shader_failed);
+}
+
+void Shader::bind() {
+    glUseProgram(id);
+}
+
+Texture::Texture(const void *buffer, Vec2i size) 
+    : size(size) {
     stbi_set_flip_vertically_on_load(false);
-    u8 *data = stbi_load(name, &size.x, &size.y, 0, 4);
-    assert(data);
-    glCreateTextures(GL_TEXTURE_2D, 1, &id);
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
     glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTextureStorage2D(id, 1, GL_RGBA8, size.x, size.y);
-    glTextureSubImage2D(id, 0, 0, 0, size.x, size.y, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    stbi_image_free(data);
-    logprint("Image", "Image %s is loaded\n", name);
+    glTextureSubImage2D(id, 0, 0, 0, size.x, size.y, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 }
 
-void Image::bind() {
-    glActiveTexture(GL_TEXTURE0);
+void Texture::bind(u32 unit) {
+    glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, id);
 }
 
-ImageLibrary::ImageLibrary() {
+Mesh::Mesh(const Vertex *vertices, size_t vertex_count, const u32 *indices, size_t index_count) {
+    this->vertices = new Vertex[vertex_count];
+    memcpy(this->vertices, vertices, sizeof(Vertex) * vertex_count);
+    this->indices = new u32[index_count];
+    memcpy(this->indices, indices, sizeof(u32) * index_count);
+    this->vertex_count = vertex_count;
+    this->index_count = index_count;
+}
+
+Mesh::~Mesh() {
+    delete[] vertices;
+    delete[] indices;
+}
+
+
+Font::Font(const char *filename, f32 height) {
+    FILE *file = fopen(filename, "rb");
+    assert(file);
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    fseek(file, 0, SEEK_SET);
     
+    char *text = new char[size + 1];
+    fread(text, 1, size, file);
+    text[size] = 0;
+    fclose(file);
+    
+    const u32 atlas_width  = 512;
+	const u32 atlas_height = 512;
+	const u32 first_codepoint = 32;
+	const u32 codepoint_count = 95;  
+    stbtt_packedchar *glyphs = new stbtt_packedchar[codepoint_count];
+    
+    u8 *loaded_atlas_data = new u8[atlas_width * atlas_height];
+    stbtt_pack_context context = {};
+	stbtt_PackBegin(&context, loaded_atlas_data, atlas_width, atlas_height, 0, 1, 0);
+	stbtt_PackSetOversampling(&context, 2, 2);
+	stbtt_PackFontRange(&context, (u8 *)text, 0, height, first_codepoint, codepoint_count, glyphs);
+	stbtt_PackEnd(&context);
+
+    u8 *atlas_data = new u8[atlas_width * atlas_height * 4];
+	for (u32 i = 0; i < atlas_width * atlas_height; ++i) {
+		u8 *dest = (u8 *)(atlas_data + i * 4);
+		dest[0] = 255;
+		dest[1] = 255;
+		dest[2] = 255;
+		// dest[3] = loaded_atlas_data[i];
+		dest[3] = loaded_atlas_data[i];
+	}
+    delete[] loaded_atlas_data;
+    tex = new Texture(atlas_data, Vec2i(atlas_width, atlas_height));
+    delete[] atlas_data;
+    
+	this->first_codepoint = first_codepoint;
+	this->size = height;
+    this->glyphs.resize(codepoint_count);
+
+	for (u32 i = 0; i < codepoint_count; ++i) {
+		++this->glyphs.len;
+		this->glyphs[i].utf32 = first_codepoint + i;
+		this->glyphs[i].min_x = glyphs[i].x0;
+		this->glyphs[i].min_y = glyphs[i].y0;
+		this->glyphs[i].max_x = glyphs[i].x1;
+		this->glyphs[i].max_y = glyphs[i].y1;
+		this->glyphs[i].offset1_x = glyphs[i].xoff;
+		this->glyphs[i].offset1_y = glyphs[i].yoff;
+		this->glyphs[i].offset2_x = glyphs[i].xoff2;
+		this->glyphs[i].offset2_y = glyphs[i].yoff2;
+		this->glyphs[i].x_advance = glyphs[i].xadvance;
+	}
+    delete glyphs;
+    delete text;
 }
 
-void ImageLibrary::init() {
-    white = get("assets/white.png");
+Font::~Font() {
+    delete tex;
 }
 
-Image *ImageLibrary::get(char *name) {
-    Image *result = 0;
-    for (u32 i = 0; i < images.size; ++i) {
-        Image *test = images[i];
-        if (test->name.cmp(name)) {
-            result = test;
+Vec2 Font::get_text_size(const char *text, size_t count, f32 scale) {
+    if (!count) {
+        count = strlen(text);
+    }
+    
+    Vec2 result = {};
+    for (u32 i = 0; i < count; ++i) {
+        char s = text[i];
+        if (s > first_codepoint && s < (first_codepoint + glyphs.len)) {
+            FontGlyph *glyph = &glyphs[s - first_codepoint];
+            result.x += glyph->x_advance * scale;
         }
     }
+    result.y = size * scale;
     
-    if (!result) {
-        Image *image = new Image(name);
-        images.add(image);
-		result = image;
-    }
-    assert(result);
     return result;
-}
-
-Mesh::Mesh(char *name) 
-    : name(name) {
-    
-}
-
-// Mesh::Mesh(char *name, Vertex *v, size_t vc, u32 *i, size_t ic)
-//     : name(name), ic(ic) {
-//     init(v, vc, i, ic);
-// }
-
-void Mesh::init(Vertex *v, size_t vc, u32 *i, size_t ic) {
-    this->ic = ic;
-    glGenVertexArrays(1, &vao_id);
-    glBindVertexArray(vao_id);
-    glGenBuffers(1, &vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * vc, v, GL_STATIC_DRAW);
-    glGenBuffers(1, &ibo_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * ic, i, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, n));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
-    glEnableVertexAttribArray(3);
-    logprint("Mesh", "Mesh %s is initialized\n", name.data);
-}
-
-void Mesh::bind() {
-    glBindVertexArray(vao_id);
-}
-
-MeshLibrary::MeshLibrary() {
-    
-}
-
-void MeshLibrary::init() {
-    Vertex vertices[] = {
-        {{0, 0, 0}, {0, 0}, {0, 0, 1}, {1, 0, 0, 1}},
-        {{1, 0, 0}, {1, 0}, {0, 0, 1}, {0, 1, 0, 1}},
-        {{0, 1, 0}, {0, 1}, {0, 0, 1}, {0, 0, 1, 1}},
-        {{1, 1, 0}, {1, 1}, {0, 0, 1}, {1, 1, 1, 1}},
-    };
-    u32 indices[] = {
-        0, 1, 3,
-        0, 2, 3
-    };
-    Mesh *mesh = new Mesh("quad");
-    mesh->init(vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
-    quad = meshes[meshes.add(mesh)];
-}
-
-void MeshLibrary::add(Mesh *mesh) {
-    meshes.add(mesh);
-}
-
-Mesh *MeshLibrary::get(char *name) {
-    Mesh *result = 0;
-    for (u32 i = 0; i < meshes.size; ++i) {
-        Mesh *test = meshes[i];
-        if (test->name.cmp(name)) {
-            result = test;
-        }
-    }
-    
-    assert(result);
-    return result;
-}
-
-Renderer::Renderer() {
-    
 }
 
 void Renderer::init() {
+    logprintln("Renderer", "Init start");
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
     
-    char *shader_code = R"FOO(#ifdef VERTEX_SHADER
-
+    Str standard_shader_code = R"FOO(#ifdef VERTEX_SHADER
 layout(location = 0) in vec4 p;
 layout(location = 1) in vec2 uv;
 layout(location = 2) in vec3 n;
@@ -239,88 +291,209 @@ in vec2 pass_uv;
 in vec4 pass_c;
 
 void main() {
+    //out_c = vec4(1, 0, 1, 0);
     out_c = pass_c * texture(tex, pass_uv);
 }
 
 #endif)FOO";
+    standard_shader = new Shader(standard_shader_code);
+    default_shader = standard_shader;
+    Str terrain_shader_code = R"FOO(#ifdef VERTEX_SHADER
+layout(location = 0) in vec4 p;
+layout(location = 1) in vec2 uv;
+layout(location = 2) in vec3 n;
+layout(location = 3) in vec4 c;
 
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", shader_code };
-    const char *const fragment_source[] = { "#version 330\n", "", shader_code };
-    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
-    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
-    glCompileShader(vertex_shader);
-    glCompileShader(fragment_shader);
-    
-    GLint vertex_compiled, fragment_compiled;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
-    
-    if (!(vertex_compiled && fragment_compiled)) {
-        char shader_log[4096];
-        if (!vertex_compiled) {
-            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
-        }
-        if (!fragment_compiled) {
-            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
-        }
-    }
-    
-    shader = glCreateProgram();
-    glAttachShader(shader, vertex_shader);
-    glAttachShader(shader, fragment_shader);
-    glLinkProgram(shader);
-    
-    GLint link_success;
-    glGetProgramiv(shader, GL_LINK_STATUS, &link_success);
-    if (!link_success) {
-        char program_log[4096];
-        glGetProgramInfoLog(shader, sizeof(program_log), 0, program_log);
-        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
-    }
- 
-    image_lib.init();
-    mesh_lib.init();
-    logprint("Renderer", "Initialized\n");
+flat out vec4 pass_c;
+uniform mat4 mvp;
+
+void main() {
+    gl_Position = mvp * p;
+    pass_c = c;
 }
+#else 
+flat in vec4 pass_c;
+out vec4 out_c;
 
-void Renderer::set_mats(Mat4x4 projection, Mat4x4 view) {
-    this->projection = projection;
-    this->view = view;    
+void main() {
+    out_c = pass_c;
 }
-
-void Renderer::begin_frame(Vec2 win_size) {
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_SCISSOR_TEST);
-    glDepthMask(GL_TRUE);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glDepthFunc(GL_LEQUAL);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+#endif 
+)FOO";
+    terrain_shader = new Shader(terrain_shader_code);
+    
+    TempArray<u8> white_tex = TempArray<u8>(512 * 512 * 4);
+    memset(white_tex.data, 0xFF, white_tex.mem_size());
+    white_texture = new Texture(white_tex.data, Vec2i(512, 512));
+    default_texture = white_texture;
+    
+    // glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
+    glCullFace(GL_BACK);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, win_size.x, win_size.y);
-    glScissor(0, 0, win_size.x, win_size.y); 
-    glClearColor(0.2, 0.2, 0.2, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glUseProgram(shader);
-    
-    Mat4x4 pm = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
-    Mat4x4 vm = Mat4x4::identity();
-    set_mats(pm, vm);
+    logprint("Renderer", "Init end\n");
 }
 
-void Renderer::draw_mesh(Mesh *mesh, Image *diffuse, Vec3 p, Quat4 ori, Vec3 s) {
-    mesh->bind();
-    diffuse->bind();
-    glUniform1i(glGetUniformLocation(shader, "tex"), 0);
-    Mat4x4 modelm = Mat4x4::identity() * Mat4x4::translate(p) * Quat4::to_mat4x4(ori) * Mat4x4::scale(s);
-    Mat4x4 mvp = projection * view * modelm;
-    glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, false, mvp.value_ptr());
-    glDrawElements(GL_TRIANGLES, mesh->ic, GL_UNSIGNED_INT, 0);
+void Renderer::cleanup() {
+    delete standard_shader;
+    delete terrain_shader;
+    delete white_texture;
+}
+
+void Renderer::clear(Vec4 color) {
+    glClearColor(color.r, color.g, color.b, color.a);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);    
+}
+
+void Renderer::set_draw_region(Vec2 window_size) {
+    glViewport(0, 0, window_size.x, window_size.y);
+    glScissor(0, 0, window_size.x, window_size.y);
+}
+
+void Renderer::immediate_begin() {
+    // vertices.clear();
+    // @UNSAFE
+    vertices.len = 0;
+    if (!IS_GL_VALID_ID(immediate_vao)) {
+        glGenVertexArrays(1, &immediate_vao);
+        glBindVertexArray(immediate_vao);
+        glGenBuffers(1, &immediate_vbo);
+    }
+}
+
+void Renderer::immediate_flush() {
+    if (!vertices.len) { return; }
+    
+    Shader *shader = current_shader;
+    assert(shader);
+    shader->bind();
+    Mat4x4 mvp = projection_matrix * view_matrix * model_matrix;
+    glUniformMatrix4fv(glGetUniformLocation(shader->id, "mvp"), 1, false, mvp.value_ptr());
+    Texture *texture = current_texture;
+	assert(texture);
+    texture->bind();
+    glUniform1i(glGetUniformLocation(shader->id, "tex"), 0);
+    
+    glBindVertexArray(immediate_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, immediate_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.len, vertices.data, GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, n));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
+    glEnableVertexAttribArray(3);
+    
+    glDrawArrays(GL_TRIANGLES, 0, vertices.len);
+}
+
+void Renderer::immediate_vertex(const Vertex &v) {
+    vertices.add(v);
+}
+
+void Renderer::set_projview(const Mat4x4 &proj, const Mat4x4 &view) {
+    this->projection_matrix = proj;
+    this->view_matrix = view;
+}
+
+void Renderer::set_model(const Mat4x4 &model) {
+    this->model_matrix = model;
+}
+
+void Renderer::set_shader(Shader *shader) {
+    if (shader == 0) {
+        shader = default_shader;
+    }
+    
+    current_shader = shader;
+}
+
+void Renderer::set_texture(Texture *texture) {
+    if (texture == 0) {
+        texture = default_texture;
+    }
+    current_texture = texture;
+}
+
+void Renderer::draw_rect(Rect rect, Vec4 color, Rect uv_rect) {
+    Vertex v0, v1, v2, v3;
+    v0.p = Vec3(rect.top_left());
+    v0.uv = uv_rect.top_left();
+    v0.c = color;
+    v1.p = Vec3(rect.top_right());
+    v1.uv = uv_rect.top_right();
+    v1.c = color;
+    v2.p = Vec3(rect.bottom_left());
+    v2.uv = uv_rect.bottom_left();
+    v2.c = color;
+    v3.p = Vec3(rect.bottom_right());
+    v3.uv = uv_rect.bottom_right();
+    v3.c = color;
+    
+    immediate_vertex(v3);
+    immediate_vertex(v1);
+    immediate_vertex(v0);
+    immediate_vertex(v0);
+    immediate_vertex(v2);
+    immediate_vertex(v3);
+}
+
+void Renderer::draw_mesh(Mesh *mesh) {
+    for (size_t i = 0; i < mesh->index_count; i += 3) {
+        immediate_vertex(mesh->vertices[mesh->indices[i]]);
+        immediate_vertex(mesh->vertices[mesh->indices[i + 1]]);
+        immediate_vertex(mesh->vertices[mesh->indices[i + 2]]);
+    }
+}
+
+
+void Renderer::draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
+    f32 line_height = font->size * scale;
+
+	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
+	f32 rheight = 1.0f / (f32)font->tex->size.y;
+
+	Vec3 offset = Vec3(p, 0);
+	offset.y += line_height;
+    
+    set_shader();
+    set_texture(font->tex);
+	for (const char *scan = text; *scan; ++scan) {
+		char symbol = *scan;
+
+		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
+			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
+
+			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
+			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
+
+			f32 y1 = offset.y + glyph->offset1_y * scale;
+			f32 y2 = y1 + glyph_height;
+			f32 x1 = offset.x + glyph->offset1_x * scale;
+			f32 x2 = x1 + glyph_width;
+
+			f32 s1 = glyph->min_x * rwidth;
+			f32 t1 = glyph->min_y * rheight;
+			f32 s2 = glyph->max_x * rwidth;
+			f32 t2 = glyph->max_y * rheight;
+            draw_rect(Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1));
+			f32 char_advance = glyph->x_advance * scale;
+			offset.x += char_advance;
+		}
+	}
+}
+
+void Renderer::set_renderering_3d(Mat4x4 proj, Mat4x4 view) {
+    set_projview(proj, view);
+    glEnable(GL_DEPTH_TEST);    
+}
+
+void Renderer::set_renderering_2d(Vec2 winsize) {
+    Mat4x4 win_proj = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
+    game->renderer.set_projview(win_proj);
+    glDisable(GL_DEPTH_TEST);
 }

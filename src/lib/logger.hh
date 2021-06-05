@@ -23,5 +23,14 @@ void print(const char *format, ...) {
     va_end(args);
 }
 
+void logprintln(const char *tag, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    logprintv(tag, format, args);
+    va_end(args);
+    print("\n");
+}
+
+
 #define LOGGER_HH 1
 #endif

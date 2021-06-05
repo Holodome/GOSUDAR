@@ -2,21 +2,8 @@
 
 Game *game;
 
-char *skip_to_next_line(char *cursor) {
-    while (*cursor && *cursor != '\n') {
-        ++cursor;
-    }
-    
-    if (*cursor == '\n') {
-        ++cursor;
-    }
-    return cursor;
-}
-
-Game::Game() {
-    logprint("Game", "Is initializing\n");
-    game = this;
-    
+void Game::init() {
+    logprint("Game", "Init start\n");
     is_running = true;   
     
     os.init();
@@ -24,21 +11,32 @@ Game::Game() {
     renderer.init();
     
     os.prepare_to_start();
+    dev_ui.begin_frame();
+    dev_ui.font = new Font("c:\\windows\\fonts\\arial.ttf", 32);
     game_state.init();
-    logprint("Game", "Is initialized\n");
+    
+    logprint("Game", "Init end\n");
+}
+
+void Game::cleanup() {
+    logprintln("Game", "Cleanup");
+    game_state.cleanup();
+    delete dev_ui.font;
+    renderer.cleanup();
+    os.cleanup();
 }
 
 void Game::update() {
     os.update_input(&input);
     input.update();
     
-    renderer.begin_frame(input.winsize);
-    
     if (input.is_quit_requested) {
         is_running = false;
     }
     
+    dev_ui.begin_frame();
     game_state.update();
+    dev_ui.end_frame();
     
     // renderer.render();
     os.update_window();

@@ -9,7 +9,7 @@ struct Str {
     // 8
     char *data;
     // 4
-    u32 size, capacity;
+    u32 len, capacity;
     // 20
     // @TODO see if this is useful
     char base_buffer[STR_BASE_ALLOC];
@@ -23,7 +23,7 @@ struct Str {
         ensure_alloced(len + 1);
         memcpy(data, text, len);
         data[len] = 0;
-        size = len;
+        this->len = len;
     } 
     ~Str() {
         if (data != base_buffer) {
@@ -33,7 +33,7 @@ struct Str {
     
     // Helper functions
     void init() {
-        size = 0;
+        len = 0;
         capacity = STR_BASE_ALLOC;
         data = base_buffer;
         data[0] = 0;
@@ -61,7 +61,7 @@ struct Str {
         }
         
         if (copy_old) {
-            memcpy(new_data, data, size);
+            memcpy(new_data, data, len);
         }
         
         if (data != base_buffer) {
@@ -71,29 +71,29 @@ struct Str {
     }
     
     char operator[](size_t idx) const {
-        assert(size > idx);
+        assert(len > idx);
         return data[idx];
     }
     char &operator[](size_t idx) {
-        assert(size > idx);
+        assert(len > idx);
         return data[idx];
     }
     
     bool cmp(const Str &other) {
-        return size == other.size && (strncmp(data, other.data, size) == 0);
+        return len == other.len && (strncmp(data, other.data, len) == 0);
     }
     
     bool cmp(const char *other) {
         size_t ol = strlen(other);
-        return ol == size && (strncmp(data, other, size) == 0);
+        return ol == len && (strncmp(data, other, len) == 0);
     }
     
     void operator=(const Str &other) {
-        size_t l = other.size;
+        size_t l = other.len;
         ensure_alloced(l + 1, false);
         memcpy(data, other.data, l);
         data[l] = 0;
-        size = l;
+        len = l;
     }
     
     void operator=(const char *text) {
@@ -101,7 +101,7 @@ struct Str {
         ensure_alloced(l + 1, false);
         memcpy(data, text, l);
         data[l] = 0;
-        size = l;
+        len = l;
     }
     
     // Library funcions placed here  

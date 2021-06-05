@@ -16,12 +16,26 @@ enum struct Key {
     Space,
     MouseLeft,
     MouseRight,
+    
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    
     Count
 };
 
 struct KeyState {
-    bool is_down;
-    int transition_count;  
+    bool is_down = false;
+    int transition_count = 0;  
 
     void update(bool is_down) {
         if (this->is_down != is_down) {
@@ -32,17 +46,17 @@ struct KeyState {
 };
 
 struct Input {
-    Vec2 winsize;
-    Vec2 mpos;
-    Vec2 mdelta;
-    f32 mwheel;  
-    KeyState keys[(u32)Key::Count];
-    f32 time, dt;
-    bool is_quit_requested;
+    Vec2 winsize = Vec2(0);
+    Vec2 mpos = Vec2(0);
+    Vec2 mdelta = Vec2(0);
+    f32 mwheel = 0;  
+    KeyState keys[(u32)Key::Count] = {};
+    f32 time = 0, dt = 0;
+    bool is_quit_requested = false;
     
-    f32 lmc_click_time;
-    bool lmc_doubleclick;
-    f32 keys_down_time[(u32)Key::Count];
+    f32 lmc_click_time = 0;
+    bool lmc_doubleclick = false;
+    f32 keys_down_time[(u32)Key::Count] = {};
     
     bool is_key_pressed(Key key) {
         KeyState *k = keys + (uintptr_t)key;
@@ -101,10 +115,12 @@ struct Input {
 
 struct OS {
     // Platform-specific data
-    OSInternal *internal;
+    OSInternal *internal = 0;
     
     // Initializes window
     void init();
+    void cleanup();
+    
     // Loads all opengl functions
     void init_renderer_backend();
     // Sets up time counting

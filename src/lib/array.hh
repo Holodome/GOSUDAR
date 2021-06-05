@@ -1,10 +1,10 @@
-#if !defined(DYNAMIC_ARRAY_HH)
+#if !defined(ARRAY_HH)
 
 #include "mem.hh"
 
 template <typename T>
 void *array_new(size_t capacity) {
-    T *ptr = (T *)Mem::alloc_clear(capacity * sizeof(T));
+    T *ptr = (T *)Mem::alloc(capacity * sizeof(T));
     for (u32 i = 0; i < capacity; ++i) {
         ptr[i] = T();
     }
@@ -16,6 +16,7 @@ void array_delete(void *ptr, size_t capacity) {
     for (u32 i = 0; i < capacity; ++i) {
         ((T *)ptr)[i].~T();
     }
+    Mem::free(ptr);
 }
 
 template <typename T>
@@ -39,13 +40,16 @@ void *array_resize(void *old_ptrv, size_t old_capacity, size_t new_capacity) {
 template <typename T> 
 struct Array {
     T *data;
-    size_t size, capacity;
+    size_t len, capacity;
     
     Array() {
-		clear();
+        data = 0;
+        clear();
     }
     ~Array() {
-        array_delete<T>(data, capacity);
+        if (data) {
+            array_delete<T>(data, capacity);
+        }
     }
     
     void clear() {
@@ -54,7 +58,7 @@ struct Array {
         }
         data = 0;
         capacity = 0;
-        size = 0;
+        len = 0;
     }
     
     void resize(size_t count) {
@@ -67,13 +71,13 @@ struct Array {
         }
         data = (T *)array_resize<T>(data, capacity, count);
         capacity = count;
-        if (capacity < size) {
-            size = capacity;
+        if (capacity < len) {
+            len = capacity;
         }
     }
     
     size_t add(const T &obj) {
-        if (size + 1 > capacity) {
+        if (len + 1 > capacity) {
             // @TODO currently we double the size of array but later we may want to increment it instead
             size_t new_capacity = capacity * 2;
             if (new_capacity == 0) {
@@ -82,19 +86,51 @@ struct Array {
             resize(new_capacity);
         }
         
-        data[size] = obj;
-        return size++;
+        data[len] = obj;
+        return len++;
     }
     
     const T &operator[](size_t idx) const {
-        assert(idx < size);
+        assert(idx < len);
         return data[idx];
     }
     
     T &operator[](size_t idx) {
-        assert(idx < size);
+        assert(idx < len);
         return data[idx];
     }
 };
-#define DYNAMIC_ARRAY_HH 1
+
+// Temporary array that is deleted when goes out of skope
+template <typename T>
+struct TempArray {
+    T *data;
+    size_t len;
+    
+    TempArray() = delete;
+    TempArray(size_t size_init) {
+        data = (T *)Mem::alloc(size_init * sizeof(T));
+        len = size_init;
+    }
+    
+    ~TempArray() {
+        Mem::free(data);
+    }
+  
+    T &operator [](size_t idx) {
+        assert(idx < len);
+        return data[idx];
+    }  
+    
+    const T &operator [](size_t idx) const {
+        assert(idx < len);
+        return data[idx];
+    }  
+    
+    size_t mem_size() const {
+        return sizeof(T) * len;
+    }
+};
+
+#define ARRAY_HH 1
 #endif

@@ -1,9 +1,0 @@
-tileset.png
-7
-floor 16 64 16 16
-wall 16 16 16 16
-wall_r 0 144 16 16
-wall_l 16 144 16 16
-wall_up 16 0 16 16
-wall_r_up 0 128 16 16
-wall_l_up 16 128 16 16

@@ -5,18 +5,25 @@
 #include "os/os.hh"
 #include "renderer/assets.hh"
 #include "renderer/renderer.hh"
-// #include "game/devui.hh"
+#include "game/devui.hh"
 #include "game/game_state.hh"
 
+// Game is a object that decribes program as one element 
+// It contains several elements that are all used in game state
+// Game state is the logic of the game
+// It decides how to use all data recived from input, what to render when to close etc.
 struct Game {
-    bool is_running;
-    OS os;
-    Renderer renderer;
-    Input input;
+    bool is_running = false;
+    OS os = OS();
+    Renderer renderer = Renderer();
+    Input input = Input();
+    DevUI dev_ui = DevUI();
     
-    GameState game_state;
+    GameState game_state = GameState();
     
-    Game();
+    void init();
+    void cleanup();
+    
     void update();  
 };
 

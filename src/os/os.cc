@@ -97,9 +97,8 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
 }
 
 void OS::init() {
-    memset(this, 0, sizeof(*this));
-    
-    internal = (OSInternal *)malloc(sizeof(OSInternal));
+    logprintln("OS", "Init start");
+    internal = new OSInternal;
     memset(internal, 0, sizeof(*internal));
     
     // Create window
@@ -121,6 +120,12 @@ void OS::init() {
                                      window_width, window_height, 0, 0, internal->instance, 0);
     ShowWindow(internal->hwnd, SW_SHOW);
     UpdateWindow(internal->hwnd);
+    logprintln("OS", "Init end");
+}
+
+void OS::cleanup() {
+    logprintln("OS", "Cleanup");
+    delete internal;        
 }
 
 void OS::init_renderer_backend() {
@@ -176,7 +181,7 @@ void OS::init_renderer_backend() {
 #define GLPROC(_name, _type)                                        \
     *(void **)&_name = (void *)internal->wglGetProcAddress(#_name);                  \
     if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
-    if (!_name) fprintf(stderr, "[ERROR] Failed to load " #_name " OGL procedure.\n");
+    if (!_name) logprintln("OpenGL", "Failed to load " #_name " OGL procedure.");
 #include "renderer/gl_procs.inc"
 #undef GLPROC
     
@@ -184,6 +189,7 @@ void OS::init_renderer_backend() {
 }
 
 void OS::prepare_to_start() {
+    logprintln("OS", "Prepare to start");
     LARGE_INTEGER pf;
     QueryPerformanceFrequency(&pf);
     internal->perf_count_frequency = pf.QuadPart;
@@ -246,6 +252,42 @@ void OS::update_input(Input *input) {
                     } break;
                     case 0x039: {
                         key = Key::Space;
+                    } break;
+                    case 0x03B: {
+                        key = Key::F1;
+                    } break;
+                    case 0x03C: {
+                        key = Key::F2;
+                    } break;
+                    case 0x03D: {
+                        key = Key::F3;
+                    } break;
+                    case 0x03E: {
+                        key = Key::F4;
+                    } break;
+                    case 0x03F: {
+                        key = Key::F5;
+                    } break;
+                    case 0x040: {
+                        key = Key::F6;
+                    } break;
+                    case 0x041: {
+                        key = Key::F7;
+                    } break;
+                    case 0x042: {
+                        key = Key::F8;
+                    } break;
+                    case 0x043: {
+                        key = Key::F9;
+                    } break;
+                    case 0x044: {
+                        key = Key::F10;
+                    } break;
+                    case 0x057: {
+                        key = Key::F11;
+                    } break;
+                    case 0x058: {
+                        key = Key::F12;
                     } break;
                 }
 

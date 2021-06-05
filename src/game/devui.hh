@@ -29,10 +29,8 @@ const Vec4 DEVUI_COLOR_HEADER_HOT =         Vec4(0.500, 0.080, 0.260, 1.000);
 const Vec4 DEVUI_COLOR_HEADER_ACTIVE =      Vec4(0.460, 0.200, 0.300, 0.860);
 
 struct DevUIDrawQueueEntry {
-    Vec3 v[4];
-    Vec4 c[4];  
-    Vec2 uvs[4];
-    RendererTexture tex;
+    Vertex v[4];
+    Texture *tex;
 };
 
 struct DevUIID {
@@ -62,15 +60,17 @@ struct DevUIButtonState {
     bool is_hot;  
 };
 
+const DevUIID EMPTY_ID { };
+
 struct DevUI {
-    Array<DevUIDrawQueueEntry> draw_queue;
-    Array<DevUIWindow> windows;
-    DevUIWindow *cur_win, *hot_win;
-    DevUIID hot_id, active_id;
+    Array<DevUIDrawQueueEntry> draw_queue = {};
+    Array<DevUIWindow> windows = {};
+    DevUIWindow *cur_win = 0, *hot_win = 0;
+    DevUIID hot_id = EMPTY_ID, active_id = EMPTY_ID;
     Font *font;
     
-    DevUI();
-    ~DevUI() {}
+    bool allow_input = false, allow_drawing = false;
+    
     void begin_frame();
     void end_frame();
     
@@ -82,13 +82,6 @@ struct DevUI {
     bool button(char *label, bool repeat_when_held = false);
     
     // Utility functions
-    // @NOTE these are directly copied from renderer
-    void draw_quad(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 v3, 
-              Vec4 c0, Vec4 c1, Vec4 c2, Vec4 c3,
-              Vec2 st0 = Vec2(0, 0), Vec2 st1 = Vec2(0, 1), Vec2 st2 = Vec2(1, 0), Vec2 st3 = Vec2(1, 1),
-              RendererTexture tex = EMPTY_TEXTURE);
-    void draw_rect(Rect rect, Vec4 color = Vec4(1), RendererTexture tex = EMPTY_TEXTURE);    
-    void draw_text(Vec2 p, Vec4 c, char *text, Font *font, f32 scale = 1.0f);
     static DevUIID make_id(DevUIWindow *win, char *text, size_t count = 0);
     void element_size(Vec2 size, Vec2 *adjust_start_offset = 0);
     DevUIButtonState update_button(Rect rect, DevUIID id, bool repeat_when_held = false);

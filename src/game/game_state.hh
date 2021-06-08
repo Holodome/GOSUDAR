@@ -25,7 +25,6 @@ struct GameState {
     Mesh *cube = 0;
     Mesh *rect = 0;
     Mesh *map  = 0;
-    
 
     void init();
     void cleanup();

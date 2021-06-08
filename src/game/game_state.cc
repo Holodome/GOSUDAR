@@ -243,10 +243,10 @@ void GameState::update_input() {
             this->focus_devui = !this->focus_devui;
         }   
     }
-    game->dev_ui.allow_input = this->enable_devui;
     game->dev_ui.allow_drawing = this->enable_devui;
+    game->dev_ui.allow_input = this->focus_devui;
     
-    bool is_game_focused = !this->focus_devui;
+    bool is_game_focused = !this->focus_devui || !game->dev_ui.allow_drawing;
     if (is_game_focused) {
         update_camera();
     } else {

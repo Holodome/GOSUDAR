@@ -73,7 +73,7 @@ struct DevUI {
     
     void begin_frame();
     void end_frame();
-    
+    // Widget functions
     void window(char *title, Rect rect);
     void window_end();
     void text(char *text);
@@ -85,6 +85,8 @@ struct DevUI {
     static DevUIID make_id(DevUIWindow *win, char *text, size_t count = 0);
     void element_size(Vec2 size, Vec2 *adjust_start_offset = 0);
     DevUIButtonState update_button(Rect rect, DevUIID id, bool repeat_when_held = false);
+    void push_rect(Rect rect, Vec4 color, Texture *tex = 0, Rect uv_rect = Rect(0, 0, 1, 1));
+    void push_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale = DEVUI_TEXT_SCALE);
 };
 
 #define DEVUI_HH 1

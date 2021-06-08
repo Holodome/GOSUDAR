@@ -45,6 +45,16 @@ namespace Math {
     }
 
     template <typename T>
+    inline T min(T a, T b) {
+        return (a < b ? a : b);
+    }
+
+    template <typename T>
+    inline T max(T a, T b) {
+        return (a > b ? a : b);
+    }
+
+    template <typename T>
     inline T lerp(T a, T b, f32 t) {
         return a * (1.0f - t) + b * t;
     }
@@ -60,7 +70,7 @@ namespace Math {
         a = b;
         b = tmp;
     }
-
+    
     template <typename T>
     struct Vec2G {
         union {
@@ -574,6 +584,10 @@ namespace Math {
             return y + h;
         }
         
+        Vec2 size() const {
+            return Vec2(w, h);
+        }
+        
         Vec2 top_left() {
             return p;
         }
@@ -621,6 +635,27 @@ namespace Math {
         
         bool collide(Vec2 p) {
             return x < p.x && y < p.y && p.x < x + w && p.y < y + h;
+        }
+        
+        bool collide(Rect rect) {
+            bool result = true;
+            if ((x + w < rect.x || x > rect.x + rect.w) ||
+                (y + h < rect.y | y > rect.y + rect.h)) {
+                result = false;
+            }
+
+            return result;
+        }
+        
+        bool contains(Rect child) {
+            return collide(child.top_left()) && collide(child.top_right()) &&
+                   collide(child.bottom_left()) && collide(child.bottom_right());
+        }
+        
+        Rect clip(Rect child) {
+            Vec2 rmin = Vec2(Math::max(x, child.x), Math::max(y, child.y));
+            Vec2 rmax = Vec2(Math::min(x + w, child.x + child.w), Math::min(y + h, child.y + child.h));
+            return Rect::minmax(rmin, rmax);
         }
     };
 

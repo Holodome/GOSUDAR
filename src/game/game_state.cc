@@ -267,13 +267,11 @@ void GameState::render() {
     game->renderer.draw_mesh(map);
     game->renderer.immediate_flush();
     
-    game->renderer.set_renderering_2d(game->input.winsize);
-    game->renderer.set_model();
-    game->renderer.set_shader();
-    
-    game->dev_ui.window("Window", Rect(0, 0, 100, 100));
-    game->dev_ui.text("Hello");
-    game->dev_ui.text("Hello again");
+    game->dev_ui.window("Debug", Rect(0, 0, 100, 100));
+    game->dev_ui.textf("DevUI focused: %s", (game->dev_ui.allow_input ? "true" : "false"));
+    game->dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
+    game->dev_ui.textf("Camera pos: %.2f %.2f %.2f", camera.pos.x, camera.pos.y, camera.pos.z);
+    game->dev_ui.textf("Camera rot: %.2f %.2f %.2f", camera.rot.x, camera.rot.y, camera.rot.z);
     game->dev_ui.window_end();
 }
 

@@ -63,6 +63,8 @@ struct DevUIButtonState {
 const DevUIID EMPTY_ID { };
 
 struct DevUI {
+    Rect clip_rect_stack[5] = {};
+    u32 clip_rect_stack_index = 0;
     Array<DevUIDrawQueueEntry> draw_queue = {};
     Array<DevUIWindow> windows = {};
     DevUIWindow *cur_win = 0, *hot_win = 0;
@@ -82,6 +84,8 @@ struct DevUI {
     bool button(char *label, bool repeat_when_held = false);
     
     // Utility functions
+    void push_clip_rect(const Rect &rect);
+    void pop_clip_rect();
     static DevUIID make_id(DevUIWindow *win, char *text, size_t count = 0);
     void element_size(Vec2 size, Vec2 *adjust_start_offset = 0);
     DevUIButtonState update_button(Rect rect, DevUIID id, bool repeat_when_held = false);

@@ -6,6 +6,26 @@
 #define CHECK_IS_ENABLED(...) if (!this->allow_drawing) { return __VA_ARGS__; }
 #define HAS_INPUT (this->allow_input && this->allow_drawing)
 
+static inline Vec4 swtich_bstate(const DevUIButtonState &bstate, Vec4 held, Vec4 hot, Vec4 idle) {
+    return (bstate.is_held ? held : bstate.is_hot ? hot : idle);
+}
+
+void DevUI::push_clip_rect(const Rect &rect) {
+    assert(clip_rect_stack_index + 1 < ARRAY_SIZE(clip_rect_stack));
+    Rect modified_rect = rect;
+    modified_rect.x -= 0.001f;
+    modified_rect.x -= 0.001f;
+    modified_rect.w += 0.001f;
+    modified_rect.h += 0.001f;
+    ++clip_rect_stack_index;
+    clip_rect_stack[clip_rect_stack_index] = modified_rect;
+}
+
+void DevUI::pop_clip_rect() {
+    assert(clip_rect_stack_index);
+    --clip_rect_stack_index;
+}
+
 DevUIID DevUI::make_id(DevUIWindow *win, char *text, size_t count) {
     DevUIID result = {};
     if (!count) {
@@ -25,17 +45,30 @@ DevUIID DevUI::make_id(DevUIWindow *win, char *text, size_t count) {
 }
 
 void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
+    // Transform coordinates and uv accoring to clipping
+    Rect clip_rect = clip_rect_stack[clip_rect_stack_index];
+    if (!clip_rect.collide(rect)) {
+        return;
+    }
+    Rect clipped = clip_rect.clip(rect);
+    Rect new_uv = {};
+    new_uv.x = uv_rect.x + (clipped.x - rect.x) / rect.w;
+    new_uv.y = uv_rect.y + (clipped.y - rect.y) / rect.h;
+    new_uv.w = uv_rect.right() + (clipped.right() - rect.right()) / rect.w * uv_rect.w - new_uv.x;
+    new_uv.h = uv_rect.bottom() + (clipped.bottom() - rect.bottom()) / rect.h * uv_rect.h - new_uv.y;
+    uv_rect = new_uv;
+    
     DevUIDrawQueueEntry entry = {};
-    entry.v[0].p = Vec3(rect.top_left());
+    entry.v[0].p = Vec3(clipped.top_left());
     entry.v[0].uv = uv_rect.top_left();
     entry.v[0].c = color;
-    entry.v[1].p = Vec3(rect.top_right());
+    entry.v[1].p = Vec3(clipped.top_right());
     entry.v[1].uv = uv_rect.top_right();
     entry.v[1].c = color;
-    entry.v[2].p = Vec3(rect.bottom_left());
+    entry.v[2].p = Vec3(clipped.bottom_left());
     entry.v[2].uv = uv_rect.bottom_left();
     entry.v[2].c = color;
-    entry.v[3].p = Vec3(rect.bottom_right());
+    entry.v[3].p = Vec3(clipped.bottom_right());
     entry.v[3].uv = uv_rect.bottom_right();
     entry.v[3].c = color;
     entry.tex = tex;
@@ -161,16 +194,13 @@ bool DevUI::button(char *label, bool repeat_when_held) {
     CHECK_CUR_WIN_IS_PRESENT;
     
     DevUIWindow *win = cur_win;
-    CHECK_CUR_WIN_IS_PRESENT;
     Vec2 text_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
     Vec2 size = text_size;
     DevUIID id = make_id(win, label);
     Rect button_rect = Rect(win->cursor, size + DEVUI_FRAME_PADDING * 2.0f);
     element_size(button_rect.s, 0);
     DevUIButtonState bstate = update_button(button_rect, id, repeat_when_held);
-    Vec4 color = (bstate.is_held ? DEVUI_COLOR_BUTTON_ACTIVE :
-        bstate.is_hot ? DEVUI_COLOR_BUTTON_HOT :
-        DEVUI_COLOR_BUTTON);
+    Vec4 color = swtich_bstate(bstate, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON);
     push_rect(button_rect, color);
     push_text(button_rect.p + DEVUI_FRAME_PADDING, DEVUI_COLOR_TEXT, label, font, DEVUI_TEXT_SCALE);
     return bstate.is_pressed;
@@ -254,9 +284,7 @@ void DevUI::window(char *title, Rect rect) {
     DevUIID resize_id = make_id(win, "$RESIZE$");
     Rect resize_rect = Rect(win->whole_rect.bottom_right() - DEVUI_RESIZE_SIZE, DEVUI_RESIZE_SIZE);
     DevUIButtonState bstate = update_button(resize_rect, resize_id, true);
-    Vec4 resize_color = (bstate.is_held ? DEVUI_COLOR_BUTTON_ACTIVE :
-        bstate.is_hot  ? DEVUI_COLOR_BUTTON_HOT :
-        DEVUI_COLOR_BUTTON);
+    Vec4 resize_color = swtich_bstate(bstate, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON); 
     if (bstate.is_held) {
         Vec2 size_change = Vec2(fmaxf(win->whole_rect.w + game->input.mdelta.x, DEVUI_MIN_WINDOW_SIZE.x), 
                                 fmaxf(win->whole_rect.h + game->input.mdelta.y, DEVUI_MIN_WINDOW_SIZE.y))
@@ -268,12 +296,18 @@ void DevUI::window(char *title, Rect rect) {
     win->title_bar_rect = Rect(win->whole_rect.p, Vec2(win->whole_rect.w, DEVUI_WINDOW_TITLE_BAR_HEIGHT));
     win->rect = Rect(win->whole_rect.x, win->whole_rect.y + DEVUI_WINDOW_TITLE_BAR_HEIGHT, 
                      win->whole_rect.w, win->whole_rect.h - DEVUI_WINDOW_TITLE_BAR_HEIGHT);
-                     
+    
+    assert(!clip_rect_stack_index);
+    push_clip_rect(win->whole_rect);
+    
     push_rect(win->rect, DEVUI_COLOR_WINDOW_BACKGROUND);
     push_rect(win->title_bar_rect, DEVUI_COLOR_WINDOW_TITLEBAR);
     push_text(win->title_bar_rect.p + Vec2(2, 0), DEVUI_COLOR_TEXT, win->title, font, DEVUI_TEXT_SCALE);
+    push_rect(resize_rect, resize_color);
     
     win->cursor = win->rect.p + DEVUI_WINDOW_PADDING;
+    Rect widget_zone = Rect(win->cursor, win->rect.size() - DEVUI_WINDOW_PADDING * 2);
+    push_clip_rect(widget_zone);
 }
 
 void DevUI::window_end() {
@@ -284,4 +318,7 @@ void DevUI::window_end() {
         active_id = make_id(cur_win, "$MOVE$");
     }
     cur_win = 0;
+    
+    pop_clip_rect(); // widget zone
+    pop_clip_rect(); // window
 }

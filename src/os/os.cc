@@ -328,3 +328,34 @@ void OS::update_input(Input *input) {
 void OS::update_window() {
     internal->wglSwapLayerBuffers(internal->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
 }
+
+void OS::go_fullscreen(bool fullscreen) {
+    static WINDOWPLACEMENT LastWindowPlacement = {sizeof(WINDOWPLACEMENT)};
+
+    DWORD WindowStyle = GetWindowLong(this->internal->hwnd, GWL_STYLE);
+    // Set fullscreen (actually this is windowed fullscreen!)
+    if (fullscreen)
+    {
+        MONITORINFO MonitorInfo = {sizeof(MONITORINFO)};
+        if (GetWindowPlacement(this->internal->hwnd, &LastWindowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(this->internal->hwnd, MONITOR_DEFAULTTOPRIMARY),
+                           &MonitorInfo))
+        {
+            SetWindowLong(this->internal->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
+
+            SetWindowPos(this->internal->hwnd, HWND_TOP,
+                         MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.top,
+                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    }
+    else
+    {
+        SetWindowLong(this->internal->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(this->internal->hwnd, &LastWindowPlacement);
+        SetWindowPos(this->internal->hwnd, 0, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}

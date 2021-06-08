@@ -3,8 +3,8 @@
 #include "game/game.hh"
 
 #define CHECK_CUR_WIN_IS_PRESENT if (!cur_win) { logprintln("Devui", "Current window is not present at devui widget function call"); assert(false); }
-#define CHECK_IS_ENABLED(...) if (!this->allow_drawing) { return __VA_ARGS__; }
-#define HAS_INPUT (this->allow_input && this->allow_drawing)
+#define CHECK_IS_ENABLED(...) if (!this->is_enabled) { return __VA_ARGS__; }
+#define HAS_INPUT (this->is_enabled && this->is_focused)
 
 static inline Vec4 swtich_bstate(const DevUIButtonState &bstate, Vec4 held, Vec4 hot, Vec4 idle) {
     return (bstate.is_held ? held : bstate.is_hot ? hot : idle);
@@ -141,7 +141,7 @@ void DevUI::begin_frame() {
 }
 
 void DevUI::end_frame() {
-    if (!allow_drawing) {
+    if (!this->is_enabled) {
         assert(draw_queue.len == 0);
     } else {
         game->renderer.set_renderering_2d(game->input.winsize);
@@ -202,7 +202,8 @@ bool DevUI::button(char *label, bool repeat_when_held) {
     DevUIButtonState bstate = update_button(button_rect, id, repeat_when_held);
     Vec4 color = swtich_bstate(bstate, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON);
     push_rect(button_rect, color);
-    push_text(button_rect.p + DEVUI_FRAME_PADDING, DEVUI_COLOR_TEXT, label, font, DEVUI_TEXT_SCALE);
+    // Почему не нужно добавлять y...
+    push_text(button_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, label, font, DEVUI_TEXT_SCALE);
     return bstate.is_pressed;
 }
 
@@ -288,7 +289,7 @@ void DevUI::window(char *title, Rect rect) {
     if (bstate.is_held) {
         Vec2 size_change = Vec2(fmaxf(win->whole_rect.w + game->input.mdelta.x, DEVUI_MIN_WINDOW_SIZE.x), 
                                 fmaxf(win->whole_rect.h + game->input.mdelta.y, DEVUI_MIN_WINDOW_SIZE.y))
-             - win->whole_rect.s;
+            - win->whole_rect.s;
         resize_rect.p += size_change;
         win->whole_rect.s += size_change;
     }

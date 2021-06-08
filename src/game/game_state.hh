@@ -15,11 +15,16 @@ struct Camera {
     Mat4x4 projection = Mat4x4::identity();
 };  
 
+struct Settings {
+    bool fullscreen = false;
+    bool enable_devui = false; // Press f3 to enable, f8 to focus mouse 
+    bool focus_devui = true;
+};  
+
 struct GameState {
     GameStateKind state_kind;
-    bool enable_devui = false; // Press f3 to enable, f8 to focus mouse 
-    bool focus_devui = false;
     
+    Settings settings;
     Camera camera;
 
     Mesh *cube = 0;

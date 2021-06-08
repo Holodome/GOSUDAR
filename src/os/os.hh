@@ -127,6 +127,8 @@ struct OS {
     void prepare_to_start();
     void update_input(Input *input);
     void update_window();
+    
+    void go_fullscreen(bool fullscreen);
 };
 
 #define OS_H 1

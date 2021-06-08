@@ -4,7 +4,6 @@
 
 #include "renderer/renderer.hh"
 
-const f32 DEVUI_MEMORY_ARENA_SIZE =         MEGABYTES(16);
 const u32 DEVUI_MAX_TITLE_SIZE =            32;
 const f32 DEVUI_KEY_REPEAT_DELAY =          0.25;
 const f32 DEVUI_KEY_REPEAT_RATE =           0.20;
@@ -15,7 +14,7 @@ const Vec2 DEVUI_MIN_WINDOW_SIZE =          Vec2(100.0, 40.0);
 const Vec2 DEVUI_ITEM_SPACING =             Vec2(10.0 ,  5.0);
 const Vec2 DEVUI_FRAME_PADDING =            Vec2(5.0  ,  4.0);
 const Vec2 DEVUI_WINDOW_PADDING =           Vec2(8.0  ,  8.0);
-const Vec2 DEVUI_RESIZE_SIZE =              Vec2(16.0f, 16.0f);
+const Vec2 DEVUI_RESIZE_SIZE =              Vec2(8.0f, 8.0f);
 const Vec4 DEVUI_COLOR_TEXT =               Vec4(0.860, 0.930, 0.890, 0.780);
 const Vec4 DEVUI_COLOR_WINDOW_BACKGROUND =  Vec4(0.130, 0.140, 0.170, 1.000);
 const Vec4 DEVUI_COLOR_WINDOW_TITLEBAR =    Vec4(0.230, 0.200, 0.270, 1.000);
@@ -28,6 +27,9 @@ const Vec4 DEVUI_COLOR_HEADER =             Vec4(0.460, 0.200, 0.300, 0.760);
 const Vec4 DEVUI_COLOR_HEADER_HOT =         Vec4(0.500, 0.080, 0.260, 1.000);
 const Vec4 DEVUI_COLOR_HEADER_ACTIVE =      Vec4(0.460, 0.200, 0.300, 0.860);
 
+// DevUI имеет свою очередь отрисовки, чтобы вызовы функций интерйефса не мешали последовтельности отрисовки 
+// игры и изображения не накладывались друг на друга. 
+// На данный момент все элементы, которые рисует DevUI, могут быть представлены в виде четырехугольников
 struct DevUIDrawQueueEntry {
     Vertex v[4];
     Texture *tex;
@@ -52,6 +54,7 @@ struct DevUIWindow {
     Rect whole_rect, rect, title_bar_rect;
     Vec2 cursor, last_line_cursor;
     f32 line_height, last_line_height;
+    Array<DevUIDrawQueueEntry> draw_queue = {};
 };
 
 struct DevUIButtonState {
@@ -63,15 +66,19 @@ struct DevUIButtonState {
 const DevUIID EMPTY_ID { };
 
 struct DevUI {
+    // Стек прямоугольников, ограничивающих область отрисовки
+    // Например, если часть текста выходит за окна, ограничивающие прямогуольники обрежут ненужный текст
     Rect clip_rect_stack[5] = {};
     u32 clip_rect_stack_index = 0;
+    // @TODO: проверить на эффективность памяти
     Array<DevUIDrawQueueEntry> draw_queue = {};
     Array<DevUIWindow> windows = {};
+    Array<u32> windows_order = {};
     DevUIWindow *cur_win = 0, *hot_win = 0;
     DevUIID hot_id = EMPTY_ID, active_id = EMPTY_ID;
-    Font *font;
+    Font *font = 0;
     
-    bool allow_input = false, allow_drawing = false;
+    bool is_enabled = false, is_focused = false;
     
     void begin_frame();
     void end_frame();

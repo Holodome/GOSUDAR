@@ -222,6 +222,10 @@ void OS::update_input(Input *input) {
                 i16 wheel_delta = HIWORD(msg.wParam);
                 input->mwheel += (f32)wheel_delta / WHEEL_DELTA;
             } break;
+            case WM_CHAR: {
+                u32 input_char = msg.wParam;
+                input->utf32 = input_char;
+            } break;
             case WM_KEYDOWN:
             case WM_KEYUP:
             case WM_SYSKEYDOWN:
@@ -297,6 +301,8 @@ void OS::update_input(Input *input) {
                 if ((u32)key) {
                     input->keys[(u32)key].update(is_down);
                 }
+                
+                TranslateMessage(&msg);
             } break;
         }
     }

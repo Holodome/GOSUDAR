@@ -57,6 +57,7 @@ struct Input {
     f32 lmc_click_time = 0;
     bool lmc_doubleclick = false;
     f32 keys_down_time[(u32)Key::Count] = {};
+    u32 utf32 = 0;
     
     bool is_key_pressed(Key key) {
         KeyState *k = keys + (uintptr_t)key;

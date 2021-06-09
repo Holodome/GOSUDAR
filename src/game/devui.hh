@@ -4,12 +4,14 @@
 
 #include "renderer/renderer.hh"
 
+const f32 DEVUI_EPSILON = 0.001f;
 const u32 DEVUI_MAX_TITLE_SIZE =            32;
 const f32 DEVUI_KEY_REPEAT_DELAY =          0.25;
 const f32 DEVUI_KEY_REPEAT_RATE =           0.20;
 const f32 DEVUI_MOUSE_DOUBLE_CLICK_TIME =   0.30;
 const f32 DEVUI_WINDOW_TITLE_BAR_HEIGHT =   20.0;
 const f32 DEVUI_TEXT_SCALE =                0.5f;
+const Vec2 DEVUI_COLLAPSE_RECT_SIZE =       Vec2(10, 10);
 const Vec2 DEVUI_MIN_WINDOW_SIZE =          Vec2(100.0, 40.0);
 const Vec2 DEVUI_ITEM_SPACING =             Vec2(10.0 ,  5.0);
 const Vec2 DEVUI_FRAME_PADDING =            Vec2(5.0  ,  4.0);
@@ -56,6 +58,7 @@ struct DevUIWindow {
     DevUIID id = DevUIID::empty();
     size_t array_idx = -1;
     
+    bool is_collapsed = false;
     Rect whole_rect = {}, rect = {}, title_bar_rect = {};
     Vec2 cursor = {}, last_line_cursor = {};
     f32 line_height = 0, last_line_height = 0;
@@ -76,6 +79,7 @@ struct DevUI {
     // @TODO: проверить на эффективность памяти
     // Array<DevUIDrawQueueEntry> draw_queue = {};
     Array<DevUIWindow> windows = {};
+    // Очередь, в которой окна рисуются на экран. Последний id в списке - верхнее окно
     Array<u32> windows_order = {};
     DevUIWindow *cur_win = 0, *hot_win = 0;
     DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();

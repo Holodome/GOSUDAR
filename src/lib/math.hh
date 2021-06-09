@@ -4,6 +4,13 @@
 
 #include "math.h"
 
+#ifdef max
+#undef max
+#endif 
+#ifdef min
+#undef min
+#endif 
+
 namespace Math {
     const f32 HALF_PI = 1.57079632679f;
     const f32 PI = 3.14159265359f;

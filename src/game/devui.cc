@@ -263,7 +263,7 @@ bool DevUI::checkbox(const char *label, bool *value) {
     return value_changed;
 }
 
-bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size) {
+bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size, u32 flags) {
     assert(buffer && buffer_size);
     assert(buffer_size < sizeof(DevUITextEditState::text));
     WIDGET_DEF_HEADER(false);
@@ -316,7 +316,6 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size) {
         } else if (is_text_input_key_pressed(Key::Delete)) {
             size_t length = strlen(te->text);
             if (te->cursor < length) {
-                printf("delete\n");
                 memmove(te->text + te->cursor, te->text + te->cursor + 1, length - te->cursor);
                 te->text[length] = 0;
             }
@@ -335,25 +334,31 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size) {
                 ++te->cursor;
             }
         } else if (game->input.utf32) {
-            char *buffer_end = te->text + te->max_length;
-            size_t current_length = strlen(te->text);
-            if (buffer_end - (te->text + current_length + 1) >= 1) {
-                memmove(te->text + te->cursor + 1, te->text + te->cursor, current_length - te->cursor);
-                te->text[te->cursor] = game->input.utf32;
-                ++te->cursor;
+            bool is_valid = true;
+            if (flags & DEVUI_INPUT_FLAG_DECIMAL) {
+                u32 c = game->input.utf32;
+                is_valid = (isdigit(c) || c == '.' || c == '-' || c == '+');
+            }
+            
+            if (is_valid) {
+                char *buffer_end = te->text + te->max_length;
+                size_t current_length = strlen(te->text);
+                if (buffer_end - (te->text + current_length + 1) >= 1) {
+                    memmove(te->text + te->cursor + 1, te->text + te->cursor, current_length - te->cursor);
+                    te->text[te->cursor] = game->input.utf32;
+                    ++te->cursor;
+                }
             }
         }
-        
-    }
-    
-    if (this->active_id != id) {
-        // memcpy(buffer, te->initial_text, te->max_length);
-        memcpy(te->text, te->initial_text, te->max_length);
-        // is_value_changed = true;
-    } else if (is_enter_pressed) {
-        memcpy(buffer, te->text, te->max_length);
-        is_value_changed = true;
-        this->active_id = DevUIID::empty();
+        if (this->active_id != id) {
+            // memcpy(buffer, te->initial_text, te->max_length);
+            memcpy(te->text, te->initial_text, te->max_length);
+            // is_value_changed = true;
+        } else if (is_enter_pressed) {
+            memcpy(buffer, te->text, te->max_length);
+            is_value_changed = true;
+            this->active_id = DevUIID::empty();
+        }
     }
     
     this->push_rect(frame_rect, DEVUI_COLOR_BUTTON);
@@ -375,6 +380,29 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size) {
     this->pop_clip_rect();
     this->push_text(label_pos, label);
     return is_value_changed;
+}
+
+
+bool DevUI::input_float(const char *label, f32 *value) {
+    WIDGET_DEF_HEADER(false);
+    
+    bool is_value_changed = false;
+    char buffer[64];
+    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    if (input_text(label, buffer, sizeof(buffer), DEVUI_INPUT_FLAG_DECIMAL)) {
+        *value = atof(buffer);
+        is_value_changed = true;
+    }
+    
+    return is_value_changed;
+}
+
+void DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
+    
+}
+
+void DevUI::drag_float(const char *label, f32 *value, f32 speed) {
+    
 }
 
 DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_held) {

@@ -228,10 +228,6 @@ void GameState::update_camera() {
         y_speed = move_coef;
     }
     camera.pos.y += y_speed;
-    
-    camera.projection = Mat4x4::perspective(Math::rad(60), game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
-    camera.view = Mat4x4::identity() * Mat4x4::rotation(camera.rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(camera.rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-camera.pos);
-
 }
 
 void GameState::update_input() {
@@ -255,6 +251,9 @@ void GameState::update_input() {
 }
 
 void GameState::render() {
+    camera.projection = Mat4x4::perspective(Math::rad(60), game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
+    camera.view = Mat4x4::identity() * Mat4x4::rotation(camera.rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(camera.rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-camera.pos);
+    
     game->renderer.set_renderering_3d(camera.projection, camera.view);
     game->renderer.immediate_begin();
     game->renderer.set_shader();
@@ -279,7 +278,10 @@ void GameState::render() {
     if (game->dev_ui.input_text("Text input", buffer, sizeof(buffer))) {
         printf("Changed: %s\n", buffer);
     }
-    game->dev_ui.button("Hello");
+    game->dev_ui.input_float("Camera x", &camera.pos.y);
+    if (game->dev_ui.button("Close game")) {
+        game->is_running = false;
+    }
     game->dev_ui.window_end();
 }
 

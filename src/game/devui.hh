@@ -30,6 +30,8 @@ const Vec4 DEVUI_COLOR_HEADER =             Vec4(0.460, 0.200, 0.300, 0.760);
 const Vec4 DEVUI_COLOR_HEADER_HOT =         Vec4(0.500, 0.080, 0.260, 1.000);
 const Vec4 DEVUI_COLOR_HEADER_ACTIVE =      Vec4(0.460, 0.200, 0.300, 0.860);
 
+const u32 DEVUI_INPUT_FLAG_DECIMAL = 0x1;
+
 // DevUI имеет свою очередь отрисовки, чтобы вызовы функций интерйефса не мешали последовтельности отрисовки 
 // игры и изображения не накладывались друг на друга. 
 // На данный момент все элементы, которые рисует DevUI, могут быть представлены в виде четырехугольников
@@ -47,6 +49,9 @@ struct DevUIID {
     
     bool operator==(DevUIID other) {
         return p == other.p && s == other.s;
+    }
+    bool operator!=(DevUIID other) {
+        return !(*this == other);
     }
     
     static DevUIID empty() {
@@ -109,7 +114,10 @@ struct DevUI {
     void textf(const char *text, ...);
     bool button(const char *label, bool repeat_when_held = false);
     bool checkbox(const char *label, bool *value);
-    bool input_text(const char *label, void *buffer, size_t buffer_size);
+    bool input_text(const char *label, void *buffer, size_t buffer_size, u32 flags = 0);
+    bool input_float(const char *label, f32 *value);
+    void slider_float(const char *label, f32 *value, f32 minv = 0.0f, f32 maxv = 1.0f);
+    void drag_float(const char *label, f32 *value, f32 speed = 1.0f);
     
     // Utility functions
     void push_clip_rect(const Rect &rect);

@@ -576,6 +576,9 @@ namespace Math {
         static Rect minmax(Vec2 min, Vec2 max) {
             return Rect(min, max - min);
         }
+        static Rect empty() {
+            return Rect(0, 0, 0, 0);
+        }
         
         f32 right() {
             return x + w;

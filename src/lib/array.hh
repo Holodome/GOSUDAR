@@ -90,6 +90,32 @@ struct Array {
         return len++;
     }
     
+    // Возвращает длину списка, если не объект не найден
+    size_t find_idx(const T &obj) {
+        size_t result = 0;
+        while (result < len) {
+            if (data[result] == obj) {
+                break;
+            }
+            ++result;
+        }
+        return result;
+    }
+    
+    // Убирает объект и передвигает все правей него на 1 индекс влево
+    void remove_idx(size_t idx) {
+        assert(data);
+        assert(idx < len);
+        memmove(data + idx, data + idx + 1, sizeof(T) * (len - idx - 1));
+        --len;
+    }
+    
+    void remove(const T &obj) {
+        size_t idx = find_idx(obj);
+        assert(idx != len);
+        remove_idx(idx);
+    }
+    
     const T &operator[](size_t idx) const {
         assert(idx < len);
         return data[idx];

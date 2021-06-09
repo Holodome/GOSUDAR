@@ -45,15 +45,20 @@ struct DevUIID {
     bool operator==(DevUIID other) {
         return p == other.p && s == other.s;
     }
+    
+    static DevUIID empty() {
+        return {};
+    }
 };
 
 struct DevUIWindow {
-    char title[DEVUI_MAX_TITLE_SIZE];
-    DevUIID id;
+    char title[DEVUI_MAX_TITLE_SIZE] = {};
+    DevUIID id = DevUIID::empty();
+    size_t array_idx = -1;
     
-    Rect whole_rect, rect, title_bar_rect;
-    Vec2 cursor, last_line_cursor;
-    f32 line_height, last_line_height;
+    Rect whole_rect = {}, rect = {}, title_bar_rect = {};
+    Vec2 cursor = {}, last_line_cursor = {};
+    f32 line_height = 0, last_line_height = 0;
     Array<DevUIDrawQueueEntry> draw_queue = {};
 };
 
@@ -63,19 +68,17 @@ struct DevUIButtonState {
     bool is_hot;  
 };
 
-const DevUIID EMPTY_ID { };
-
 struct DevUI {
     // Стек прямоугольников, ограничивающих область отрисовки
     // Например, если часть текста выходит за окна, ограничивающие прямогуольники обрежут ненужный текст
     Rect clip_rect_stack[5] = {};
     u32 clip_rect_stack_index = 0;
     // @TODO: проверить на эффективность памяти
-    Array<DevUIDrawQueueEntry> draw_queue = {};
+    // Array<DevUIDrawQueueEntry> draw_queue = {};
     Array<DevUIWindow> windows = {};
     Array<u32> windows_order = {};
     DevUIWindow *cur_win = 0, *hot_win = 0;
-    DevUIID hot_id = EMPTY_ID, active_id = EMPTY_ID;
+    DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();
     Font *font = 0;
     
     bool is_enabled = false, is_focused = false;

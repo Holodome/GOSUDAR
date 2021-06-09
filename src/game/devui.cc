@@ -45,6 +45,7 @@ DevUIID DevUI::make_id(DevUIWindow *win, char *text, size_t count) {
 }
 
 void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
+    CHECK_CUR_WIN_IS_PRESENT;
     // Transform coordinates and uv accoring to clipping
     Rect clip_rect = clip_rect_stack[clip_rect_stack_index];
     if (!clip_rect.collide(rect)) {
@@ -72,7 +73,7 @@ void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
     entry.v[3].uv = uv_rect.bottom_right();
     entry.v[3].c = color;
     entry.tex = tex;
-    draw_queue.add(entry);
+    this->cur_win->draw_queue.add(entry);
 }
 
 void DevUI::push_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
@@ -125,16 +126,21 @@ void DevUI::element_size(Vec2 size, Vec2 *adjust_start_offset) {
 }
 
 void DevUI::begin_frame() {
-    draw_queue.clear();
-    
-    hot_id = EMPTY_ID;
+    hot_id = DevUIID::empty();
     hot_win = 0;
     
     if (HAS_INPUT) {
-        for (u32 i = 0; i < windows.len; ++i) {
-            DevUIWindow *window = &windows[i];
+        for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
+            DevUIWindow *window = &windows[windows_order[window_id_idx]];
             if (window->whole_rect.collide(game->input.mpos)) {
                 hot_win = window;
+            }
+        }
+ 
+        if (hot_win) {
+            if (game->input.is_key_pressed(Key::MouseLeft)) {
+                windows_order.remove(hot_win->array_idx);
+                windows_order.add(hot_win->array_idx);
             }
         }
     }
@@ -142,21 +148,26 @@ void DevUI::begin_frame() {
 
 void DevUI::end_frame() {
     if (!this->is_enabled) {
-        assert(draw_queue.len == 0);
+        // assert(draw_queue.len == 0);
     } else {
-        game->renderer.set_renderering_2d(game->input.winsize);
-        game->renderer.set_shader(game->renderer.standard_shader);
-        for (u32 i = 0; i < draw_queue.len; ++i) {
-            DevUIDrawQueueEntry *entry = &draw_queue[i];
-            game->renderer.immediate_begin();
-            game->renderer.set_texture(entry->tex);
-            game->renderer.immediate_vertex(entry->v[3]);
-            game->renderer.immediate_vertex(entry->v[1]);
-            game->renderer.immediate_vertex(entry->v[0]);
-            game->renderer.immediate_vertex(entry->v[0]);
-            game->renderer.immediate_vertex(entry->v[2]);
-            game->renderer.immediate_vertex(entry->v[3]);
-            game->renderer.immediate_flush();
+        // for (i64 window_id_idx = windows_order.len - 1; window_id_idx >= 0; --window_id_idx) {
+        for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
+            DevUIWindow &window = windows[windows_order[window_id_idx]];
+            game->renderer.set_renderering_2d(game->input.winsize);
+            game->renderer.set_shader(game->renderer.standard_shader);
+            for (u32 i = 0; i < window.draw_queue.len; ++i) {
+                DevUIDrawQueueEntry *entry = &window.draw_queue[i];
+                game->renderer.immediate_begin();
+                game->renderer.set_texture(entry->tex);
+                game->renderer.immediate_vertex(entry->v[3]);
+                game->renderer.immediate_vertex(entry->v[1]);
+                game->renderer.immediate_vertex(entry->v[0]);
+                game->renderer.immediate_vertex(entry->v[0]);
+                game->renderer.immediate_vertex(entry->v[2]);
+                game->renderer.immediate_vertex(entry->v[3]);
+                game->renderer.immediate_flush();
+            }
+            window.draw_queue.clear();
         }
     }
 }
@@ -233,7 +244,7 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
             if (is_hot) {
                 is_pressed = true;
             }
-            active_id = EMPTY_ID;
+            active_id = DevUIID::empty();
         }
     }
     
@@ -252,33 +263,33 @@ void DevUI::window(char *title, Rect rect) {
     assert(title_len < sizeof(DevUIWindow::title));
     
     DevUIWindow *win = 0;
-    bool used_new_slot = true;
+    bool use_new_slot = true;
     for (u32 i = 0; i < windows.len; ++i) {
         DevUIWindow *test_win = &windows[i];
         if (!Str::cmp(title, test_win->title)) {
             win = test_win;
-            used_new_slot = false;
+            use_new_slot = false;
         }
     }
     
-    if (!win) {
-        windows.add({});
-        win = &windows[windows.len - 1];
-    }
-    
-    cur_win = win;
-    if (used_new_slot) {
+    if (use_new_slot) {
+        assert(!win);
+        win = &windows[windows.add(DevUIWindow())];
+        win->id = make_id(0, title, title_len);
+        win->array_idx = windows.len - 1;
         memcpy(win->title, title, title_len);
         win->whole_rect = rect;
-        win->id = make_id(0, title, title_len);
+        
+        windows_order.add(win->array_idx);
     }
+    this->cur_win = win;
     
     DevUIID move_id = make_id(win, "$MOVE$");
-    if (active_id == move_id) {
+    if (this->active_id == move_id) {
         if (game->input.is_key_held(Key::MouseLeft) && HAS_INPUT) {
             win->whole_rect = Rect::move(win->whole_rect, game->input.mdelta);
         } else {
-            active_id = EMPTY_ID;
+            this->active_id = DevUIID::empty();
         }
     }
     

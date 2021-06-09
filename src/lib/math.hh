@@ -598,16 +598,28 @@ namespace Math {
             return Vec2(w, h);
         }
         
-        Vec2 top_left() {
+        Vec2 middle() const {
+            return p + s * 0.5f;
+        }
+        
+        f32 middle_x() const {
+            return x + w * 0.5f;
+        }
+        
+        f32 middle_y() const {
+            return y + h * 0.5f;
+        }
+        
+        Vec2 top_left() const {
             return p;
         }
-        Vec2 bottom_left() {
+        Vec2 bottom_left() const {
             return p + Vec2(0, h);
         }
-        Vec2 top_right() {
+        Vec2 top_right() const {
             return p + Vec2(w, 0);
         }
-        Vec2 bottom_right() {
+        Vec2 bottom_right() const {
             return p + s;
         }
         

@@ -12,6 +12,7 @@ const f32 DEVUI_MOUSE_DOUBLE_CLICK_TIME =   0.30;
 const f32 DEVUI_WINDOW_TITLE_BAR_HEIGHT =   20.0;
 const f32 DEVUI_TEXT_SCALE =                0.5f;
 const f32 DEVUI_TEXT_CURSOR_WIDTH =         2.0f;
+const f32 DEVUI_SLIDER_GRAB_WIDTH =         10.0f;
 const Vec2 DEVUI_CHECKMARK_OFFSET =         Vec2(4, 4);
 const Vec2 DEVUI_COLLAPSE_RECT_SIZE =       Vec2(10, 10);
 const Vec2 DEVUI_MIN_WINDOW_SIZE =          Vec2(100.0, 40.0);
@@ -116,8 +117,8 @@ struct DevUI {
     bool checkbox(const char *label, bool *value);
     bool input_text(const char *label, void *buffer, size_t buffer_size, u32 flags = 0);
     bool input_float(const char *label, f32 *value);
-    void slider_float(const char *label, f32 *value, f32 minv = 0.0f, f32 maxv = 1.0f);
-    void drag_float(const char *label, f32 *value, f32 speed = 1.0f);
+    bool slider_float(const char *label, f32 *value, f32 minv = 0.0f, f32 maxv = 1.0f);
+    bool drag_float(const char *label, f32 *value, f32 speed = 0.2f);
     
     // Utility functions
     void push_clip_rect(const Rect &rect);

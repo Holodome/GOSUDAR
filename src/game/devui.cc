@@ -15,11 +15,15 @@ static inline Vec4 color_from_bstate(const DevUIButtonState &bstate, Vec4 held, 
 void DevUI::push_clip_rect(const Rect &rect) {
     assert(clip_rect_stack_index + 1 < ARRAY_SIZE(clip_rect_stack));
     Rect modified_rect = rect;
+    if (clip_rect_stack_index) {
+        modified_rect = clip_rect_stack[clip_rect_stack_index].clip(rect);
+    }
     modified_rect.x -= DEVUI_EPSILON;
     modified_rect.y -= DEVUI_EPSILON;
     modified_rect.w += DEVUI_EPSILON * 2;
     modified_rect.h += DEVUI_EPSILON * 2;
     ++clip_rect_stack_index;
+    
     clip_rect_stack[clip_rect_stack_index] = modified_rect;
 }
 
@@ -361,7 +365,7 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size, u32 
         }
     }
     
-    this->push_rect(frame_rect, DEVUI_COLOR_BUTTON);
+    this->push_rect(frame_rect, DEVUI_COLOR_WIDGET_BACKGROUND);
     if (active_id == id) {
         Vec2 pre_cursor_text_size = font->get_text_size(te->text, te->cursor, DEVUI_TEXT_SCALE);
         if (!te->cursor) {
@@ -397,12 +401,102 @@ bool DevUI::input_float(const char *label, f32 *value) {
     return is_value_changed;
 }
 
-void DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
+bool DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
+    WIDGET_DEF_HEADER(false);
+    DevUIWindow *win = cur_win;
+    DevUIID id = this->make_id(win, label);
+    Vec2 label_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
+    Rect frame_rect = Rect(win->cursor, Vec2(win->rect.w * 0.65f, label_size.y) + DEVUI_FRAME_PADDING * 2);
+    Rect slider_zone_rect = Rect(frame_rect.p + DEVUI_FRAME_PADDING, frame_rect.size() - DEVUI_FRAME_PADDING * 2);
     
+    f32 slider_workzone_width = slider_zone_rect.w - DEVUI_SLIDER_GRAB_WIDTH;
+    f32 slider_workzone_min_x = slider_zone_rect.x + DEVUI_SLIDER_GRAB_WIDTH * 0.5f;
+    f32 slider_workzone_max_x = slider_workzone_min_x + slider_workzone_width;
+    f32 slider_zero_pos = (minv < 0.0f ? 1.0f : 0.0f);
+    DevUIButtonState slider_state = this->update_button(slider_zone_rect, id, true);
+    element_size(frame_rect.size());
+    same_line();
+    Vec2 label_pos = win->cursor;
+    element_size(label_size);
+    
+    bool is_value_changed = false;
+    if (slider_state.is_held) {
+        f32 slider_pos = Math::clamp((game->input.mpos.x - slider_workzone_min_x) / slider_workzone_width, 0, 1);
+        f32 new_value ;
+        if (slider_pos < slider_zero_pos) {
+            f32 a = 1.0f - slider_pos / slider_zero_pos;
+            new_value = Math::lerp(Math::min(maxv, 0.0f), maxv, a);
+        } else {
+            f32 a = slider_pos;
+            new_value = Math::lerp(Math::max(minv, 0.0f), maxv, a);
+        }
+        
+        if (*value != new_value) {
+            *value = new_value;
+            is_value_changed = true;
+        }
+    }
+    
+    f32 value_clamped = Math::clamp(*value, minv, maxv);
+    f32 grab_pos_normalized;
+    if (value_clamped < 0.0f) {
+        f32 f = 1.0f - (value_clamped - minv) / (Math::min(0.0f, maxv) - minv);
+        grab_pos_normalized = (1.0f - f) * slider_zero_pos;
+    } else {
+        f32 f = (value_clamped - Math::max(0.0f, minv)) / (maxv - Math::max(0.0f, minv));
+        grab_pos_normalized = slider_zero_pos + f * (1.0f - slider_zero_pos);
+    }
+    
+    f32 grab_x = Math::lerp(slider_workzone_min_x, slider_workzone_max_x, grab_pos_normalized);
+    Rect grab_rect = Rect(Vec2(grab_x - DEVUI_SLIDER_GRAB_WIDTH * 0.5f, slider_zone_rect.y),
+                          Vec2(DEVUI_SLIDER_GRAB_WIDTH, slider_zone_rect.h));
+    Vec4 color = color_from_bstate(slider_state, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON);
+    
+    this->push_rect(frame_rect, DEVUI_COLOR_WIDGET_BACKGROUND);
+    this->push_rect(grab_rect, color);
+    
+    char buffer[64];
+    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    Vec2 value_size = font->get_text_size(buffer, 0, DEVUI_TEXT_SCALE);
+    Vec2 value_pos = Vec2(slider_zone_rect.middle_x() - value_size.x * 0.5f, frame_rect.y);
+    this->push_text(value_pos, buffer);
+    this->push_text(label_pos, label);
+    
+    return is_value_changed;
 }
 
-void DevUI::drag_float(const char *label, f32 *value, f32 speed) {
+bool DevUI::drag_float(const char *label, f32 *value, f32 speed) {
+    WIDGET_DEF_HEADER(false);
+    DevUIWindow *win = cur_win;
+    DevUIID id = this->make_id(win, label);
+    Vec2 label_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
+    Rect frame_rect = Rect(win->cursor, Vec2(win->rect.w * 0.65f, label_size.y) + DEVUI_FRAME_PADDING * 2);
+    Rect slider_zone_rect = Rect(frame_rect.p + DEVUI_FRAME_PADDING, frame_rect.size() - DEVUI_FRAME_PADDING * 2);
     
+    DevUIButtonState slider_state = this->update_button(slider_zone_rect, id, true);
+    element_size(frame_rect.size());
+    same_line();
+    Vec2 label_pos = win->cursor;
+    element_size(label_size);
+    
+    bool is_value_changed = false;
+    if (slider_state.is_held) {
+        f32 new_value = *value + game->input.mdelta.x * speed;
+        if (*value != new_value) {
+            *value = new_value;
+            is_value_changed = true;
+        }
+    }
+    
+    this->push_rect(frame_rect, DEVUI_COLOR_WIDGET_BACKGROUND);
+    
+    char buffer[64];
+    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    Vec2 value_size = font->get_text_size(buffer, 0, DEVUI_TEXT_SCALE);
+    Vec2 value_pos = Vec2(slider_zone_rect.middle_x() - value_size.x * 0.5f, frame_rect.y);
+    this->push_text(value_pos, buffer);
+    this->push_text(label_pos, label);
+    return is_value_changed;
 }
 
 DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_held) {

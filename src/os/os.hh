@@ -14,6 +14,16 @@ enum struct Key {
     Shift,
     Ctrl,
     Space,
+    Enter, 
+    Escape,
+    
+    Backspace,
+    Delete, 
+    Home, 
+    End,
+    Left,
+    Right,
+    
     MouseLeft,
     MouseRight,
     

@@ -46,6 +46,24 @@ DevUIID DevUI::make_id(DevUIWindow *win, const char *text, size_t count) {
     return result;
 }
 
+bool DevUI::is_text_input_key_pressed(Key key) {
+    bool result = false;
+    f32 time_pressed = game->input.keys_down_time[(u32)key];
+    if (time_pressed > DEVUI_KEY_REPEAT_DELAY) {
+        f32 half_repeate_rate = DEVUI_KEY_REPEAT_RATE * 0.5f;
+        f32 press_mod = fmodf(time_pressed - DEVUI_KEY_REPEAT_DELAY, DEVUI_KEY_REPEAT_RATE);
+        f32 abs_mod = fmodf(time_pressed - DEVUI_KEY_REPEAT_DELAY - game->input.dt, DEVUI_KEY_REPEAT_RATE);
+        if ((press_mod > half_repeate_rate) != (abs_mod > half_repeate_rate)) {
+            result = true;
+        }
+    } else if (time_pressed == 0) {
+        result = true;
+    }
+    
+    return result;
+}
+
+
 void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
     CHECK_CUR_WIN_IS_PRESENT;
     // Transform coordinates and uv accoring to clipping
@@ -78,7 +96,7 @@ void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
     this->cur_win->draw_queue.add(entry);
 }
 
-void DevUI::push_text(Vec2 p, Vec4 color, const char *text, f32 scale) {
+void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
     f32 line_height = font->size * scale;
 	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
 	f32 rheight = 1.0f / (f32)font->tex->size.y;
@@ -184,7 +202,7 @@ void DevUI::text(const char *text) {
     Vec2 text_size = font->get_text_size(text, 0, DEVUI_TEXT_SCALE);
     Rect text_rect = Rect(win->cursor, text_size + DEVUI_FRAME_PADDING * 2.0f);
     element_size(text_size, &text_rect.p);
-    push_text(text_rect.p, DEVUI_COLOR_TEXT, text, DEVUI_TEXT_SCALE);
+    push_text(text_rect.p, text);
 }
 void DevUI::textv(const char *format, va_list args) {
     WIDGET_DEF_HEADER();
@@ -204,15 +222,14 @@ bool DevUI::button(const char *label, bool repeat_when_held) {
     WIDGET_DEF_HEADER(false);
     DevUIWindow *win = cur_win;
     Vec2 text_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
-    Vec2 size = text_size;
     DevUIID id = make_id(win, label);
-    Rect button_rect = Rect(win->cursor, size + DEVUI_FRAME_PADDING * 2.0f);
-    element_size(button_rect.s, 0);
+    Rect button_rect = Rect(win->cursor, text_size + DEVUI_FRAME_PADDING * 2.0f);
+    element_size(button_rect.s);
     DevUIButtonState bstate = update_button(button_rect, id, repeat_when_held);
     Vec4 color = color_from_bstate(bstate, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON);
     push_rect(button_rect, color);
     // Почему не нужно добавлять y...
-    push_text(button_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, label);
+    push_text(button_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), label);
     return bstate.is_pressed;
 }
 
@@ -242,8 +259,122 @@ bool DevUI::checkbox(const char *label, bool *value) {
         Rect checkmark_rect = Rect(checkbox_rect.p + DEVUI_CHECKMARK_OFFSET, checkbox_rect.size() - DEVUI_CHECKMARK_OFFSET * 2);
         push_rect(checkmark_rect, checkmark_color);
     }
-    push_text(text_rect.p, DEVUI_COLOR_TEXT, label);
+    push_text(text_rect.p, label);
     return value_changed;
+}
+
+bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size) {
+    assert(buffer && buffer_size);
+    assert(buffer_size < sizeof(DevUITextEditState::text));
+    WIDGET_DEF_HEADER(false);
+    DevUIWindow *win = cur_win;
+    DevUIID id = make_id(win, label);
+    Vec2 label_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
+    Rect frame_rect = Rect(win->cursor, Vec2(win->rect.w * 0.65f, label_size.y) + DEVUI_FRAME_PADDING * 2);
+    element_size(frame_rect.size());
+    same_line();
+    Vec2 label_pos = win->cursor;
+    element_size(label_size);
+    
+    bool is_ctrl_down = game->input.is_key_held(Key::Ctrl);
+    bool is_shift_down = game->input.is_key_held(Key::Shift);
+    bool is_hot = this->hot_win == win && !hot_id && frame_rect.collide(game->input.mpos);
+    if (is_hot) {
+        this->hot_id = id;
+    }
+    
+    DevUITextEditState *te = &this->text_edit;
+    if (game->input.is_key_pressed(Key::MouseLeft)) {
+        if (is_hot) {
+            if (this->active_id != id) {
+                memset(te, 0, sizeof(*te));
+                strncpy(te->text, (const char *)buffer, sizeof(te->text));
+                strncpy(te->initial_text, (const char *)buffer, sizeof(te->text));
+                te->max_length = Math::min(sizeof(te->text), buffer_size);
+            }
+            this->active_id = id;
+        } else if (this->active_id == id) {
+            this->active_id = DevUIID::empty();
+        }
+    }
+    
+    bool is_value_changed = false;
+    bool is_enter_pressed = false;
+    if (active_id == id) {
+        size_t length = strlen(te->text);
+        if (is_text_input_key_pressed(Key::Enter)) {
+            is_enter_pressed = true;
+        } else if (is_text_input_key_pressed(Key::Escape)) {
+            this->active_id = DevUIID::empty();
+        } else if (is_text_input_key_pressed(Key::Backspace)) {
+            if (te->cursor) {
+                size_t length = strlen(te->text);
+                memmove(te->text + te->cursor - 1, te->text + te->cursor, length - te->cursor);
+                te->text[length - 1] = 0;
+                --te->cursor;
+            }
+        } else if (is_text_input_key_pressed(Key::Delete)) {
+            size_t length = strlen(te->text);
+            if (te->cursor < length) {
+                printf("delete\n");
+                memmove(te->text + te->cursor, te->text + te->cursor + 1, length - te->cursor);
+                te->text[length] = 0;
+            }
+        } else if (is_text_input_key_pressed(Key::Home)) {
+            te->cursor = 0;
+        } else if (is_text_input_key_pressed(Key::End)) {
+            size_t length = strlen(te->text);
+            te->cursor = length;
+        } else if (is_text_input_key_pressed(Key::Left)) {
+            if (te->cursor) {
+                --te->cursor;
+            }
+        } else if (is_text_input_key_pressed(Key::Right)) {
+            size_t length = strlen(te->text);
+            if (te->cursor < length) {
+                ++te->cursor;
+            }
+        } else if (game->input.utf32) {
+            char *buffer_end = te->text + te->max_length;
+            size_t current_length = strlen(te->text);
+            if (buffer_end - (te->text + current_length + 1) >= 1) {
+                memmove(te->text + te->cursor + 1, te->text + te->cursor, current_length - te->cursor);
+                te->text[te->cursor] = game->input.utf32;
+                ++te->cursor;
+            }
+        }
+        
+    }
+    
+    if (this->active_id != id) {
+        // memcpy(buffer, te->initial_text, te->max_length);
+        memcpy(te->text, te->initial_text, te->max_length);
+        // is_value_changed = true;
+    } else if (is_enter_pressed) {
+        memcpy(buffer, te->text, te->max_length);
+        is_value_changed = true;
+        this->active_id = DevUIID::empty();
+    }
+    
+    this->push_rect(frame_rect, DEVUI_COLOR_BUTTON);
+    if (active_id == id) {
+        Vec2 pre_cursor_text_size = font->get_text_size(te->text, te->cursor, DEVUI_TEXT_SCALE);
+        if (!te->cursor) {
+            pre_cursor_text_size.x = 0;
+        } 
+        Vec2 cursor_pos = frame_rect.p + DEVUI_FRAME_PADDING + Vec2(pre_cursor_text_size.x, 0);
+        Rect cursor_rect = Rect(cursor_pos, Vec2(DEVUI_TEXT_CURSOR_WIDTH, pre_cursor_text_size.y));
+        this->push_rect(cursor_rect, Colors::white);
+    }
+    this->push_clip_rect(frame_rect);
+    const char *text_to_draw = (const char *)buffer;
+    if (this->active_id == id) {
+        text_to_draw = te->text;
+    }
+    this->push_text(frame_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), text_to_draw);    
+    this->pop_clip_rect();
+    this->push_text(label_pos, label);
+    return is_value_changed;
 }
 
 DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_held) {
@@ -353,7 +484,7 @@ void DevUI::window(const char *title, Rect rect) {
         push_rect(resize_rect, resize_color);
     }
     push_rect(win->title_bar_rect, DEVUI_COLOR_WINDOW_TITLEBAR);
-    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, win->title);
+    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), win->title);
     push_rect(collapse_rect, collapse_color);
     
     win->cursor = win->rect.p + DEVUI_WINDOW_PADDING;

@@ -210,6 +210,7 @@ void OS::update_input(Input *input) {
         ++key_index) {
         (input->keys + key_index)->transition_count = 0;        
     }
+    input->utf32 = 0;
     
     MSG msg;
     while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) {
@@ -224,7 +225,10 @@ void OS::update_input(Input *input) {
             } break;
             case WM_CHAR: {
                 u32 input_char = msg.wParam;
-                input->utf32 = input_char;
+                // Limit to ASCII for now
+                if (0x20 <= input_char && input_char <= 0x7F) {
+                    input->utf32 = input_char;
+                }
             } break;
             case WM_KEYDOWN:
             case WM_KEYUP:
@@ -259,6 +263,30 @@ void OS::update_input(Input *input) {
                     } break;
                     case 0x039: {
                         key = Key::Space;
+                    } break;
+                    case 0x01C: {
+                        key = Key::Enter;
+                    } break;
+                    case 0x001: {
+                        key = Key::Escape;
+                    } break;
+                    case 0x00E: {
+                        key = Key::Backspace;
+                    } break;
+                    case 0x153: {
+                        key = Key::Delete;
+                    } break;
+                    case 0x147: {
+                        key = Key::Home;
+                    } break;
+                    case 0x14F: {
+                        key = Key::End;
+                    } break;
+                    case 0x14B: {
+                        key = Key::Left;
+                    } break;
+                    case 0x14D: {
+                        key = Key::Right;
                     } break;
                     case 0x03B: {
                         key = Key::F1;

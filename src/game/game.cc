@@ -12,7 +12,7 @@ void Game::init() {
     
     os.prepare_to_start();
     dev_ui.begin_frame();
-    dev_ui.font = new Font("c:\\windows\\fonts\\arial.ttf", 32);
+    dev_ui.font = new Font("c:\\windows\\fonts\\consola.ttf", 32);
     game_state.init();
     
     logprint("Game", "Init end\n");

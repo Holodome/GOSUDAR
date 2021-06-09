@@ -275,6 +275,11 @@ void GameState::render() {
     if (game->dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
         game->os.go_fullscreen(this->settings.fullscreen);
     }
+    static char buffer[32] = {};
+    if (game->dev_ui.input_text("Text input", buffer, sizeof(buffer))) {
+        printf("Changed: %s\n", buffer);
+    }
+    game->dev_ui.button("Hello");
     game->dev_ui.window_end();
 }
 

@@ -28,7 +28,7 @@ void DevUI::pop_clip_rect() {
     --clip_rect_stack_index;
 }
 
-DevUIID DevUI::make_id(DevUIWindow *win, char *text, size_t count) {
+DevUIID DevUI::make_id(DevUIWindow *win, const char *text, size_t count) {
     DevUIID result = {};
     if (!count) {
         count = strlen(text);
@@ -78,7 +78,7 @@ void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
     this->cur_win->draw_queue.add(entry);
 }
 
-void DevUI::push_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
+void DevUI::push_text(Vec2 p, Vec4 color, const char *text, f32 scale) {
     f32 line_height = font->size * scale;
 	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
 	f32 rheight = 1.0f / (f32)font->tex->size.y;
@@ -106,8 +106,8 @@ void DevUI::push_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scal
 }
 
 void DevUI::element_size(Vec2 size, Vec2 *adjust_start_offset) {
-    DevUIWindow *win = cur_win;
     CHECK_CUR_WIN_IS_PRESENT;
+    DevUIWindow *win = cur_win;
     f32 line_height = fmaxf(size.y, win->line_height);
     if (adjust_start_offset) {
         adjust_start_offset->y += (line_height - size.y) * 0.5f;
@@ -117,6 +117,18 @@ void DevUI::element_size(Vec2 size, Vec2 *adjust_start_offset) {
                        win->cursor.y + line_height + DEVUI_ITEM_SPACING.y);
     win->last_line_height = line_height;
     win->line_height = 0;
+}
+
+void DevUI::same_line(f32 spacing_w) {
+    CHECK_CUR_WIN_IS_PRESENT;
+    DevUIWindow *win = cur_win;
+    if (spacing_w < 0) {
+        spacing_w = DEVUI_ITEM_SPACING.x;
+    }
+    f32 x = win->last_line_cursor.x + spacing_w;
+    f32 y = win->last_line_cursor.y;
+    win->cursor = Vec2(x, y);
+    win->line_height = win->last_line_height;
 }
 
 void DevUI::begin_frame() {
@@ -166,21 +178,21 @@ void DevUI::end_frame() {
     }
 }
 
-void DevUI::text(char *text) {
+void DevUI::text(const char *text) {
     WIDGET_DEF_HEADER();
     DevUIWindow *win = cur_win;
     Vec2 text_size = font->get_text_size(text, 0, DEVUI_TEXT_SCALE);
     Rect text_rect = Rect(win->cursor, text_size + DEVUI_FRAME_PADDING * 2.0f);
     element_size(text_size, &text_rect.p);
-    push_text(text_rect.p, DEVUI_COLOR_TEXT, text, font, DEVUI_TEXT_SCALE);
+    push_text(text_rect.p, DEVUI_COLOR_TEXT, text, DEVUI_TEXT_SCALE);
 }
-void DevUI::textv(char *format, va_list args) {
+void DevUI::textv(const char *format, va_list args) {
     WIDGET_DEF_HEADER();
     char buffer[1024];
     Str::formatv(buffer, sizeof(buffer), format, args);
     text(buffer);
 }
-void DevUI::textf(char *format, ...) {
+void DevUI::textf(const char *format, ...) {
     WIDGET_DEF_HEADER();
     va_list args;
     va_start(args, format);
@@ -188,7 +200,7 @@ void DevUI::textf(char *format, ...) {
     va_end(args);
 }
 
-bool DevUI::button(char *label, bool repeat_when_held) {
+bool DevUI::button(const char *label, bool repeat_when_held) {
     WIDGET_DEF_HEADER(false);
     DevUIWindow *win = cur_win;
     Vec2 text_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
@@ -200,8 +212,38 @@ bool DevUI::button(char *label, bool repeat_when_held) {
     Vec4 color = color_from_bstate(bstate, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON);
     push_rect(button_rect, color);
     // Почему не нужно добавлять y...
-    push_text(button_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, label, font, DEVUI_TEXT_SCALE);
+    push_text(button_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, label);
     return bstate.is_pressed;
+}
+
+bool DevUI::checkbox(const char *label, bool *value) {
+    assert(value);
+    WIDGET_DEF_HEADER(false);
+    DevUIWindow *win = cur_win;
+    Vec2 text_size = font->get_text_size(label, 0, DEVUI_TEXT_SCALE);
+    DevUIID id = make_id(win, label);
+    Rect checkbox_rect = Rect(win->cursor, Vec2(text_size.y + DEVUI_FRAME_PADDING.y * 2, 
+                                                text_size.y + DEVUI_FRAME_PADDING.y * 2));
+    element_size(checkbox_rect.size());
+    same_line();
+    Rect text_rect = Rect(win->cursor, text_size);
+    element_size(text_rect.size());
+    
+    push_rect(checkbox_rect, DEVUI_COLOR_BUTTON);
+    DevUIButtonState checkbox_state = update_button(checkbox_rect, id);
+    bool value_changed = false;
+    if (checkbox_state.is_pressed) {
+        value_changed = true;
+        *value = !(*value);
+    }
+    
+    if (*value || checkbox_state.is_hot) {
+        Vec4 checkmark_color = (*value ? DEVUI_COLOR_BUTTON_ACTIVE : DEVUI_COLOR_BUTTON_HOT);
+        Rect checkmark_rect = Rect(checkbox_rect.p + DEVUI_CHECKMARK_OFFSET, checkbox_rect.size() - DEVUI_CHECKMARK_OFFSET * 2);
+        push_rect(checkmark_rect, checkmark_color);
+    }
+    push_text(text_rect.p, DEVUI_COLOR_TEXT, label);
+    return value_changed;
 }
 
 DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_held) {
@@ -215,7 +257,7 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
     bool is_hot = (hot_win == win) && !hot_id && rect.collide(game->input.mpos);
     bool is_pressed = false;
     if (is_hot) {
-        hot_id = id;
+        this->hot_id = id;
         if (game->input.is_key_held(Key::MouseLeft)) {
             active_id = id;
         } else if (repeat_when_held && game->input.is_key_held(Key::MouseLeft) && active_id == id) {
@@ -242,7 +284,7 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
 }
 
     
-void DevUI::window(char *title, Rect rect) {
+void DevUI::window(const char *title, Rect rect) {
     CHECK_IS_ENABLED();
     
     size_t title_len = strlen(title);
@@ -311,7 +353,7 @@ void DevUI::window(char *title, Rect rect) {
         push_rect(resize_rect, resize_color);
     }
     push_rect(win->title_bar_rect, DEVUI_COLOR_WINDOW_TITLEBAR);
-    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, win->title, font, DEVUI_TEXT_SCALE);
+    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), DEVUI_COLOR_TEXT, win->title);
     push_rect(collapse_rect, collapse_color);
     
     win->cursor = win->rect.p + DEVUI_WINDOW_PADDING;

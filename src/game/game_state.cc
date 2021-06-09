@@ -272,19 +272,7 @@ void GameState::render() {
     game->dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
     game->dev_ui.textf("Camera pos: %.2f %.2f %.2f", camera.pos.x, camera.pos.y, camera.pos.z);
     game->dev_ui.textf("Camera rot: %.2f %.2f %.2f", camera.rot.x, camera.rot.y, camera.rot.z);
-    if (game->dev_ui.button("Fullscreen")) {
-        this->settings.fullscreen = !this->settings.fullscreen;
-        game->os.go_fullscreen(this->settings.fullscreen);
-    }
-    game->dev_ui.window_end();
-    
-    game->dev_ui.window("Debug1", Rect(500, 500, 400, 400));
-    game->dev_ui.textf("DevUI focused: %s", (game->dev_ui.is_focused ? "true" : "false"));
-    game->dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
-    game->dev_ui.textf("Camera pos: %.2f %.2f %.2f", camera.pos.x, camera.pos.y, camera.pos.z);
-    game->dev_ui.textf("Camera rot: %.2f %.2f %.2f", camera.rot.x, camera.rot.y, camera.rot.z);
-    if (game->dev_ui.button("Fullscreen")) {
-        this->settings.fullscreen = !this->settings.fullscreen;
+    if (game->dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
         game->os.go_fullscreen(this->settings.fullscreen);
     }
     game->dev_ui.window_end();

@@ -667,6 +667,12 @@ namespace Math {
             Vec2 rmax = Vec2(Math::min(x + w, child.x + child.w), Math::min(y + h, child.y + child.h));
             return Rect::minmax(rmin, rmax);
         }
+        
+        Rect join(Rect other) {
+            Vec2 rmin = Vec2(Math::min(x, other.x), Math::min(y, other.y));
+            Vec2 rmax = Vec2(Math::max(x + w, other.x + other.w), Math::max(y + h, other.y + other.h));
+            return Rect::minmax(rmin, rmax);
+        }
     };
 
     struct Bounds {

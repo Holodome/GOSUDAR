@@ -11,7 +11,6 @@ void Game::init() {
     renderer.init();
     
     os.prepare_to_start();
-    dev_ui.font = new Font("c:\\windows\\fonts\\consola.ttf", 32);
     game_state.init();
     
     logprint("Game", "Init end\n");
@@ -20,7 +19,6 @@ void Game::init() {
 void Game::cleanup() {
     logprintln("Game", "Cleanup");
     game_state.cleanup();
-    delete dev_ui.font;
     renderer.cleanup();
     os.cleanup();
 }
@@ -34,9 +32,7 @@ void Game::update() {
     }
     
     renderer.begin_frame();
-    dev_ui.begin_frame();
     game_state.update();
-    dev_ui.end_frame();
     
     // renderer.render();
     os.update_window();

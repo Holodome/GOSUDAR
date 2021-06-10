@@ -16,7 +16,6 @@ struct Game {
     OS os = OS();
     Renderer renderer = Renderer();
     Input input = Input();
-    DevUI dev_ui = DevUI();
     
     GameState game_state = GameState();
     

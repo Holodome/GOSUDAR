@@ -2,12 +2,6 @@
 
 #include "lib/lib.hh"
 
-enum struct GameStateKind {
-    None = 0x0,
-    Game,
-    Menu
-};
-
 struct Camera {
     Vec3 pos = Vec3(0); 
     Vec3 rot = Vec3(0);
@@ -29,13 +23,15 @@ struct TextureData {
 struct TextureLibrary {
     Array<TextureData> texture_datas = {};
     HashTable<size_t> texture_ids = {};
+    
+    
 };
 
 struct GameState {
-    GameStateKind state_kind;
+    DevUI dev_ui = {};
     
-    Settings settings;
-    Camera camera;
+    Settings settings = {};
+    Camera camera = {};
 
     Mesh *cube = 0;
     Mesh *rect = 0;

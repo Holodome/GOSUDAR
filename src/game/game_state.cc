@@ -277,11 +277,11 @@ void GameState::render() {
     if (game->dev_ui.input_text("Text input", buffer, sizeof(buffer))) {
         printf("Changed: %s\n", buffer);
     }
-    game->dev_ui.drag_float("Camera y", &camera.pos.y);
     if (game->dev_ui.button("Close game")) {
         game->is_running = false;
     }
-    game->dev_ui.slider_float("Camera rot x", &camera.rot.x, 0, 1);
+    static float some_value = -1;
+    game->dev_ui.slider_float("Some value", &some_value, -1, 0);
     game->dev_ui.drag_float3("Camera pos", camera.pos.e);
     game->dev_ui.drag_float3("Camera rot", camera.rot.e);
     game->dev_ui.window_end();

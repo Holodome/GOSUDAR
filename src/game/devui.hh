@@ -112,6 +112,7 @@ struct DevUI {
     DevUIWindow *cur_win = 0, *hot_win = 0;
     DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();
     Font *font = 0;
+    f32 text_height = 0;
     DevUITextEditState text_edit = {};
     
     bool is_enabled = false, is_focused = false;

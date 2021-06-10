@@ -11,7 +11,6 @@ void Game::init() {
     renderer.init();
     
     os.prepare_to_start();
-    dev_ui.begin_frame();
     dev_ui.font = new Font("c:\\windows\\fonts\\consola.ttf", 32);
     game_state.init();
     

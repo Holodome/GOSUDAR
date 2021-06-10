@@ -16,6 +16,10 @@ namespace Math {
     const f32 PI = 3.14159265359f;
     const f32 TWO_PI = 6.28318530718f;
 
+    inline bool is_power_of_two(u64 x) {
+        return !(x & (x - 1));
+    }
+
     inline f32 
     rsqrt(f32 a) {
         return 1.0f / sqrtf(a);

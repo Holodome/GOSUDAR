@@ -181,6 +181,18 @@ void GameState::init() {
     }
     map = make_map(map_size, height_map.data);
     logprintln("GameState", "Init end");
+    
+    this->tex_lib.texture_ids.set("a", 2);
+    this->tex_lib.texture_ids.set("b", 3);
+    this->tex_lib.texture_ids.set("c", 4);
+    size_t *a, *b, *c;
+    this->tex_lib.texture_ids.get("a", &a);
+    this->tex_lib.texture_ids.get("b", &b);
+    this->tex_lib.texture_ids.get("c", &c);
+    printf("%u %u %u\n", *a, *b, *c); 
+    this->tex_lib.texture_ids.del("a");
+    this->tex_lib.texture_ids.get("a", &a);
+    printf("%llu\n", a); 
 }
 
 void GameState::cleanup() {
@@ -250,10 +262,12 @@ void GameState::update_input() {
     }
 }
 
-void GameState::render() {
+void GameState::update_logic() {
     camera.projection = Mat4x4::perspective(Math::rad(60), game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
     camera.view = Mat4x4::identity() * Mat4x4::rotation(camera.rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(camera.rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-camera.pos);
-    
+}
+
+void GameState::render() {
     game->renderer.set_renderering_3d(camera.projection, camera.view);
     game->renderer.immediate_begin();
     game->renderer.set_shader();
@@ -273,15 +287,9 @@ void GameState::render() {
     if (game->dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
         game->os.go_fullscreen(this->settings.fullscreen);
     }
-    static char buffer[32] = {};
-    if (game->dev_ui.input_text("Text input", buffer, sizeof(buffer))) {
-        printf("Changed: %s\n", buffer);
-    }
     if (game->dev_ui.button("Close game")) {
         game->is_running = false;
     }
-    static float some_value = -1;
-    game->dev_ui.slider_float("Some value", &some_value, -1, 0);
     game->dev_ui.drag_float3("Camera pos", camera.pos.e);
     game->dev_ui.drag_float3("Camera rot", camera.rot.e);
     game->dev_ui.window_end();
@@ -292,6 +300,6 @@ void GameState::update() {
     game->renderer.clear(Vec4(0.2));
 
     update_input();
- 
+    update_logic();
     render();   
 }

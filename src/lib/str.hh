@@ -17,7 +17,7 @@ struct Str {
     Str() {
         init();
     }
-    Str(char *text) {
+    Str(const char *text) {
         init();
         u32 len = strlen(text);
         ensure_alloced(len + 1);

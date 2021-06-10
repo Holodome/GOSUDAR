@@ -3,7 +3,6 @@
 #include "lib/lib.hh"
 
 #include "os/os.hh"
-#include "renderer/assets.hh"
 #include "renderer/renderer.hh"
 #include "game/devui.hh"
 #include "game/game_state.hh"

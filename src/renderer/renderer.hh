@@ -2,8 +2,6 @@
 
 #include "lib/lib.hh"
 
-#include "renderer/assets.hh"
-
 #include "thirdparty/glcorearb.h"
 
 const static GLuint GL_INVALID_ID = 0;

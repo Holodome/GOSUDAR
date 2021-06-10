@@ -437,7 +437,6 @@ bool DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
     if (slider_state.is_held) {
         f32 slider_pos = Math::clamp((game->input.mpos.x - slider_workzone_min_x) / slider_workzone_width, 0.0f, 1.0f);
         f32 new_value = Math::lerp(minv, maxv, slider_pos);
-        
         if (*value != new_value) {
             *value = new_value;
             is_value_changed = true;

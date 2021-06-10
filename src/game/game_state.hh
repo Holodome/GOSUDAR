@@ -21,6 +21,16 @@ struct Settings {
     bool focus_devui = true;
 };  
 
+struct TextureData {
+    void *data;
+    Vec2i size;  
+};
+
+struct TextureLibrary {
+    Array<TextureData> texture_datas = {};
+    HashTable<size_t> texture_ids = {};
+};
+
 struct GameState {
     GameStateKind state_kind;
     
@@ -31,6 +41,8 @@ struct GameState {
     Mesh *rect = 0;
     Mesh *map  = 0;
 
+    TextureLibrary tex_lib = {};
+
     void init();
     void cleanup();
     
@@ -38,6 +50,7 @@ struct GameState {
     // private
     void update_camera();
     void update_input();
+    void update_logic();
     void render();
 };
 

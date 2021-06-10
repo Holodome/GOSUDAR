@@ -2,12 +2,6 @@
 
 #include "game/game.hh"
 
-#define STBI_MALLOC Mem::alloc
-#define STBI_REALLOC Mem::realloc
-#define STBI_FREE Mem::free
-#define STB_IMAGE_IMPLEMENTATION
-#include "thirdparty/stb_image.h"
-
 #define STBTT_malloc(x,u)  ((void)(u),Mem::alloc(x))
 #define STBTT_free(x,u)    ((void)(u),Mem::free(x))
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -148,7 +142,6 @@ void Shader::bind() {
 
 Texture::Texture(const void *buffer, Vec2i size) 
     : size(size) {
-    stbi_set_flip_vertically_on_load(false);
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -159,7 +152,7 @@ Texture::Texture(const void *buffer, Vec2i size)
     glTextureSubImage2D(id, 0, 0, 0, size.x, size.y, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 }
 
-void Texture::bind(u32 unit) {
+void Texture::bind(u32 unit) const {
     glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, id);
 }
@@ -177,7 +170,6 @@ Mesh::~Mesh() {
     delete[] vertices;
     delete[] indices;
 }
-
 
 Font::Font(const char *filename, f32 height) {
     FILE *file = fopen(filename, "rb");
@@ -322,12 +314,7 @@ void main() {
 #endif 
 )FOO";
     terrain_shader = new Shader(terrain_shader_code);
-    
-    TempArray<u8> white_tex = TempArray<u8>(512 * 512 * 4);
-    memset(white_tex.data, 0xFF, white_tex.mem_size());
-    white_texture = new Texture(white_tex.data, Vec2i(512, 512));
-    default_texture = white_texture;
-    
+   
     // glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
@@ -340,7 +327,6 @@ void main() {
 void Renderer::cleanup() {
     delete standard_shader;
     delete terrain_shader;
-    delete white_texture;
 }
 
 void Renderer::begin_frame() {
@@ -413,17 +399,17 @@ void Renderer::set_model(const Mat4x4 &model) {
 
 void Renderer::set_shader(Shader *shader) {
     if (shader == 0) {
-        shader = default_shader;
+        shader = this->default_shader;
     }
     
-    current_shader = shader;
+    this->current_shader = shader;
 }
 
 void Renderer::set_texture(Texture *texture) {
     if (texture == 0) {
-        texture = default_texture;
+        texture = game->tex_lib.default_texture;
     }
-    current_texture = texture;
+    this->current_texture = texture;
 }
 
 void Renderer::draw_rect(Rect rect, Vec4 color, Rect uv_rect) {

@@ -9,6 +9,9 @@ void Game::init() {
     os.init();
     os.init_renderer_backend();
     renderer.init();
+    // Init assets after initing renderer
+    this->tex_lib.init();
+    // This is kinda circly- but renderer params have to be set after texture
     
     os.prepare_to_start();
     game_state.init();

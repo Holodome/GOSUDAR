@@ -1,7 +1,7 @@
 #include "os/os.cc"
 #include "renderer/renderer.cc"
-// #include "renderer/font.cc"
 #include "game/game.cc"
 #include "game/game_state.cc"
+#include "game/texture_library.cc"
 #include "game/devui.cc"
 #include "main.cc"

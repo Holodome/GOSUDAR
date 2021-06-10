@@ -69,7 +69,7 @@ static Mesh *make_rect() {
         Vec3(1, 1, 0),
     };
     u32 vi[] = {
-        0, 1, 2, 1, 2, 3
+        2, 1, 0, 1, 2, 3
     };
     Vertex vertices[ARRAY_SIZE(p)];
     for (size_t i = 0; i < ARRAY_SIZE(p); ++i) {
@@ -168,6 +168,9 @@ static Mesh *make_map(Vec2i size, f32 *height_map) {
 
 void GameState::init() {
     logprintln("GameState", "Init start");
+    
+    game->tex_lib.load("dog.jpg", "dog");
+    
     cube = make_cube();
     rect = make_rect();
     Vec2i map_size(30, 30);
@@ -258,7 +261,7 @@ void GameState::update_logic() {
     
     dev_ui.window("Debug", Rect(0, 0, 400, 400));
     dev_ui.textf("DevUI focused: %s", (dev_ui.is_focused ? "true" : "false"));
-    dev_ui.textf("Draw call count: %llu", game->renderer.statistics.draw_call_count);
+    dev_ui.textf("Draw call count: %llu", game->renderer.last_frame_statisitcs.draw_call_count);
     dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
     if (dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
         game->os.go_fullscreen(this->settings.fullscreen);
@@ -276,12 +279,17 @@ void GameState::render() {
     game->renderer.immediate_begin();
     game->renderer.set_shader();
     game->renderer.set_texture();
-    game->renderer.draw_mesh(cube);
+    // game->renderer.draw_mesh(cube);
     game->renderer.immediate_flush();
     game->renderer.immediate_begin();
     game->renderer.set_shader(game->renderer.terrain_shader);
     game->renderer.set_texture();
-    game->renderer.draw_mesh(map);
+    // game->renderer.draw_mesh(map);
+    game->renderer.immediate_flush();
+    game->renderer.immediate_begin();
+    game->renderer.set_shader();
+    game->renderer.set_texture(&game->tex_lib.get("dog")->texture);
+    game->renderer.draw_mesh(this->rect);
     game->renderer.immediate_flush();
 }
 
@@ -289,6 +297,7 @@ void GameState::update() {
     this->dev_ui.begin_frame();
     update_input();
     update_logic();
+    // @TODO find way to assert no calls to renderer made before this point...
     game->renderer.set_draw_region(game->input.winsize);
     game->renderer.clear(Vec4(0.2));
     render();   

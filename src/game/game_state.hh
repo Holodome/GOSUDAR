@@ -15,18 +15,6 @@ struct Settings {
     bool focus_devui = true;
 };  
 
-struct TextureData {
-    void *data;
-    Vec2i size;  
-};
-
-struct TextureLibrary {
-    Array<TextureData> texture_datas = {};
-    HashTable<size_t> texture_ids = {};
-    
-    
-};
-
 struct GameState {
     DevUI dev_ui = {};
     
@@ -36,8 +24,6 @@ struct GameState {
     Mesh *cube = 0;
     Mesh *rect = 0;
     Mesh *map  = 0;
-
-    TextureLibrary tex_lib = {};
 
     void init();
     void cleanup();

@@ -30,12 +30,16 @@ struct Shader {
 
 struct Texture {
     GLuint id = GL_INVALID_ID;
-    Vec2i size;
+    Vec2i size = Vec2i(0);
     
+    Texture() = default;
     Texture(const void *buffer, Vec2i size);
-    void bind(u32 unit = 0);
+    void bind(u32 unit = 0) const;
+    
+    bool is_valid() const {
+        return id != GL_INVALID_ID;
+    }
 };  
-
 
 struct FontGlyph {
 	u32 utf32;
@@ -84,10 +88,7 @@ struct Renderer {
     Shader *standard_shader = 0;
     Shader *terrain_shader = 0;
     
-    Texture *white_texture = 0;
-    
     Shader *default_shader = 0;
-    Texture *default_texture = 0;
     
     Texture *current_texture = 0;
     Shader *current_shader = 0;
@@ -98,7 +99,6 @@ struct Renderer {
     Mat4x4 view_matrix       = Mat4x4::identity();
     Mat4x4 projection_matrix = Mat4x4::identity();
     Mat4x4 model_matrix      = Mat4x4::identity();
-    
     
     RendererStatistics last_frame_statisitcs = {}, statistics = {};
     

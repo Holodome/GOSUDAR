@@ -6,14 +6,16 @@
 
 namespace Mem {
     static u64 times_alloced = 0;
+    static size_t currently_allocated = 0;
     
     void *alloc_base(size_t size) {
         assert(size);
         if (!size) {
             return 0;
         }
-        size_t padded_size = (size + 15) & ~15;
+        size_t padded_size = (size + 0xF) & ~0xF;
         ++times_alloced;
+        currently_allocated += padded_size;
         return ::_aligned_malloc(padded_size, 16);
     }
     
@@ -35,6 +37,7 @@ namespace Mem {
         // @TODO stb_truetype calls free with null, better investigate it 
         // assert(ptr);
         if (ptr) {
+            currently_allocated -= ::_aligned_msize(ptr, 16, 0);
             assert(times_alloced);
             --times_alloced;
             ::_aligned_free(ptr);
@@ -42,7 +45,10 @@ namespace Mem {
     }
     
     void *realloc(void *ptr, size_t new_size) {
-        return ::_aligned_realloc(ptr, new_size, 16);
+        currently_allocated -= ::_aligned_msize(ptr, 16, 0);
+        void *result = ::_aligned_realloc(ptr, new_size, 16);
+        currently_allocated += ::_aligned_msize(result, 16, 0);
+        return result;
     }
 }
 

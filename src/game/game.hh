@@ -6,6 +6,7 @@
 #include "renderer/renderer.hh"
 #include "game/devui.hh"
 #include "game/game_state.hh"
+#include "game/texture_library.hh"
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
@@ -16,6 +17,8 @@ struct Game {
     OS os = OS();
     Renderer renderer = Renderer();
     Input input = Input();
+    // @TODO Assets...    
+    TextureLibrary tex_lib = TextureLibrary();
     
     GameState game_state = GameState();
     

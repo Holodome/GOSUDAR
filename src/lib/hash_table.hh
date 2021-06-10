@@ -113,6 +113,20 @@ struct HashTable {
         }
         return false;
     }
+    
+    T *get_index(size_t index) const {
+        assert(index <= num_entries);
+        size_t count = 0;
+        for (size_t i = 0; i < this->table_size; ++i) {
+            for (HashNode *node = this->heads[i]; node; node = node->next) {
+                if (count == index) {
+                    return &node->value;
+                }
+                ++count;
+            }
+        }
+        return 0;
+    }
 };  
 
 #define HASH_TABLE_HH 1

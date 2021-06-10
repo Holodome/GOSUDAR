@@ -1,5 +1,6 @@
-- Fix font text length approximation (spaces are not counted)
 - Fix sliders for negative values
-- Fix sliders when value is out of range
 - Fix when using slider overlay other button and slider is stopped until hovered again
 - Make sliders and drags go into inputs on ctrl+click
+- Allow some settings for live updating using file watcing
+- Allow profiling 
+- Check how callign window with one name multiple times works

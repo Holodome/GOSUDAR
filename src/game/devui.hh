@@ -42,6 +42,12 @@ struct DevUIDrawQueueEntry {
 };
 
 struct DevUIID {
+    // p is parent id
+    // s is child id
+    // p should contain information about parent, while s contains information about child
+    // When need to nest ids, new parent id is pushed on stack and is used to make children ids
+    // This way complex widgets can have children with same names but no collisions
+    // @TODO record all ids to detect collisions. Since it is dev tool, we can just assert on duplicate id and developer will have to change it
     u32 p, s;
     
     operator bool() {
@@ -70,6 +76,8 @@ struct DevUIWindow {
     Vec2 cursor = {}, last_line_cursor = {};
     f32 line_height = 0, last_line_height = 0;
     Array<DevUIDrawQueueEntry> draw_queue = {};
+    // Used whem making complex widgets, like single widget edit for 3-component vector
+    f32 item_width = 0, default_item_width = 0;
 };
 
 struct DevUIButtonState {
@@ -89,6 +97,9 @@ struct DevUITextEditState {
 };  
 
 struct DevUI {
+    // Стек ID, который используется для создания вложеных систем
+    DevUIID id_stack[5] = {};
+    u32 id_stack_index = 0;
     // Стек прямоугольников, ограничивающих область отрисовки
     // Например, если часть текста выходит за окна, ограничивающие прямогуольники обрежут ненужный текст
     Rect clip_rect_stack[5] = {};
@@ -118,12 +129,18 @@ struct DevUI {
     bool input_text(const char *label, void *buffer, size_t buffer_size, u32 flags = 0);
     bool input_float(const char *label, f32 *value);
     bool slider_float(const char *label, f32 *value, f32 minv = 0.0f, f32 maxv = 1.0f);
+    // speed is value/px change
     bool drag_float(const char *label, f32 *value, f32 speed = 0.2f);
+    bool drag_float3(const char *label, f32 value[3], f32 speed = 0.2f);
     
     // Utility functions
+    void label(const char *label);
+    Vec2 get_text_size(const char *text, size_t count = 0);
     void push_clip_rect(const Rect &rect);
     void pop_clip_rect();
-    static DevUIID make_id(DevUIWindow *win, const char *text, size_t count = 0);
+    void push_id(const DevUIID &id);
+    void pop_id();
+    DevUIID make_id(const char *text, size_t count = 0);
     void element_size(Vec2 size, Vec2 *adjust_start_offset = 0);
     void same_line(f32 spacing_w = DEVUI_ITEM_SPACING.x);
     DevUIButtonState update_button(Rect rect, DevUIID id, bool repeat_when_held = false);

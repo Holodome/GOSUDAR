@@ -34,6 +34,7 @@ void Game::update() {
         is_running = false;
     }
     
+    renderer.begin_frame();
     dev_ui.begin_frame();
     game_state.update();
     dev_ui.end_frame();

@@ -74,6 +74,14 @@ struct Mesh {
 };
 
 
+struct RendererStatistics {
+    size_t draw_call_count = 0;
+    
+    void begin_frame() {
+        draw_call_count = 0;
+    }
+};
+
 struct Renderer {
     Shader *standard_shader = 0;
     Shader *terrain_shader = 0;
@@ -93,8 +101,13 @@ struct Renderer {
     Mat4x4 projection_matrix = Mat4x4::identity();
     Mat4x4 model_matrix      = Mat4x4::identity();
     
+    
+    RendererStatistics last_frame_statisitcs = {}, statistics = {};
+    
     void init();
     void cleanup();
+    
+    void begin_frame();
     
     void clear(Vec4 color);
     void set_draw_region(Vec2 window_size);

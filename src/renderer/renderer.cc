@@ -250,8 +250,9 @@ Vec2 Font::get_text_size(const char *text, size_t count, f32 scale) {
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         char s = text[i];
-        if (s > first_codepoint && s < (first_codepoint + glyphs.len)) {
+        if (s >= first_codepoint && s < (first_codepoint + glyphs.len)) {
             FontGlyph *glyph = &glyphs[s - first_codepoint];
+            // FontGlyph *glyph = &glyphs[first_codepoint];
             result.x += glyph->x_advance * scale;
         }
     }
@@ -342,6 +343,11 @@ void Renderer::cleanup() {
     delete white_texture;
 }
 
+void Renderer::begin_frame() {
+    last_frame_statisitcs = statistics;
+    statistics.begin_frame();
+}
+
 void Renderer::clear(Vec4 color) {
     glClearColor(color.r, color.g, color.b, color.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);    
@@ -388,6 +394,7 @@ void Renderer::immediate_flush() {
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
     glEnableVertexAttribArray(3);
     
+    ++statistics.draw_call_count;
     glDrawArrays(GL_TRIANGLES, 0, vertices.len);
 }
 

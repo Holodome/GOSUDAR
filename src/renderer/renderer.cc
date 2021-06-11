@@ -316,7 +316,7 @@ void main() {
     terrain_shader = new Shader(terrain_shader_code);
    
     // glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glCullFace(GL_BACK);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -344,18 +344,19 @@ void Renderer::set_draw_region(Vec2 window_size) {
     glScissor(0, 0, window_size.x, window_size.y);
 }
 
-void Renderer::immediate_begin() {
+void Renderer::imm_begin() {
     // vertices.clear();
     // @UNSAFE
     vertices.len = 0;
-    if (!IS_GL_VALID_ID(immediate_vao)) {
+    this->current_shader = this->default_shader;
+    if (immediate_vao == GL_INVALID_ID) {
         glGenVertexArrays(1, &immediate_vao);
         glBindVertexArray(immediate_vao);
         glGenBuffers(1, &immediate_vbo);
     }
 }
 
-void Renderer::immediate_flush() {
+void Renderer::imm_flush() {
     if (!vertices.len) { return; }
     
     Shader *shader = current_shader;
@@ -384,7 +385,7 @@ void Renderer::immediate_flush() {
     glDrawArrays(GL_TRIANGLES, 0, vertices.len);
 }
 
-void Renderer::immediate_vertex(const Vertex &v) {
+void Renderer::imm_vertex(const Vertex &v) {
     vertices.add(v);
 }
 
@@ -412,73 +413,81 @@ void Renderer::set_texture(Texture *texture) {
     this->current_texture = texture;
 }
 
-void Renderer::draw_rect(Rect rect, Vec4 color, Rect uv_rect) {
+void Renderer::imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+                             Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
+                             Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,
+                             Texture *texture) {
+    this->set_texture(texture);
+    this->imm_begin();
     Vertex v0, v1, v2, v3;
-    v0.p = Vec3(rect.top_left());
-    v0.uv = uv_rect.top_left();
-    v0.c = color;
-    v1.p = Vec3(rect.top_right());
-    v1.uv = uv_rect.top_right();
-    v1.c = color;
-    v2.p = Vec3(rect.bottom_left());
-    v2.uv = uv_rect.bottom_left();
-    v2.c = color;
-    v3.p = Vec3(rect.bottom_right());
-    v3.uv = uv_rect.bottom_right();
-    v3.c = color;
+    v0.p = v00;
+    v0.uv = uv00;
+    v0.c = c00;
+    v1.p = v01;
+    v1.uv = uv01;
+    v1.c = c01;
+    v2.p = v10;
+    v2.uv = uv10;
+    v2.c = c10;
+    v3.p = v11;
+    v3.uv = uv11;
+    v3.c = c11;
+    this->imm_vertex(v3);
+    this->imm_vertex(v1);
+    this->imm_vertex(v0);
+    this->imm_vertex(v0);
+    this->imm_vertex(v2);
+    this->imm_vertex(v3);
+    this->imm_flush();                  
+}
+
+void Renderer::imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+                             Vec4 c, Texture *texture) {
+    this->imm_draw_quad(v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture);
+}
+
+void Renderer::imm_draw_rect(Rect rect, Vec4 color, Rect uv_rect, Texture *texture) {
+    Vec3 v[4]; 
+    rect.store_points(v);
+    Vec2 uvs[4];
+    uv_rect.store_points(uvs);
+    this->imm_draw_quad(v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], texture);
+}
+
+// void Renderer::imm_draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
+//     f32 line_height = font->size * scale;
+
+// 	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
+// 	f32 rheight = 1.0f / (f32)font->tex->size.y;
+
+// 	Vec3 offset = Vec3(p, 0);
+// 	offset.y += line_height;
     
-    immediate_vertex(v3);
-    immediate_vertex(v1);
-    immediate_vertex(v0);
-    immediate_vertex(v0);
-    immediate_vertex(v2);
-    immediate_vertex(v3);
-}
+//     set_shader();
+// 	for (const char *scan = text; *scan; ++scan) {
+// 		char symbol = *scan;
 
-void Renderer::draw_mesh(Mesh *mesh) {
-    for (size_t i = 0; i < mesh->index_count; i += 3) {
-        immediate_vertex(mesh->vertices[mesh->indices[i]]);
-        immediate_vertex(mesh->vertices[mesh->indices[i + 1]]);
-        immediate_vertex(mesh->vertices[mesh->indices[i + 2]]);
-    }
-}
+// 		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
+// 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 
+// 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
+// 			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
 
-void Renderer::draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
-    f32 line_height = font->size * scale;
+// 			f32 y1 = offset.y + glyph->offset1_y * scale;
+// 			f32 y2 = y1 + glyph_height;
+// 			f32 x1 = offset.x + glyph->offset1_x * scale;
+// 			f32 x2 = x1 + glyph_width;
 
-	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
-	f32 rheight = 1.0f / (f32)font->tex->size.y;
-
-	Vec3 offset = Vec3(p, 0);
-	offset.y += line_height;
-    
-    set_shader();
-    set_texture(font->tex);
-	for (const char *scan = text; *scan; ++scan) {
-		char symbol = *scan;
-
-		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
-			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
-
-			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
-			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
-
-			f32 y1 = offset.y + glyph->offset1_y * scale;
-			f32 y2 = y1 + glyph_height;
-			f32 x1 = offset.x + glyph->offset1_x * scale;
-			f32 x2 = x1 + glyph_width;
-
-			f32 s1 = glyph->min_x * rwidth;
-			f32 t1 = glyph->min_y * rheight;
-			f32 s2 = glyph->max_x * rwidth;
-			f32 t2 = glyph->max_y * rheight;
-            draw_rect(Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1));
-			f32 char_advance = glyph->x_advance * scale;
-			offset.x += char_advance;
-		}
-	}
-}
+// 			f32 s1 = glyph->min_x * rwidth;
+// 			f32 t1 = glyph->min_y * rheight;
+// 			f32 s2 = glyph->max_x * rwidth;
+// 			f32 t2 = glyph->max_y * rheight;
+//             this->imm_draw_rect(Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1), font->tex);
+// 			f32 char_advance = glyph->x_advance * scale;
+// 			offset.x += char_advance;
+// 		}
+// 	}
+// }
 
 void Renderer::set_renderering_3d(Mat4x4 proj, Mat4x4 view) {
     set_projview(proj, view);

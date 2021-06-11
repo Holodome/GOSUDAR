@@ -5,14 +5,11 @@
 #include "thirdparty/glcorearb.h"
 
 const static GLuint GL_INVALID_ID = 0;
-#define IS_GL_VALID_ID(_id) (_id != GL_INVALID_ID)
 
 #define GLPROC(_name, _type) \
 extern _type _name;
 #include "renderer/gl_procs.inc"
 #undef GLPROC
-
-typedef u32 Index;
 
 struct Vertex {
     Vec3 p = Vec3(0);
@@ -68,10 +65,10 @@ struct Font {
 struct Mesh {
     Vertex *vertices = 0;
     size_t vertex_count = 0;   
-    Index *indices = 0;
+    u32 *indices = 0;
     size_t index_count = 0;
     
-    Mesh(const Vertex *vertices, size_t vertex_count, const Index *indices, size_t index_count);
+    Mesh(const Vertex *vertices, size_t vertex_count, const u32 *indices, size_t index_count);
     ~Mesh();
 };
 
@@ -109,9 +106,9 @@ struct Renderer {
     
     void clear(Vec4 color);
     void set_draw_region(Vec2 window_size);
-    void immediate_begin();
-    void immediate_flush();
-    void immediate_vertex(const Vertex &v);
+    void imm_begin();
+    void imm_flush();
+    void imm_vertex(const Vertex &v);
     void set_projview(const Mat4x4 &proj = Mat4x4::identity(), const Mat4x4 &view = Mat4x4::identity());
     void set_model(const Mat4x4 &model = Mat4x4::identity());
     void set_shader(Shader *shader = 0);
@@ -120,9 +117,14 @@ struct Renderer {
     void set_renderering_3d(Mat4x4 proj, Mat4x4 view);
     void set_renderering_2d(Vec2 winsize);
     
-    void draw_rect(Rect rect, Vec4 color, Rect uv_rect = Rect(0, 0, 1, 1));
-    void draw_mesh(Mesh *mesh);
-    void draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale = 1.0f);
+    void imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+                       Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
+                       Vec2 uv00 = Vec2(0, 0), Vec2 uv01 = Vec2(0, 1), Vec2 uv10 = Vec2(1, 0), Vec2 uv11 = Vec2(1, 1),
+                       Texture *texture = 0);
+    void imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+                       Vec4 c = Colors::white, Texture *texture = 0);
+    void imm_draw_rect(Rect rect, Vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), Texture *texture = 0);
+    // void imm_draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale = 1.0f);
 };
 
 #define RENDERER_H 1

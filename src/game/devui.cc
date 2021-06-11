@@ -211,22 +211,22 @@ void DevUI::end_frame() {
     if (!this->is_enabled) {
         // assert(draw_queue.len == 0);
     } else {
-        // for (i64 window_id_idx = windows_order.len - 1; window_id_idx >= 0; --window_id_idx) {
         for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
             DevUIWindow &window = windows[windows_order[window_id_idx]];
             game->renderer.set_renderering_2d(game->input.winsize);
             game->renderer.set_shader(game->renderer.standard_shader);
+            game->renderer.set_model();
             for (u32 i = 0; i < window.draw_queue.len; ++i) {
                 DevUIDrawQueueEntry *entry = &window.draw_queue[i];
-                game->renderer.immediate_begin();
+                game->renderer.imm_begin();
                 game->renderer.set_texture(entry->tex);
-                game->renderer.immediate_vertex(entry->v[3]);
-                game->renderer.immediate_vertex(entry->v[1]);
-                game->renderer.immediate_vertex(entry->v[0]);
-                game->renderer.immediate_vertex(entry->v[0]);
-                game->renderer.immediate_vertex(entry->v[2]);
-                game->renderer.immediate_vertex(entry->v[3]);
-                game->renderer.immediate_flush();
+                game->renderer.imm_vertex(entry->v[3]);
+                game->renderer.imm_vertex(entry->v[1]);
+                game->renderer.imm_vertex(entry->v[0]);
+                game->renderer.imm_vertex(entry->v[0]);
+                game->renderer.imm_vertex(entry->v[2]);
+                game->renderer.imm_vertex(entry->v[3]);
+                game->renderer.imm_flush();
             }
             window.draw_queue.clear();
         }

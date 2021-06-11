@@ -31,6 +31,7 @@ struct TextureLibrary {
     // Perform load from data, data is made owned by this
     void load(const char *name, void *data, Vec2i size);
     TextureData *get(const char *name);
+    Texture *get_tex(const char *name);
 };
 
 #define TEXTURE_LIBRARY_HH 1

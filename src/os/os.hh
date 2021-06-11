@@ -132,10 +132,10 @@ struct OS {
     void init();
     void cleanup();
     
+    f32 get_time() const;
+    
     // Loads all opengl functions
     void init_renderer_backend();
-    // Sets up time counting
-    void prepare_to_start();
     void update_input(Input *input);
     void update_window();
     

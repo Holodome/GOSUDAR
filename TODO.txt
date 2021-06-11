@@ -4,3 +4,9 @@
 - Check how calling window with one name multiple times works
 - Find out reason for delay when interacting with ui (can be seen while moving window)
 - Save devui windows positions, remove rects from window creation 
+- Check texture library for perfomance
+- Find a way to save memory on textures in texture library (they are not freed until program end)
+- Check how hash tables react on storage overflowing
+- Buttons press is not working properly.....
+- A way to render sprites in 3d world horizontally (split with 2d)
+- Select tiles on map

@@ -19,10 +19,6 @@ int main(int argc, char **argv) {
         mleak = true;
         logprintln("Mem", "Memory leak detected: free not called %llu times", Mem::times_alloced);
     }
-    if (Mem::currently_allocated) {
-        mleak = true;
-        logprintln("Mem", "Memory leak detected: %llu bytes are not deallocated", Mem::currently_allocated);
-    }
     
     if (!mleak) {
         logprintln("Mem", "No memory leaks detected");

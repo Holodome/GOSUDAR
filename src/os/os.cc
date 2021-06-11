@@ -123,6 +123,14 @@ void OS::init() {
                                      window_width, window_height, 0, 0, internal->instance, 0);
     ShowWindow(internal->hwnd, SW_SHOW);
     UpdateWindow(internal->hwnd);
+    
+    LARGE_INTEGER pf;
+    QueryPerformanceFrequency(&pf);
+    internal->perf_count_frequency = pf.QuadPart;
+    
+    LARGE_INTEGER time;
+    QueryPerformanceCounter(&time);
+    internal->last_frame_time = internal->game_start_time = time;
     logprintln("OS", "Init end");
 }
 
@@ -189,17 +197,6 @@ void OS::init_renderer_backend() {
 #undef GLPROC
     
     internal->wglSwapIntervalEXT(1);
-}
-
-void OS::prepare_to_start() {
-    logprintln("OS", "Prepare to start");
-    LARGE_INTEGER pf;
-    QueryPerformanceFrequency(&pf);
-    internal->perf_count_frequency = pf.QuadPart;
-    
-    LARGE_INTEGER time;
-    QueryPerformanceCounter(&time);
-    internal->last_frame_time = internal->game_start_time = time;
 }
 
 void OS::update_input(Input *input) {
@@ -395,4 +392,11 @@ void OS::go_fullscreen(bool fullscreen) {
         SetWindowPos(this->internal->hwnd, 0, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
+}
+
+f32 OS::get_time() const {
+    LARGE_INTEGER current_time;
+    QueryPerformanceCounter(&current_time);
+    f32 delta_time = (f32)(current_time.QuadPart - internal->game_start_time.QuadPart) / (f32)internal->perf_count_frequency;
+    return delta_time;
 }

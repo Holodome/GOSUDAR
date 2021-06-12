@@ -8,5 +8,5 @@
 - Find a way to save memory on textures in texture library (they are not freed until program end)
 - Check how hash tables react on storage overflowing
 - Buttons press is not working properly.....
-- A way to render sprites in 3d world horizontally (split with 2d)
 - Select tiles on map
+- http://www.opengl-tutorial.org/ru/intermediate-tutorials/billboards-particles/billboards/ 

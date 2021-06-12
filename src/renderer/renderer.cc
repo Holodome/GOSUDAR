@@ -500,12 +500,26 @@ void Renderer::set_renderering_2d(Vec2 winsize) {
     glDisable(GL_DEPTH_TEST);
 }
 
-void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness, Vec3 cam_z) {
+void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
+    Vec3 cam_z = Mat4x4::inverse(this->projection_matrix * this->view_matrix).v[2].xyz;
     Vec3 line = (b - a);
     line -= cam_z * Math::dot(cam_z, line);
     Vec3 line_perp = Math::cross(line, cam_z);
     line_perp = Math::normalize(line_perp);
     line_perp *= thickness;
     this->imm_draw_quad(a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
+}
+
+void Renderer::imm_draw_quad_outline(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {
+    this->imm_draw_line(v00, v01, color, thickness);
+    this->imm_draw_line(v10, v11, color, thickness);
+    this->imm_draw_line(v11, v01, color, thickness);
+    this->imm_draw_line(v01, v00, color, thickness);
+}
+
+void Renderer::imm_draw_rect_outline(Rect rect, Vec4 color, f32 thickness) {
+    Vec3 v[4]; 
+    rect.store_points(v);
+    this->imm_draw_quad_outline(v[0], v[1], v[2], v[3], color, thickness);
 }

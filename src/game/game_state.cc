@@ -86,8 +86,7 @@ void GameState::render() {
         }
     }
     
-    
-    game->renderer.imm_draw_line(Vec3(0, 1, 0),  this->point_on_plane, Colors::red, 0.01f, this->camera.uv_to_world(Vec2(0)));
+    game->renderer.imm_draw_line(Vec3(0, 1, 0),  this->point_on_plane, Colors::red, 0.01f);
     game->renderer.set_renderering_2d(game->input.winsize);
 }
 

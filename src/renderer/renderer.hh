@@ -124,8 +124,9 @@ struct Renderer {
     void imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
                        Vec4 c = Colors::white, Texture *texture = 0);
     void imm_draw_rect(Rect rect, Vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), Texture *texture = 0);
-    void imm_draw_line(Vec3 a, Vec3 b, Vec4 color = Colors::white, f32 thickness = 1.0f, Vec3 cam_z = Vec3(0, 0, 1));
-    // void imm_draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale = 1.0f);
+    void imm_draw_line(Vec3 a, Vec3 b, Vec4 color = Colors::white, f32 thickness = 1.0f);
+    void imm_draw_quad_outline(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color = Colors::white, f32 thickness = 1.0f);
+    void imm_draw_rect_outline(Rect rect, Vec4 color = Colors::white, f32 thickness = 1.0f);
 };
 
 #define RENDERER_H 1

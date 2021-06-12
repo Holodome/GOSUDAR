@@ -9,7 +9,7 @@
 void GameState::init() {
     logprintln("GameState", "Init start");
     
-    game->tex_lib.load("dog.jpg", "dog");
+    game->tex_lib.load("e:\\dev\\GAMEMEME\\dog.jpg", "dog");
     
     cube = make_cube();
     rect = make_rect();
@@ -85,12 +85,28 @@ void GameState::update_input() {
 }
 
 void GameState::update_logic() {
-    camera.projection = Mat4x4::perspective(Math::rad(60), game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
+    dev_ui.window("Debug", Rect(0, 0, 400, 400));
+    static f32 vfov = Math::rad(60);
+    static f32 focus_dist = 1.0f;
+    dev_ui.slider_float("FOV", &vfov, 0, Math::rad(120));
+    dev_ui.drag_float("Focus dist", &focus_dist, 0.1f);
+    
+    camera.projection = Mat4x4::perspective(vfov, game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
     camera.view = Mat4x4::identity() * Mat4x4::rotation(camera.rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(camera.rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-camera.pos);
     
-    dev_ui.window("Debug", Rect(0, 0, 400, 400));
+    f32 x = (2.0f * game->input.mpos.x) / game->input.winsize.x - 1.0f;
+    f32 y = 1.0f - (2.0f * game->input.mpos.y) / game->input.winsize.y;
+    Vec3 ray_dir = this->camera.screen_to_world(Vec2(x, y));
+    dev_ui.textf("rd: %f %f %f", ray_dir.x, ray_dir.y, ray_dir.z);
+    
+    f32 t = (-0 - Math::dot(Vec3(0, 1, 0), camera.pos)) / Math::dot(Vec3(0, 1, 0), ray_dir);
+    Vec3 p = camera.pos + ray_dir * t;
+    this->point_on_plane = p;
+    
     dev_ui.textf("DevUI focused: %s", (dev_ui.is_focused ? "true" : "false"));
-    dev_ui.textf("Draw call count: %llu", game->renderer.last_frame_statisitcs.draw_call_count);
+    dev_ui.textf("Mouse: %f %f", game->input.mpos.x, game->input.mpos.y);
+    dev_ui.textf("P: %f %f %f", p.x, p.y, p.z);
+    dev_ui.textf("Draw call count: %llu", game->renderer.statistics.draw_call_count);
     dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
     if (dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
         game->os.go_fullscreen(this->settings.fullscreen);
@@ -105,9 +121,23 @@ void GameState::update_logic() {
 
 void GameState::render() {
     game->renderer.set_renderering_3d(camera.projection, camera.view);
-    // Draw map
- 
-    game->renderer.imm_draw_rect(Rect(0, 0, 1, 1), Vec4(1), Rect(0, 0, 1, 1),  game->tex_lib.get_tex("dog"));   
+    // // Draw map
+    Vec2i map_size = Vec2i(10, 10);
+    f32 tile_size = 2.0f;
+    for (size_t y = 0; y < map_size.y; ++y) {
+        for (size_t x = 0; x < map_size.x; ++x) {
+            Vec4 color = Colors::green;
+            game->renderer.imm_draw_quad(Vec3(x, 0, y) * tile_size, Vec3(x, 0, y + 1) * tile_size,
+                                         Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
+                                         color);
+        }
+    }
+    
+    
+    game->renderer.imm_draw_line(Vec3(0, 1, 0),  this->point_on_plane, Colors::red, 0.01f, this->camera.screen_to_world(Vec2(0)));
+    // game->renderer.imm_draw_rect(Rect(0, 0, 1, 1), Vec4(1), Rect(0, 0, 1, 1),  game->tex_lib.get_tex("dog"));   
+    // game->renderer.imm_draw_line(camera.pos, this->point_on_plane + Vec3(0, 1, 0), Colors::red, 1.0f, this->camera.screen_to_world(Vec2(0)));
+    game->renderer.set_renderering_2d(game->input.winsize);
 }
 
 void GameState::update() {

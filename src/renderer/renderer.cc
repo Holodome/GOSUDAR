@@ -317,8 +317,8 @@ void main() {
    
     // glEnable(GL_DEPTH_TEST);
     // glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
     glCullFace(GL_BACK);
+    glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     logprint("Renderer", "Init end\n");
@@ -330,8 +330,8 @@ void Renderer::cleanup() {
 }
 
 void Renderer::begin_frame() {
-    last_frame_statisitcs = statistics;
-    statistics.begin_frame();
+    statistics = current_statistics;
+    current_statistics.begin_frame();
 }
 
 void Renderer::clear(Vec4 color) {
@@ -381,7 +381,7 @@ void Renderer::imm_flush() {
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
     glEnableVertexAttribArray(3);
     
-    ++statistics.draw_call_count;
+    ++current_statistics.draw_call_count;
     glDrawArrays(GL_TRIANGLES, 0, vertices.len);
 }
 
@@ -498,4 +498,11 @@ void Renderer::set_renderering_2d(Vec2 winsize) {
     Mat4x4 win_proj = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
     game->renderer.set_projview(win_proj);
     glDisable(GL_DEPTH_TEST);
+}
+
+void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness, Vec3 cam_z) {
+    // @TODO not behaving properly when ab is close to parallel with cam_z
+    Vec3 ab = (b - a);
+    Vec3 ab_perp = Math::normalize(Math::cross(ab, cam_z)) * thickness;
+    this->imm_draw_quad(a - ab_perp, a + ab_perp, b - ab_perp, b + ab_perp, color);
 }

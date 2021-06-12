@@ -238,6 +238,9 @@ namespace Math {
             struct {
                 T r, g, b, a;
             };
+            struct {
+                Vec3G<T> xyz;
+            };
             T e[4];
         };
         
@@ -511,13 +514,13 @@ namespace Math {
             Vec4 vec2 = Vec4(m.e[1][2], m.e[0][2], m.e[0][2], m.e[0][2]);
             Vec4 vec3 = Vec4(m.e[1][3], m.e[0][3], m.e[0][3], m.e[0][3]);
             
-            Vec4 inv0 = vec1 * fac0 - vec2 * fac1 + vec3 * fac2;
-            Vec4 inv1 = vec0 * fac0 - vec2 * fac3 + vec3 * fac4;
-            Vec4 inv2 = vec0 * fac1 - vec1 * fac3 + vec3 * fac5;
-            Vec4 inv3 = vec0 * fac2 - vec1 * fac4 + vec2 * fac5;
+            Vec4 inv0 = (vec1 * fac0) - (vec2 * fac1) + (vec3 * fac2);
+            Vec4 inv1 = (vec0 * fac0) - (vec2 * fac3) + (vec3 * fac4);
+            Vec4 inv2 = (vec0 * fac1) - (vec1 * fac3) + (vec3 * fac5);
+            Vec4 inv3 = (vec0 * fac2) - (vec1 * fac4) + (vec2 * fac5);
             
             const Vec4 sign_a = Vec4(1, -1,  1, -1);
-            const Vec4 sign_b = Vec4(1,  1, -1,  1);
+            const Vec4 sign_b = Vec4(-1,  1, -1,  1);
             
             Mat4x4 inverse;
             for(u32 i = 0; 

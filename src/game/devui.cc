@@ -215,7 +215,6 @@ void DevUI::end_frame() {
             DevUIWindow &window = windows[windows_order[window_id_idx]];
             game->renderer.set_renderering_2d(game->input.winsize);
             game->renderer.set_shader(game->renderer.standard_shader);
-            game->renderer.set_model();
             for (u32 i = 0; i < window.draw_queue.len; ++i) {
                 DevUIDrawQueueEntry *entry = &window.draw_queue[i];
                 game->renderer.imm_begin();
@@ -492,17 +491,17 @@ bool DevUI::drag_float(const char *label, f32 *value, f32 speed) {
 
 void DevUI::value(const char *label, f32 value) {
     WIDGET_DEF_HEADER();
-    this->textf("%s: %f", label, value);
+    this->textf("%s: %.2f", label, value);
 }
 
 void DevUI::value(const char *label, Vec2 value) {
     WIDGET_DEF_HEADER();
-    this->textf("%s: %f, %f", label, value.x, value.y);
+    this->textf("%s: %.2f, %.2f", label, value.x, value.y);
 }
 
 void DevUI::value(const char *label, Vec3 value) {
     WIDGET_DEF_HEADER();
-    this->textf("%s: %f, %f, %f", label, value.x, value.y, value.z);
+    this->textf("%s: %.2f, %.2f, %.2f", label, value.x, value.y, value.z);
 }
 
 bool DevUI::drag_float3(const char *label, f32 value[3], f32 speed) {
@@ -642,7 +641,8 @@ void DevUI::window(const char *title, Rect rect) {
 void DevUI::window_end() {
     CHECK_IS_ENABLED();    
     CHECK_CUR_WIN_IS_PRESENT;
-    if (!active_id && !hot_id && cur_win->title_bar_rect.collide(game->input.mpos)
+    // @CLEAN
+    if (!active_id && !hot_id && this->windows_order[this->windows_order.len - 1] == cur_win->array_idx && cur_win->title_bar_rect.collide(game->input.mpos)
         && game->input.is_key_held(Key::MouseLeft) && HAS_INPUT) {
         active_id = make_id("$MOVE");
     }

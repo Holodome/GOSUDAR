@@ -46,7 +46,7 @@ void GameState::update_input() {
 }
 
 void GameState::update_logic() {
-    dev_ui.window("Debug", Rect(0, 0, 400, 400));
+    dev_ui.window("Dev", Rect(500, 0, 400, 300));
     
     this->camera.recalculate_matrices();
     Vec3 ray_dir = this->camera.screen_to_world(game->input.mpos);
@@ -56,9 +56,11 @@ void GameState::update_logic() {
     } else {
         this->point_on_plane = Vec3(0, 1, 0);
     }
+    dev_ui.value("Selected point", this->point_on_plane);
+    dev_ui.window_end();
     
+    dev_ui.window("Debug", Rect(0, 0, 400, 400));
     dev_ui.textf("DevUI focused: %s", (dev_ui.is_focused ? "true" : "false"));
-    dev_ui.value("Mouse pos", game->input.mpos);
     dev_ui.textf("Draw call count: %llu", game->renderer.statistics.draw_call_count);
     dev_ui.textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);
     if (dev_ui.checkbox("Fullscreen", &this->settings.fullscreen)) {
@@ -85,8 +87,14 @@ void GameState::render() {
                                          color);
         }
     }
+    if (Math::length(this->point_on_plane - Vec3(0, 1, 0)) > 0.001f) {
+        i32 x = this->point_on_plane.x / tile_size;
+        i32 y = this->point_on_plane.z / tile_size;
+        game->renderer.imm_draw_quad_outline(Vec3(x, 0, y) * tile_size, Vec3(x, 0, y + 1) * tile_size,
+                                             Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
+                                             Colors::black, 0.02f);
+    }
     
-    game->renderer.imm_draw_line(Vec3(0, 1, 0),  this->point_on_plane, Colors::red, 0.01f);
     game->renderer.set_renderering_2d(game->input.winsize);
 }
 

@@ -95,7 +95,8 @@ struct Renderer {
     
     Mat4x4 view_matrix       = Mat4x4::identity();
     Mat4x4 projection_matrix = Mat4x4::identity();
-    Mat4x4 model_matrix      = Mat4x4::identity();
+    Mat4x4 mvp               = Mat4x4::identity();
+    Mat4x4 imvp              = Mat4x4::identity();
     
     RendererStatistics current_statistics = {}, statistics = {};
     
@@ -110,7 +111,6 @@ struct Renderer {
     void imm_flush();
     void imm_vertex(const Vertex &v);
     void set_projview(const Mat4x4 &proj = Mat4x4::identity(), const Mat4x4 &view = Mat4x4::identity());
-    void set_model(const Mat4x4 &model = Mat4x4::identity());
     void set_shader(Shader *shader = 0);
     void set_texture(Texture *texture = 0);
     

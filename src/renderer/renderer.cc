@@ -362,8 +362,7 @@ void Renderer::imm_flush() {
     Shader *shader = current_shader;
     assert(shader);
     shader->bind();
-    Mat4x4 mvp = projection_matrix * view_matrix * model_matrix;
-    glUniformMatrix4fv(glGetUniformLocation(shader->id, "mvp"), 1, false, mvp.value_ptr());
+    glUniformMatrix4fv(glGetUniformLocation(shader->id, "mvp"), 1, false, this->mvp.value_ptr());
     Texture *texture = current_texture;
 	assert(texture);
     texture->bind();
@@ -392,10 +391,8 @@ void Renderer::imm_vertex(const Vertex &v) {
 void Renderer::set_projview(const Mat4x4 &proj, const Mat4x4 &view) {
     this->projection_matrix = proj;
     this->view_matrix = view;
-}
-
-void Renderer::set_model(const Mat4x4 &model) {
-    this->model_matrix = model;
+    this->mvp = this->projection_matrix * this->view_matrix;
+    this->imvp = Mat4x4::inverse(this->mvp);
 }
 
 void Renderer::set_shader(Shader *shader) {
@@ -502,20 +499,25 @@ void Renderer::set_renderering_2d(Vec2 winsize) {
 
 void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
-    Vec3 cam_z = Mat4x4::inverse(this->projection_matrix * this->view_matrix).v[2].xyz;
+    Vec3 cam_z = this->imvp.v[2].xyz;
     Vec3 line = (b - a);
     line -= cam_z * Math::dot(cam_z, line);
     Vec3 line_perp = Math::cross(line, cam_z);
+    Vec3 other_perp = Math::cross(line_perp, line);
     line_perp = Math::normalize(line_perp);
+    // other_perp = Math::normalize(other_perp);
     line_perp *= thickness;
+    // other_perp *= thickness;
     this->imm_draw_quad(a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
+    // this->imm_draw_quad(a - other_perp, a + other_perp, b - other_perp, b + other_perp, color);
+    
 }
 
 void Renderer::imm_draw_quad_outline(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {
     this->imm_draw_line(v00, v01, color, thickness);
-    this->imm_draw_line(v10, v11, color, thickness);
-    this->imm_draw_line(v11, v01, color, thickness);
-    this->imm_draw_line(v01, v00, color, thickness);
+    this->imm_draw_line(v01, v11, color, thickness);
+    this->imm_draw_line(v11, v10, color, thickness);
+    this->imm_draw_line(v10, v00, color, thickness);
 }
 
 void Renderer::imm_draw_rect_outline(Rect rect, Vec4 color, f32 thickness) {

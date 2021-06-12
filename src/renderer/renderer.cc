@@ -502,7 +502,10 @@ void Renderer::set_renderering_2d(Vec2 winsize) {
 
 void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness, Vec3 cam_z) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
-    Vec3 ab = (b - a);
-    Vec3 ab_perp = Math::normalize(Math::cross(ab, cam_z)) * thickness;
-    this->imm_draw_quad(a - ab_perp, a + ab_perp, b - ab_perp, b + ab_perp, color);
+    Vec3 line = (b - a);
+    line -= cam_z * Math::dot(cam_z, line);
+    Vec3 line_perp = Math::cross(line, cam_z);
+    line_perp = Math::normalize(line_perp);
+    line_perp *= thickness;
+    this->imm_draw_quad(a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
 }

@@ -490,6 +490,21 @@ bool DevUI::drag_float(const char *label, f32 *value, f32 speed) {
     return is_value_changed;
 }
 
+void DevUI::value(const char *label, f32 value) {
+    WIDGET_DEF_HEADER();
+    this->textf("%s: %f", label, value);
+}
+
+void DevUI::value(const char *label, Vec2 value) {
+    WIDGET_DEF_HEADER();
+    this->textf("%s: %f, %f", label, value.x, value.y);
+}
+
+void DevUI::value(const char *label, Vec3 value) {
+    WIDGET_DEF_HEADER();
+    this->textf("%s: %f, %f, %f", label, value.x, value.y, value.z);
+}
+
 bool DevUI::drag_float3(const char *label, f32 value[3], f32 speed) {
     WIDGET_DEF_HEADER(false);
     DevUIID id = this->make_id(label);

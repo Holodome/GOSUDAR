@@ -4,4 +4,5 @@
 #include "game/game_state.cc"
 #include "game/texture_library.cc"
 #include "game/devui.cc"
+#include "game/camera.cc"
 #include "main.cc"

@@ -134,6 +134,10 @@ struct DevUI {
     bool drag_float(const char *label, f32 *value, f32 speed = 0.2f);
     bool drag_float3(const char *label, f32 value[3], f32 speed = 0.2f);
     
+    void value(const char *label, f32 value);
+    void value(const char *label, Vec2 value);
+    void value(const char *label, Vec3 value);
+    
     // Utility functions
     void label(const char *label);
     Vec2 get_text_size(const char *text, size_t count = 0);

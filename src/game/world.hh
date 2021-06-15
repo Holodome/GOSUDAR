@@ -7,6 +7,7 @@
 struct World {
     Camera camera = {};
 
+    Vec2i map_size = Vec2i(10, 10);
     Vec3 player_pos = Vec3(0, 0, 0);
     Vec3 point_on_plane;
 

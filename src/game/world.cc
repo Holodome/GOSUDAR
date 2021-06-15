@@ -10,7 +10,26 @@ void World::cleanup() {
 }
 
 void World::update() {
-    this->camera.update_input();
+    f32 move_coef = 4.0f * game->input.dt;
+    f32 z_speed = 0;
+    if (game->input.is_key_held(Key::W)) {
+        z_speed = move_coef;
+    } else if (game->input.is_key_held(Key::S)) {
+        z_speed = -move_coef;
+    }
+    this->player_pos.x += z_speed *  sinf(this->camera.rot.x);
+    this->player_pos.z += z_speed * -cosf(this->camera.rot.x);
+    
+    f32 x_speed = 0;
+    if (game->input.is_key_held(Key::D)) {
+        x_speed = move_coef;
+    } else if (game->input.is_key_held(Key::A)) {
+        x_speed = -move_coef;
+    }
+    this->player_pos.x += x_speed *  sinf(this->camera.rot.x + Math::HALF_PI);
+    this->player_pos.z += x_speed * -cosf(this->camera.rot.x + Math::HALF_PI);
+    this->camera.center_pos = this->player_pos;
+    this->camera.update();
     
     this->camera.recalculate_matrices();
     Vec3 ray_dir = this->camera.screen_to_world(game->input.mpos);
@@ -20,15 +39,18 @@ void World::update() {
     } else {
         this->point_on_plane = Vec3(0, 1, 0);
     }
-    dev_ui->value("Selected point", this->point_on_plane);
-    dev_ui->window_end();
-    this->player_pos = this->camera.pos;
+ 
 }
 
 void World::render() {
+    dev_ui->window("World", Rect(500, 0, 400, 400));
+    dev_ui->drag_float3("Player pos", this->player_pos.e);
+    dev_ui->value("Selected point", this->point_on_plane);
+    dev_ui->value("Camera pos", this->camera.pos);
+    dev_ui->value("Camera rot", this->camera.rot);
+    dev_ui->window_end();
     renderer->set_renderering_3d(camera.mvp);
     // Draw map
-    Vec2i map_size = Vec2i(10, 10);
     f32 tile_size = 2.0f;
     for (size_t y = 0; y < map_size.y; ++y) {
         for (size_t x = 0; x < map_size.x; ++x) {
@@ -52,7 +74,7 @@ void World::render() {
     Vec3 up = this->camera.mvp.get_y();
     f32 width = 0.5f;
     f32 height = 0.5f;
-    Vec3 mid_bottom = this->point_on_plane;
+    Vec3 mid_bottom = this->player_pos;
     Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
     Vec3 top_right = top_left + right * width;
     Vec3 bottom_left = top_left - up * height;

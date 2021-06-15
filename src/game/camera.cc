@@ -3,7 +3,13 @@
 #include "game/game.hh"
 #include "game/ray_casting.hh"
 
-void Camera::update_input() {
+void Camera::init() {
+    
+}
+
+void Camera::update() {
+    this->distance_from_player -= game->input.mwheel;
+    
     if (game->input.is_key_held(Key::MouseLeft)) {
         f32 x_view_coef = 1.0f * game->input.dt;
         f32 y_view_coef = 0.6f * game->input.dt;
@@ -12,41 +18,22 @@ void Camera::update_input() {
         this->rot.x += x_angle_change;
         this->rot.x = Math::unwind_rad(this->rot.x);
         this->rot.y += y_angle_change;
-        this->rot.y = Math::clamp(this->rot.y, -Math::HALF_PI, Math::HALF_PI);
+        this->rot.y = Math::clamp(this->rot.y, 0.01f, Math::HALF_PI - 0.01f);
     }
     
-    f32 move_coef = 4.0f * game->input.dt;
-    f32 z_speed = 0;
-    if (game->input.is_key_held(Key::W)) {
-        z_speed = move_coef;
-    } else if (game->input.is_key_held(Key::S)) {
-        z_speed = -move_coef;
-    }
-    this->pos.x += z_speed *  sinf(this->rot.x);
-    this->pos.z += z_speed * -cosf(this->rot.x);
-    
-    f32 x_speed = 0;
-    if (game->input.is_key_held(Key::D)) {
-        x_speed = move_coef;
-    } else if (game->input.is_key_held(Key::A)) {
-        x_speed = -move_coef;
-    }
-    this->pos.x += x_speed *  sinf(this->rot.x + Math::HALF_PI);
-    this->pos.z += x_speed * -cosf(this->rot.x + Math::HALF_PI);
-    
-    f32 y_speed = 0;
-    if (game->input.is_key_held(Key::Ctrl)) {
-        y_speed = -move_coef;
-    } else if (game->input.is_key_held(Key::Space)) {
-        y_speed = move_coef;
-    }
-    this->pos.y += y_speed;
+    f32 horiz_distance = distance_from_player * Math::cos(this->rot.y);
+    f32 vert_distance = distance_from_player * Math::sin(this->rot.y);
+    f32 offsetx = horiz_distance * Math::sin(-this->rot.x);
+    f32 offsetz = horiz_distance * Math::cos(-this->rot.x);
+    this->pos.x = offsetx + this->center_pos.x;
+    this->pos.z = offsetz + this->center_pos.z;
+    this->pos.y = vert_distance;
 }
 
 void Camera::recalculate_matrices() {
-    f32 vfov = Math::rad(60);
-    this->projection = Mat4x4::perspective(vfov, game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
+    this->projection = Mat4x4::perspective(this->fovr, game->input.winsize.aspect_ratio(), this->near_plane, this->far_plane);
     this->view = Mat4x4::identity() * Mat4x4::rotation(this->rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(this->rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
+    // this->view = Mat4x4::identity() * Mat4x4::look_at(this->pos, this->center_pos) * Mat4x4::translate(-this->pos);
     this->mvp = this->projection * this->view;
 }
 

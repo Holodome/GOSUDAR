@@ -76,10 +76,27 @@ namespace Math {
     }
 
     template <typename T>
-    void swap(T &a, T &b) {
+    inline void swap(T &a, T &b) {
         T tmp = a;
         a = b;
         b = tmp;
+    }
+    
+    template <typename T>
+    inline T abs(T a) {
+        return (a < 0 ? -a : a);
+    }
+    
+    inline f32 sign(f32 a) {
+        return a / abs(a);
+    }
+    
+    inline f32 sin(f32 a) {
+        return sinf(a);
+    } 
+    
+    inline f32 cos(f32 a) {
+        return cosf(a);
     }
     
     template <typename T>
@@ -543,6 +560,26 @@ namespace Math {
                 inverse.i[i] *= one_over_det;
             }
             return inverse;
+        }
+        
+        static Mat4x4 look_at(Vec3 from, Vec3 to) {
+            Vec3 z = normalize(to - from);
+            Vec3 x = normalize(cross(Vec3(0, 1, 0), z));
+            Vec3 y = cross(z, x);
+            Mat4x4 result = identity();
+            result.e[0][0] = x.x;
+            result.e[1][0] = x.y;
+            result.e[2][0] = x.z;
+            result.e[3][0] = -dot(x, from);
+            result.e[0][1] = y.x;
+            result.e[1][1] = y.y;
+            result.e[2][1] = y.z;
+            result.e[3][1] = -dot(y, from);
+            result.e[0][2] = z.x;
+            result.e[1][2] = z.y;
+            result.e[2][2] = z.z;
+            result.e[3][2] = -dot(z, from);
+            return result;
         }
         
         friend Mat4x4 operator*(Mat4x4 a, Mat4x4 b) {

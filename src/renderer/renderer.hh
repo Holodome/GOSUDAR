@@ -127,5 +127,7 @@ struct Renderer {
     void imm_draw_rect_outline(Rect rect, Vec4 color = Colors::white, f32 thickness = 1.0f);
 };
 
+extern Renderer *renderer;
+
 #define RENDERER_H 1
 #endif

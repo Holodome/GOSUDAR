@@ -8,6 +8,8 @@
 #define WIDGET_DEF_HEADER(...) CHECK_IS_ENABLED(__VA_ARGS__) CHECK_CUR_WIN_IS_PRESENT CHECK_WINDOW_IS_NOT_COLLAPSED(__VA_ARGS__)
 #define HAS_INPUT (this->is_enabled && this->is_focused)
 
+DevUI *dev_ui;
+
 static inline Vec4 color_from_bstate(const DevUIButtonState &bstate, Vec4 held, Vec4 hot, Vec4 idle) {
     return (bstate.is_held ? held : bstate.is_hot ? hot : idle);
 }
@@ -213,19 +215,19 @@ void DevUI::end_frame() {
     } else {
         for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
             DevUIWindow &window = windows[windows_order[window_id_idx]];
-            game->renderer.set_renderering_2d(game->input.winsize);
-            game->renderer.set_shader(game->renderer.standard_shader);
+            renderer->set_renderering_2d(game->input.winsize);
+            renderer->set_shader(renderer->standard_shader);
             for (u32 i = 0; i < window.draw_queue.len; ++i) {
                 DevUIDrawQueueEntry *entry = &window.draw_queue[i];
-                game->renderer.imm_begin();
-                game->renderer.set_texture(entry->tex);
-                game->renderer.imm_vertex(entry->v[3]);
-                game->renderer.imm_vertex(entry->v[1]);
-                game->renderer.imm_vertex(entry->v[0]);
-                game->renderer.imm_vertex(entry->v[0]);
-                game->renderer.imm_vertex(entry->v[2]);
-                game->renderer.imm_vertex(entry->v[3]);
-                game->renderer.imm_flush();
+                renderer->imm_begin();
+                renderer->set_texture(entry->tex);
+                renderer->imm_vertex(entry->v[3]);
+                renderer->imm_vertex(entry->v[1]);
+                renderer->imm_vertex(entry->v[0]);
+                renderer->imm_vertex(entry->v[0]);
+                renderer->imm_vertex(entry->v[2]);
+                renderer->imm_vertex(entry->v[3]);
+                renderer->imm_flush();
             }
             window.draw_queue.clear();
         }
@@ -561,6 +563,7 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
     
 void DevUI::window(const char *title, Rect rect) {
     CHECK_IS_ENABLED();
+    assert(!this->cur_win);
     
     size_t title_len = strlen(title);
     assert(title_len < sizeof(DevUIWindow::title));
@@ -651,4 +654,9 @@ void DevUI::window_end() {
     pop_id();
     pop_clip_rect(); // widget zone
     pop_clip_rect(); // window
+}
+
+void DevUI::init() {
+    assert(!::dev_ui);
+    ::dev_ui = this;
 }

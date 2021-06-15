@@ -2,7 +2,7 @@
 
 #include "lib/lib.hh"
 
-#include "game/camera.hh"
+#include "game/world.hh"
 
 struct Settings {
     bool fullscreen = false;
@@ -11,23 +11,16 @@ struct Settings {
 };  
 
 struct GameState {
-    DevUI dev_ui = {};
+    DevUI local_dev_ui = {};
     
     Settings settings = {};
-    Camera camera = {};
-
-    Mesh *cube = 0;
-    Mesh *rect = 0;
-    
-    Vec3 player_pos = Vec3(0, 0, 0);
-    Vec3 point_on_plane;
+    World world = {};
     
     void init();
     void cleanup();
     
     void update();
-    // private
-    void update_input();
+    
     void update_logic();
     void render();
 };

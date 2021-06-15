@@ -2,18 +2,19 @@
 
 #include "lib/lib.hh"
 
-struct Tile {
-    bool is_walkable;    
-};
+#include "game/camera.hh"
 
 struct World {
-    Vec2i size;
-    Array<Tile> tiles;
+    Camera camera = {};
+
+    Vec3 player_pos = Vec3(0, 0, 0);
+    Vec3 point_on_plane;
+
+    void init();
+    void cleanup();
     
-    World(Vec2i size);
-    ~World();
-    
-    u32 tile_index(Vec2i pos);
+    void update();
+    void render();
 };  
 
 #define WORLD_HH 1

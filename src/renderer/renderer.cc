@@ -12,6 +12,8 @@ static _type _name;
 #include "renderer/gl_procs.inc"
 #undef GLPROC
 
+Renderer *renderer;
+
 static void APIENTRY
 opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                       const GLchar* message, const void *_) {
@@ -228,6 +230,7 @@ Font::Font(const char *filename, f32 height) {
 	}
     delete glyphs;
     delete text;
+    logprintln("Fonts", "Loaded font '%s'", filename);
 }
 
 Font::~Font() {
@@ -321,6 +324,8 @@ void main() {
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
+    assert(!::renderer);
+    ::renderer = this;
     logprint("Renderer", "Init end\n");
 }
 
@@ -491,7 +496,7 @@ void Renderer::set_renderering_3d(const Mat4x4 &mvp) {
 
 void Renderer::set_renderering_2d(Vec2 winsize) {
     Mat4x4 win_proj = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
-    game->renderer.set_mvp(win_proj);
+    renderer->set_mvp(win_proj);
     glDisable(GL_DEPTH_TEST);
 }
 

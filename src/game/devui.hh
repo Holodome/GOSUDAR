@@ -117,6 +117,7 @@ struct DevUI {
     
     bool is_enabled = false, is_focused = false;
     
+    void init(); 
     void begin_frame();
     void end_frame();
     // Widget functions
@@ -153,6 +154,8 @@ struct DevUI {
     void push_text(Vec2 p, const char *text, Vec4 color = DEVUI_COLOR_TEXT, f32 scale = DEVUI_TEXT_SCALE);
     bool is_text_input_key_pressed(Key key);
 };
+
+extern DevUI *dev_ui;
 
 #define DEVUI_HH 1
 #endif

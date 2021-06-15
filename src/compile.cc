@@ -5,4 +5,5 @@
 #include "game/texture_library.cc"
 #include "game/devui.cc"
 #include "game/camera.cc"
+#include "game/world.cc"
 #include "main.cc"

@@ -39,7 +39,7 @@ void GameState::update_logic() {
         this->world.update();
     }
     
-    dev_ui->window("Debug", Rect(0, 0, 400, 400));
+    dev_ui->window("Debug");
     dev_ui->textf("DevUI focused: %s", (dev_ui->is_focused ? "true" : "false"));
     dev_ui->textf("Draw call count: %llu", renderer->statistics.draw_call_count);
     dev_ui->textf("FPS: %.1f; DT: %.1fms", 1.0f / game->input.dt, game->input.dt * 1000.0f);

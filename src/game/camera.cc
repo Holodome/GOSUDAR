@@ -15,25 +15,24 @@ void Camera::update() {
         f32 y_view_coef = 0.6f * game->input.dt;
         f32 x_angle_change = game->input.mdelta.x * x_view_coef;
         f32 y_angle_change = game->input.mdelta.y * y_view_coef;
-        this->rot.x += x_angle_change;
-        this->rot.x = Math::unwind_rad(this->rot.x);
-        this->rot.y += y_angle_change;
-        this->rot.y = Math::clamp(this->rot.y, 0.01f, Math::HALF_PI - 0.01f);
+        this->yaw += x_angle_change;
+        this->yaw = Math::unwind_rad(this->yaw);
+        this->pitch += y_angle_change;
+        this->pitch = Math::clamp(this->pitch, 0.01f, Math::HALF_PI - 0.01f);
     }
     
-    f32 horiz_distance = distance_from_player * Math::cos(this->rot.y);
-    f32 vert_distance = distance_from_player * Math::sin(this->rot.y);
-    f32 offsetx = horiz_distance * Math::sin(-this->rot.x);
-    f32 offsetz = horiz_distance * Math::cos(-this->rot.x);
+    f32 horiz_distance = distance_from_player * Math::cos(this->pitch);
+    f32 vert_distance = distance_from_player * Math::sin(this->pitch);
+    f32 offsetx = horiz_distance * Math::sin(-this->yaw);
+    f32 offsetz = horiz_distance * Math::cos(-this->yaw);
     this->pos.x = offsetx + this->center_pos.x;
     this->pos.z = offsetz + this->center_pos.z;
     this->pos.y = vert_distance;
 }
 
 void Camera::recalculate_matrices() {
-    this->projection = Mat4x4::perspective(this->fovr, game->input.winsize.aspect_ratio(), this->near_plane, this->far_plane);
-    this->view = Mat4x4::identity() * Mat4x4::rotation(this->rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(this->rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
-    // this->view = Mat4x4::identity() * Mat4x4::look_at(this->pos, this->center_pos) * Mat4x4::translate(-this->pos);
+    this->projection = Mat4x4::perspective(this->fov, game->input.winsize.aspect_ratio(), this->near_plane, this->far_plane);
+    this->view = Mat4x4::identity() * Mat4x4::rotation(this->pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(this->yaw, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
     this->mvp = this->projection * this->view;
 }
 

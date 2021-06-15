@@ -67,7 +67,7 @@ struct DevUIID {
 };
 
 struct DevUIWindow {
-    char title[DEVUI_MAX_TITLE_SIZE] = {};
+    Str title = {};
     DevUIID id = DevUIID::empty();
     size_t array_idx = -1;
     
@@ -121,7 +121,7 @@ struct DevUI {
     void begin_frame();
     void end_frame();
     // Widget functions
-    void window(const char *title, Rect rect);
+    void window(const char *title);
     void window_end();
     void text(const char *text);
     void textv(const char *text, va_list args);
@@ -153,6 +153,7 @@ struct DevUI {
     void push_rect(Rect rect, Vec4 color, Texture *tex = 0, Rect uv_rect = Rect(0, 0, 1, 1));
     void push_text(Vec2 p, const char *text, Vec4 color = DEVUI_COLOR_TEXT, f32 scale = DEVUI_TEXT_SCALE);
     bool is_text_input_key_pressed(Key key);
+    Rect get_new_window_rect();
 };
 
 extern DevUI *dev_ui;

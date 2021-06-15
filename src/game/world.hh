@@ -16,6 +16,8 @@ struct World {
     
     void update();
     void render();
+    
+    void get_billboard_positions(Vec3 mid_bottom, f32 width, f32 height, Vec3 out[4]);
 };  
 
 #define WORLD_HH 1

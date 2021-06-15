@@ -560,8 +560,19 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
     return result;
 }
 
+Rect DevUI::get_new_window_rect() {
+    // @TODO some algorithm for creating rects that dont collide with previous
+    Rect rects[] = {
+        Rect(0, 0, 400, 400),
+        Rect(450, 0, 400, 400),
+        Rect(0, 450, 400, 400),
+        Rect(450, 450, 400, 400),
+    };
+    assert(this->windows.len <= ARRAY_SIZE(rects));
+    return rects[this->windows.len - 1];
+}
     
-void DevUI::window(const char *title, Rect rect) {
+void DevUI::window(const char *title) {
     CHECK_IS_ENABLED();
     assert(!this->cur_win);
     
@@ -572,7 +583,7 @@ void DevUI::window(const char *title, Rect rect) {
     bool use_new_slot = true;
     for (u32 i = 0; i < windows.len; ++i) {
         DevUIWindow *test_win = &windows[i];
-        if (!Str::cmp(title, test_win->title)) {
+        if (test_win->title.cmp(title)) {
             assert(!win);
             win = test_win;
             use_new_slot = false;
@@ -584,7 +595,8 @@ void DevUI::window(const char *title, Rect rect) {
         win = &windows[windows.add(DevUIWindow())];
         win->id = make_id(title, title_len);
         win->array_idx = windows.len - 1;
-        memcpy(win->title, title, title_len);
+        win->title = Str(title);
+        Rect rect = this->get_new_window_rect();
         win->whole_rect = rect;
         
         windows_order.add(win->array_idx);
@@ -632,7 +644,7 @@ void DevUI::window(const char *title, Rect rect) {
         push_rect(resize_rect, resize_color);
     }
     push_rect(win->title_bar_rect, DEVUI_COLOR_WINDOW_TITLEBAR);
-    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), win->title);
+    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), win->title.data);
     push_rect(collapse_rect, collapse_color);
     
     win->cursor = win->rect.p + DEVUI_WINDOW_PADDING;

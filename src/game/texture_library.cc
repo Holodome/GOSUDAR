@@ -26,7 +26,7 @@ TextureData::TextureData(const char *filename, const char *name) {
     text[size] = 0;
     fclose(file);
     
-    stbi_set_flip_vertically_on_load(true);
+    // stbi_set_flip_vertically_on_load(true);
     int w, h;
     this->data = stbi_load(filename, &w, &h, 0, 4);
     this->size = Vec2i(w, h);
@@ -46,14 +46,12 @@ TextureData::~TextureData() {
     Mem::free(data);
 }
 
-TextureLibrary::TextureLibrary() {
-    
-}
-
-TextureLibrary::~TextureLibrary() {
+void TextureLibrary::cleanup() {
+    logprintln("TexLib", "Cleanup");
     for (size_t i = 0; i < this->textures.num_entries; ++i) {
         TextureData **data = this->textures.get_index(i);
         assert(data);
+        logprintln("TexLib", "Deleting texture '%s'", (*data)->name.data);
         delete (*data);
     }   
 }

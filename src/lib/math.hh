@@ -570,6 +570,18 @@ namespace Math {
         Mat4x4 &operator*=(Mat4x4 b) {
             return (*this = *this * b);
         }
+        
+        Vec3 get_x() {
+            return Vec3(e[0][0], e[1][0], e[2][0]);
+        }
+
+        Vec3 get_y() {
+            return Vec3(e[0][1], e[1][1], e[2][1]);
+        }
+
+        Vec3 get_z() {
+            return Vec3(e[0][2], e[1][2], e[2][2]);
+        }
     };
 
     struct Rect {

@@ -20,12 +20,10 @@ struct TextureData {
 struct TextureLibrary {
     HashTable<TextureData *> textures = {};
     Texture *default_texture = 0;
-    
-    TextureLibrary();
-    ~TextureLibrary();  
 
     // Perform load of standart textures
     void init();
+    void cleanup();  
     // Perform load from file
     void load(const char *filename, const char *name = 0);
     // Perform load from data, data is made owned by this

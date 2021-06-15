@@ -93,8 +93,6 @@ struct Renderer {
     GLuint immediate_vbo = GL_INVALID_ID;
     Array<Vertex> vertices = {};
     
-    Mat4x4 view_matrix       = Mat4x4::identity();
-    Mat4x4 projection_matrix = Mat4x4::identity();
     Mat4x4 mvp               = Mat4x4::identity();
     Mat4x4 imvp              = Mat4x4::identity();
     
@@ -110,11 +108,11 @@ struct Renderer {
     void imm_begin();
     void imm_flush();
     void imm_vertex(const Vertex &v);
-    void set_projview(const Mat4x4 &proj = Mat4x4::identity(), const Mat4x4 &view = Mat4x4::identity());
+    void set_mvp(const Mat4x4 &mvp = Mat4x4::identity());
     void set_shader(Shader *shader = 0);
     void set_texture(Texture *texture = 0);
     
-    void set_renderering_3d(Mat4x4 proj, Mat4x4 view);
+    void set_renderering_3d(const Mat4x4 &mvp);
     void set_renderering_2d(Vec2 winsize);
     
     void imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,

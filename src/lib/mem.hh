@@ -3,6 +3,11 @@
 #include "general.hh"
 
 #define MEM_CLEAR_TO_ZERO 1
+#include <crtdbg.h>
+
+#undef free 
+#undef malloc 
+#undef realloc
 
 namespace Mem {
     static u64 times_alloced = 0;
@@ -42,6 +47,9 @@ namespace Mem {
     }
     
     void *realloc(void *ptr, size_t new_size) {
+        if (ptr == 0) {
+            ++times_alloced;
+        }
         void *result = ::_aligned_realloc(ptr, new_size, 16);
         return result;
     }

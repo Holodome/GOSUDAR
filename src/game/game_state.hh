@@ -19,6 +19,7 @@ struct GameState {
     Mesh *cube = 0;
     Mesh *rect = 0;
     
+    Vec3 player_pos = Vec3(0, 0, 0);
     Vec3 point_on_plane;
     
     void init();

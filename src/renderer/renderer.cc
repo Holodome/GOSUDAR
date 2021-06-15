@@ -388,10 +388,8 @@ void Renderer::imm_vertex(const Vertex &v) {
     vertices.add(v);
 }
 
-void Renderer::set_projview(const Mat4x4 &proj, const Mat4x4 &view) {
-    this->projection_matrix = proj;
-    this->view_matrix = view;
-    this->mvp = this->projection_matrix * this->view_matrix;
+void Renderer::set_mvp(const Mat4x4 &mvp) {
+    this->mvp = mvp;
     this->imvp = Mat4x4::inverse(this->mvp);
 }
 
@@ -486,24 +484,25 @@ void Renderer::imm_draw_rect(Rect rect, Vec4 color, Rect uv_rect, Texture *textu
 // 	}
 // }
 
-void Renderer::set_renderering_3d(Mat4x4 proj, Mat4x4 view) {
-    set_projview(proj, view);
+void Renderer::set_renderering_3d(const Mat4x4 &mvp) {
+    this->set_mvp(mvp);
     glEnable(GL_DEPTH_TEST);    
 }
 
 void Renderer::set_renderering_2d(Vec2 winsize) {
     Mat4x4 win_proj = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
-    game->renderer.set_projview(win_proj);
+    game->renderer.set_mvp(win_proj);
     glDisable(GL_DEPTH_TEST);
 }
 
 void Renderer::imm_draw_line(Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
-    Vec3 cam_z = this->imvp.v[2].xyz;
+    // Vec3 cam_z = this->imvp.v[2].xyz;
+    Vec3 cam_z = this->mvp.get_z();
     Vec3 line = (b - a);
     line -= cam_z * Math::dot(cam_z, line);
     Vec3 line_perp = Math::cross(line, cam_z);
-    Vec3 other_perp = Math::cross(line_perp, line);
+    // Vec3 other_perp = Math::cross(line_perp, line);
     line_perp = Math::normalize(line_perp);
     // other_perp = Math::normalize(other_perp);
     line_perp *= thickness;

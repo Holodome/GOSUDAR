@@ -8,12 +8,13 @@ struct Camera {
     Vec3 rot = Vec3(0);
     Mat4x4 view = Mat4x4::identity();
     Mat4x4 projection = Mat4x4::identity();
+    Mat4x4 mvp = Mat4x4::identity();
         
     void update_input();    
     void recalculate_matrices();
     
-    Vec3 Camera::screen_to_world(Vec2 screen);
-    Vec3 Camera::uv_to_world(Vec2 uv);
+    Vec3 screen_to_world(Vec2 screen);
+    Vec3 uv_to_world(Vec2 uv);
 };  
 
 #define CAMERA_HH 1

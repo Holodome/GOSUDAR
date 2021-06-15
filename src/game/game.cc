@@ -24,9 +24,10 @@ void Game::init() {
 
 void Game::cleanup() {
     logprintln("Game", "Cleanup");
-    game_state.cleanup();
-    renderer.cleanup();
-    os.cleanup();
+    this->game_state.cleanup();
+    this->tex_lib.cleanup();
+    this->renderer.cleanup();
+    this->os.cleanup();
 }
 
 void Game::update() {

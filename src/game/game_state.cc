@@ -10,6 +10,7 @@ void GameState::init() {
     logprintln("GameState", "Init start");
     
     game->tex_lib.load("e:\\dev\\GAMEMEME\\dog.jpg", "dog");
+    game->tex_lib.load("e:\\dev\\GAMEMEME\\dude.png", "dude");
     
     cube = make_cube();
     rect = make_rect();
@@ -58,6 +59,7 @@ void GameState::update_logic() {
     }
     dev_ui.value("Selected point", this->point_on_plane);
     dev_ui.window_end();
+    this->player_pos = this->camera.pos;
     
     dev_ui.window("Debug", Rect(0, 0, 400, 400));
     dev_ui.textf("DevUI focused: %s", (dev_ui.is_focused ? "true" : "false"));
@@ -75,7 +77,7 @@ void GameState::update_logic() {
 }
 
 void GameState::render() {
-    game->renderer.set_renderering_3d(camera.projection, camera.view);
+    game->renderer.set_renderering_3d(camera.mvp);
     // // Draw map
     Vec2i map_size = Vec2i(10, 10);
     f32 tile_size = 2.0f;
@@ -90,10 +92,23 @@ void GameState::render() {
     if (Math::length(this->point_on_plane - Vec3(0, 1, 0)) > 0.001f) {
         i32 x = this->point_on_plane.x / tile_size;
         i32 y = this->point_on_plane.z / tile_size;
-        game->renderer.imm_draw_quad_outline(Vec3(x, 0, y) * tile_size, Vec3(x, 0, y + 1) * tile_size,
-                                             Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
-                                             Colors::black, 0.02f);
+        if (0 <= x && x < map_size.x && 0 <= y && y < map_size.y) {
+            game->renderer.imm_draw_quad_outline(Vec3(x, 0, y) * tile_size, Vec3(x, 0, y + 1) * tile_size,
+                                                 Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
+                                                 Colors::black, 0.02f);
+        }
     }
+    
+    Vec3 right = this->camera.mvp.get_x();
+    Vec3 up = this->camera.mvp.get_y();
+    f32 width = 0.5f;
+    f32 height = 0.5f;
+    Vec3 mid_bottom = this->point_on_plane;
+    Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
+    Vec3 top_right = top_left + right * width;
+    Vec3 bottom_left = top_left - up * height;
+    Vec3 bottom_right = top_right - up * height;
+    game->renderer.imm_draw_quad(top_left, bottom_left, top_right, bottom_right, Colors::white, game->tex_lib.get_tex("dog"));
     
     game->renderer.set_renderering_2d(game->input.winsize);
 }

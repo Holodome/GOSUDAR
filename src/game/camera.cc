@@ -47,6 +47,7 @@ void Camera::recalculate_matrices() {
     f32 vfov = Math::rad(60);
     this->projection = Mat4x4::perspective(vfov, game->input.winsize.aspect_ratio(), 0.1f, 100.0f);
     this->view = Mat4x4::identity() * Mat4x4::rotation(this->rot.y, Vec3(1, 0, 0)) * Mat4x4::rotation(this->rot.x, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
+    this->mvp = this->projection * this->view;
 }
 
 Vec3 Camera::screen_to_world(Vec2 screen) {

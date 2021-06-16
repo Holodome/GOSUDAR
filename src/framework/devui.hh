@@ -3,6 +3,7 @@
 #include "lib/lib.hh"
 
 #include "framework/renderer.hh"
+#include "framework/assets.hh"
 
 const f32 DEVUI_EPSILON =                   0.001f;
 const u32 DEVUI_MAX_TITLE_SIZE =            32;
@@ -111,7 +112,7 @@ struct DevUI {
     Array<u32> windows_order = {};
     DevUIWindow *cur_win = 0, *hot_win = 0;
     DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();
-    Font *font = 0;
+    FontData *font = 0;
     f32 text_height = 0;
     DevUITextEditState text_edit = {};
     

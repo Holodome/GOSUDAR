@@ -13,3 +13,4 @@ cl %build_options% ../src/compile.cc -link -opt:ref gdi32.lib user32.lib kernel3
 REM robocopy ..\assets assets /MIR /E /NFL /NDL /NJH /NJS /nc /ns /np
 
 popd 
+copy build\game.exe game\

@@ -12,6 +12,7 @@
 #include <string.h>
 #include <float.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 typedef int8_t  i8;
 typedef int16_t i16;

@@ -4,8 +4,8 @@
 
 #include "framework/os.hh"
 #include "framework/renderer.hh"
+#include "framework/assets.hh"
 #include "framework/devui.hh"
-#include "framework/texture_library.hh"
 #include "game/game_state.hh"
 
 // Game is a object that decribes program as one element 
@@ -17,8 +17,7 @@ struct Game {
     OS os = OS();
     Renderer renderer = Renderer();
     Input input = Input();
-    // @TODO Assets...    
-    TextureLibrary tex_lib = TextureLibrary();
+    Assets assets = Assets();
     
     GameState game_state = GameState();
     

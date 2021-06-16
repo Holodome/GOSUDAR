@@ -4,6 +4,18 @@
 
 #include "game/world.hh"
 
+struct SpriteDescription {
+    Str name;
+    Str filename;
+    Vec2i image_size;    
+};
+
+struct GameObjectDescription {
+    Str name;
+    Str sprite_name;
+    Vec2 sprite_size; // Game units
+};  
+
 struct Settings {
     bool fullscreen = false;
     bool enable_devui = false; // Press f3 to enable, f8 to focus mouse 

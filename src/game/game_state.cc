@@ -7,11 +7,8 @@
 void GameState::init() {
     logprintln("GameState", "Init start");
     
-    game->tex_lib.load("e:\\dev\\GAMEMEME\\dog.jpg", "dog");
-    game->tex_lib.load("e:\\dev\\GAMEMEME\\dude.png", "dude");
-    
     this->local_dev_ui.init();
-    dev_ui->font = new Font("c:\\windows\\fonts\\consola.ttf", 32);
+    dev_ui->font = assets->get_font("consolas");
     logprintln("GameState", "Init end");
 }
 

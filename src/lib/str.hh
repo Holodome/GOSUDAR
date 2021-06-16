@@ -22,9 +22,16 @@ struct Str {
         u32 len = strlen(text);
         ensure_alloced(len + 1);
         memcpy(data, text, len);
-        data[len] = 0;
+        this->data[len] = 0;
         this->len = len;
     } 
+    Str(const char *text, size_t len) {
+        init();
+        ensure_alloced(len + 1);
+        memcpy(data, text, len);
+        this->data[len] = 0;
+        this->len = len;
+    }
     ~Str() {
         if (data != base_buffer) {
             Mem::free(data);

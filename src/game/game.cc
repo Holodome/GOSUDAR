@@ -11,7 +11,7 @@ void Game::init() {
     f32 init_start = game->os.get_time();
     renderer.init();
     // Init assets after initing renderer
-    this->tex_lib.init();
+    this->assets.init("assets.cfg");
     // This is kinda circly- but renderer params have to be set after texture
     
     game_state.init();
@@ -25,7 +25,7 @@ void Game::init() {
 void Game::cleanup() {
     logprintln("Game", "Cleanup");
     this->game_state.cleanup();
-    this->tex_lib.cleanup();
+    this->assets.cleanup();
     this->renderer.cleanup();
     this->os.cleanup();
 }

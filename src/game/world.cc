@@ -87,5 +87,5 @@ void World::render() {
     
     Vec3 player_v[4];
     this->get_billboard_positions(this->player_pos, 0.5f, 0.5f, player_v);
-    renderer->imm_draw_quad(player_v, game->tex_lib.get_tex("dude"));
+    renderer->imm_draw_quad(player_v, assets->get_tex("dude"));
 }

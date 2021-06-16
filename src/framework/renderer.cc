@@ -1,11 +1,6 @@
 #include "framework/renderer.hh"
-
+#include "framework/assets.hh"
 #include "game/game.hh"
-
-#define STBTT_malloc(x,u)  ((void)(u),Mem::alloc(x))
-#define STBTT_free(x,u)    ((void)(u),Mem::free(x))
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "thirdparty/stb_truetype.h"
 
 #define GLPROC(_name, _type) \
 static _type _name;
@@ -173,89 +168,6 @@ Mesh::~Mesh() {
     delete[] indices;
 }
 
-Font::Font(const char *filename, f32 height) {
-    FILE *file = fopen(filename, "rb");
-    assert(file);
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    char *text = new char[size + 1];
-    fread(text, 1, size, file);
-    text[size] = 0;
-    fclose(file);
-    
-    const u32 atlas_width  = 512;
-	const u32 atlas_height = 512;
-	const u32 first_codepoint = 32;
-	const u32 codepoint_count = 95;  
-    stbtt_packedchar *glyphs = new stbtt_packedchar[codepoint_count];
-    
-    u8 *loaded_atlas_data = new u8[atlas_width * atlas_height];
-    stbtt_pack_context context = {};
-	stbtt_PackBegin(&context, loaded_atlas_data, atlas_width, atlas_height, 0, 1, 0);
-	stbtt_PackSetOversampling(&context, 2, 2);
-	stbtt_PackFontRange(&context, (u8 *)text, 0, height, first_codepoint, codepoint_count, glyphs);
-	stbtt_PackEnd(&context);
-
-    u8 *atlas_data = new u8[atlas_width * atlas_height * 4];
-	for (u32 i = 0; i < atlas_width * atlas_height; ++i) {
-		u8 *dest = (u8 *)(atlas_data + i * 4);
-		dest[0] = 255;
-		dest[1] = 255;
-		dest[2] = 255;
-		// dest[3] = loaded_atlas_data[i];
-		dest[3] = loaded_atlas_data[i];
-	}
-    delete[] loaded_atlas_data;
-    tex = new Texture(atlas_data, Vec2i(atlas_width, atlas_height));
-    delete[] atlas_data;
-    
-	this->first_codepoint = first_codepoint;
-	this->size = height;
-    this->glyphs.resize(codepoint_count);
-
-	for (u32 i = 0; i < codepoint_count; ++i) {
-		++this->glyphs.len;
-		this->glyphs[i].utf32 = first_codepoint + i;
-		this->glyphs[i].min_x = glyphs[i].x0;
-		this->glyphs[i].min_y = glyphs[i].y0;
-		this->glyphs[i].max_x = glyphs[i].x1;
-		this->glyphs[i].max_y = glyphs[i].y1;
-		this->glyphs[i].offset1_x = glyphs[i].xoff;
-		this->glyphs[i].offset1_y = glyphs[i].yoff;
-		this->glyphs[i].offset2_x = glyphs[i].xoff2;
-		this->glyphs[i].offset2_y = glyphs[i].yoff2;
-		this->glyphs[i].x_advance = glyphs[i].xadvance;
-	}
-    delete glyphs;
-    delete text;
-    logprintln("Fonts", "Loaded font '%s'", filename);
-}
-
-Font::~Font() {
-    delete tex;
-}
-
-Vec2 Font::get_text_size(const char *text, size_t count, f32 scale) {
-    if (!count) {
-        count = strlen(text);
-    }
-    
-    Vec2 result = {};
-    for (u32 i = 0; i < count; ++i) {
-        char s = text[i];
-        if (s >= first_codepoint && s < (first_codepoint + glyphs.len)) {
-            FontGlyph *glyph = &glyphs[s - first_codepoint];
-            // FontGlyph *glyph = &glyphs[first_codepoint];
-            result.x += glyph->x_advance * scale;
-        }
-    }
-    result.y = size * scale;
-    
-    return result;
-}
-
 void Renderer::init() {
     logprintln("Renderer", "Init start");
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
@@ -408,7 +320,7 @@ void Renderer::set_shader(Shader *shader) {
 
 void Renderer::set_texture(Texture *texture) {
     if (texture == 0) {
-        texture = game->tex_lib.default_texture;
+        texture = assets->get_tex("white");
     }
     this->current_texture = texture;
 }

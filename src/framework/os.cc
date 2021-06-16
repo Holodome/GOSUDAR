@@ -1,4 +1,4 @@
-#include "os.hh"
+#include "framework/os.hh"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -8,7 +8,7 @@
 #endif 
 #include <windows.h>
 
-#include "renderer/renderer.hh"
+#include "framework/renderer.hh"
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
 
@@ -193,7 +193,7 @@ void OS::init_renderer_backend() {
     *(void **)&_name = (void *)internal->wglGetProcAddress(#_name);                  \
     if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
     if (!_name) logprintln("OpenGL", "Failed to load " #_name " OGL procedure.");
-#include "renderer/gl_procs.inc"
+#include "framework/gl_procs.inc"
 #undef GLPROC
     
     internal->wglSwapIntervalEXT(1);

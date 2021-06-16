@@ -1,7 +1,7 @@
 #if !defined(TEXTURE_LIBRARY_HH)
 
 #include "lib/lib.hh"
-#include "renderer/renderer.hh"
+#include "framework/renderer.hh"
 
 const size_t TEXTURE_LIBRARY_CAPACITY = 256;
 

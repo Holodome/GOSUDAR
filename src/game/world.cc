@@ -25,6 +25,7 @@ void World::cleanup() {
 }
 
 void World::update() {
+    // Move player
     f32 move_coef = 4.0f * game->input.dt;
     f32 z_speed = 0;
     if (game->input.is_key_held(Key::W)) {
@@ -45,8 +46,8 @@ void World::update() {
     this->player_pos.z += x_speed * Math::sin(this->camera.yaw);
     this->camera.center_pos = this->player_pos;
     this->camera.update();
-    
     this->camera.recalculate_matrices();
+    
     Vec3 ray_dir = this->camera.screen_to_world(game->input.mpos);
     f32 t = 0;
     if (ray_intersect_plane(Vec3(0, 1, 0), 0, Ray(camera.pos, ray_dir), &t) && t > 0) {
@@ -79,12 +80,12 @@ void World::render() {
         i32 y = this->point_on_plane.z / tile_size;
         if (0 <= x && x < map_size.x && 0 <= y && y < map_size.y) {
             renderer->imm_draw_quad_outline(Vec3(x, 0, y) * tile_size, Vec3(x, 0, y + 1) * tile_size,
-                                                 Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
-                                                 Colors::black, 0.02f);
+                                            Vec3(x + 1, 0, y) * tile_size, Vec3(x + 1, 0, y + 1) * tile_size,
+                                            Colors::black, 0.02f);
         }
     }
     
     Vec3 player_v[4];
     this->get_billboard_positions(this->player_pos, 0.5f, 0.5f, player_v);
-    renderer->imm_draw_quad(player_v[0], player_v[1], player_v[2], player_v[3], Colors::white, game->tex_lib.get_tex("dude"));
+    renderer->imm_draw_quad(player_v, game->tex_lib.get_tex("dude"));
 }

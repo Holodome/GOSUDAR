@@ -1,10 +1,8 @@
 #include "game/game_state.hh"
 #include "game/game.hh"
-#include "renderer/renderer.hh"
+#include "framework/renderer.hh"
 
 #include "lib/perlin.hh"
-
-#include "game/mesh_utils.cc"
 
 void GameState::init() {
     logprintln("GameState", "Init start");

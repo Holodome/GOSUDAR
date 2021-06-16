@@ -1,4 +1,4 @@
-#include "renderer/renderer.hh"
+#include "framework/renderer.hh"
 
 #include "game/game.hh"
 
@@ -9,7 +9,7 @@
 
 #define GLPROC(_name, _type) \
 static _type _name;
-#include "renderer/gl_procs.inc"
+#include "framework/gl_procs.inc"
 #undef GLPROC
 
 Renderer *renderer;
@@ -444,6 +444,11 @@ void Renderer::imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
 void Renderer::imm_draw_quad(Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
                              Vec4 c, Texture *texture) {
     this->imm_draw_quad(v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture);
+}
+
+void Renderer::imm_draw_quad(Vec3 v[4], Texture *texture) {
+    this->imm_draw_quad(v[0], v[1], v[2], v[3], Colors::white, Colors::white, Colors::white, Colors::white,
+                        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture);
 }
 
 void Renderer::imm_draw_rect(Rect rect, Vec4 color, Rect uv_rect, Texture *texture) {

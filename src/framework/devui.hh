@@ -2,7 +2,7 @@
 
 #include "lib/lib.hh"
 
-#include "renderer/renderer.hh"
+#include "framework/renderer.hh"
 
 const f32 DEVUI_EPSILON =                   0.001f;
 const u32 DEVUI_MAX_TITLE_SIZE =            32;

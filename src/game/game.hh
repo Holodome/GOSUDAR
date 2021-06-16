@@ -2,11 +2,11 @@
 
 #include "lib/lib.hh"
 
-#include "os/os.hh"
-#include "renderer/renderer.hh"
-#include "game/devui.hh"
+#include "framework/os.hh"
+#include "framework/renderer.hh"
+#include "framework/devui.hh"
+#include "framework/texture_library.hh"
 #include "game/game_state.hh"
-#include "game/texture_library.hh"
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state

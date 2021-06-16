@@ -1,4 +1,4 @@
-#include "game/texture_library.hh"
+#include "framework/texture_library.hh"
 
 #define STBI_MALLOC Mem::alloc
 #define STBI_REALLOC Mem::realloc

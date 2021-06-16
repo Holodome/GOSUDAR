@@ -13,13 +13,19 @@
 
 Assets *assets;
 
-TextureData::TextureData(const char *filename, const char *name) {
-    if (name == 0) {
-        name = filename;
-    }
-    
+const char *ASSET_KINDS[] = {
+    "None",
+    "Image",
+    "Font"
+};
+
+const char *ASSET_STATES[] = {
+    "Unloaded",
+    "Loaded"  
+};
+
+TextureData::TextureData(const char *filename) {
     this->filename = Str(filename);
-    this->name = Str(name);
     FILE *file = fopen(filename, "rb");
     assert(file);
     fseek(file, 0, SEEK_END);
@@ -39,8 +45,7 @@ TextureData::TextureData(const char *filename, const char *name) {
     delete[] text;
 }
 
-TextureData::TextureData(const char *name, void *data, Vec2i size) {
-    this->name = Str(name);
+TextureData::TextureData(void *data, Vec2i size) {
     this->filename;
     this->data = data;
     this->size = size;
@@ -222,11 +227,18 @@ void Assets::init(const char *sprites_cfg_name) {
     for (size_t i = 0; i < this->asset_infos.num_entries; ++i) {
         AssetInfo *info = this->asset_infos.get_index(i);
         assert(info);
-        logprintln("Assets", "Loaded asset info for '%s': filename '%s'", info->name.data, info->filename.data);
+        logprint("Assets", "Loaded asset info for '%s': ", info->name.data);
+        print("kind: '%s' ", ASSET_KINDS[(u32)info->kind]);
+        if (info->kind == AssetKind::Font) {
+            print("filename: '%s' ", info->filename.data);
+        } else if (info->kind == AssetKind::Image) {
+            print("filename: '%s' ", info->filename.data);
+        }
+        print("\n");
     }
     
     // @CLEAN
-    this->load("white");
+    this->get_tex("white");
     logprintln("Assets", "Init end");
 }
 
@@ -241,19 +253,16 @@ AssetInfo *Assets::get_info(const char *name) {
     return result;
 }
 
-void Assets::load(const char *name) {
-    AssetInfo *info = this->get_info(name);
-    assert(info->state == AssetState::Unloaded);
-    logprintln("Assets", "Loading asset '%s'", info->name.data);
-    // Load...
-    logprintln("Assets", "Loaded asset '%s'", info->name.data);
-}
-    
 TextureData *Assets::get_tex_data(const char *name) {
     AssetInfo *info = this->get_info(name);
     assert(info->kind == AssetKind::Image);
-    assert(info->state == AssetState::Loaded);
-    return &this->texture_datas[info->array_entry_idx];
+    if (info->state == AssetState::Loaded) {
+    } else {
+        size_t idx = this->texture_datas.add(new TextureData(info->filename.data));
+        info->state = AssetState::Loaded;
+        info->array_entry_idx = idx;
+    }
+    return this->texture_datas[info->array_entry_idx];
 }
 
 Texture *Assets::get_tex(const char *name) {
@@ -263,6 +272,13 @@ Texture *Assets::get_tex(const char *name) {
 FontData *Assets::get_font(const char *name) {
     AssetInfo *info = this->get_info(name);
     assert(info->kind == AssetKind::Font);
-    assert(info->state == AssetState::Loaded);
-    return &this->font_datas[info->array_entry_idx];
+    FontData *result = 0;
+    if (info->state == AssetState::Loaded) {
+    } else {
+        size_t idx = this->font_datas.add(new FontData(info->filename.data, 32));
+        info->state = AssetState::Loaded;
+        info->array_entry_idx = idx;
+    }
+    result = this->font_datas[info->array_entry_idx];
+    return result;
 }

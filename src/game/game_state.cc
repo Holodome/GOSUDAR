@@ -14,7 +14,6 @@ void GameState::init() {
 
 void GameState::cleanup() {
     logprintln("GameState", "Cleanup");
-    delete dev_ui->font;
 }
 
 void GameState::update_logic() {

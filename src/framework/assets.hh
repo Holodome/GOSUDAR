@@ -6,13 +6,12 @@
 
 struct TextureData {
     Str filename;
-    Str name;
     void *data;
     Vec2i size;  
     Texture texture;
     
-    TextureData(const char *filename, const char *name = 0);
-    TextureData(const char *name, void *data, Vec2i size);
+    TextureData(const char *filename);
+    TextureData(void *data, Vec2i size);
     ~TextureData();
 };
 
@@ -64,14 +63,13 @@ struct Assets {
     Str sprites_cfg_name;
     HashTable<AssetInfo> asset_infos;
     
-    Array<TextureData> texture_datas;
-    Array<FontData> font_datas;
+    Array<TextureData *> texture_datas;
+    Array<FontData *> font_datas;
     
     void init(const char *sprites_cfg_name);
     void cleanup();
     
     AssetInfo *get_info(const char *name);
-    void load(const char *name);
     
     TextureData *get_tex_data(const char *name);
     Texture *get_tex(const char *name);

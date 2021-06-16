@@ -1,6 +1,7 @@
 #include "game/game.hh"
 
 int main(int argc, char **argv) {
+    logger_init();
     logprintln("App", "start");
     
     {
@@ -25,5 +26,6 @@ int main(int argc, char **argv) {
     }
     
     logprintln("App", "end of main");
+    logger_cleanup();
     return 0;
 }

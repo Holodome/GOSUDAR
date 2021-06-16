@@ -9,8 +9,8 @@
 #include "lib/str.hh"
 #include "lib/array.hh"
 #include "lib/misc.hh"
-#include "lib/logger.hh"
 #include "lib/hash_table.hh"
+#include "framework/logger.hh"
 
 extern struct Game *game;
 

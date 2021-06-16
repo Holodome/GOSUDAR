@@ -12,6 +12,8 @@
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
 
+OS *os;
+
 struct OSInternal {
     HINSTANCE instance;
     HWND hwnd;
@@ -101,8 +103,10 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
 
 void OS::init() {
     logprintln("OS", "Init start");
-    internal = new OSInternal;
-    memset(internal, 0, sizeof(*internal));
+    assert(!::os);
+    ::os = this;
+    this->internal = new OSInternal;
+    memset(this->internal, 0, sizeof(*this->internal));
     
     // Create window
     internal->instance = GetModuleHandle(0);
@@ -399,4 +403,118 @@ f32 OS::get_time() const {
     QueryPerformanceCounter(&current_time);
     f32 delta_time = (f32)(current_time.QuadPart - internal->game_start_time.QuadPart) / (f32)internal->perf_count_frequency;
     return delta_time;
+}
+
+RealWorldTime OS::get_real_world_time() {
+    SYSTEMTIME time;
+    GetLocalTime(&time);
+    RealWorldTime result;
+    result.year = time.wYear;
+    result.month = time.wMonth;
+    result.day = time.wDay;
+    result.hour = time.wHour;
+    result.minute = time.wMinute;
+    result.second = time.wSecond;
+    result.millisecond = time.wMilliseconds;
+    return result;
+}
+
+
+void OS::mkdir(const char *name) {
+    HRESULT result = CreateDirectoryA(name, 0);
+    // assert(result);
+    // @TODO errors
+}
+
+FileHandle OS::open_file(const char *name, bool read) {
+    FileHandle result = {};
+    CT_ASSERT(sizeof(result.storage) >= sizeof(HANDLE));
+    HANDLE handle;
+    if (read) {
+        handle = CreateFileA(name, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+    } else {
+        handle = CreateFileA(name, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
+    }
+    assert(handle != INVALID_HANDLE_VALUE);
+    memcpy(result.storage, &handle, sizeof(handle));
+    return result;
+}
+
+bool OS::is_file_handle_valid(FileHandle handle) {
+    return *((HANDLE *)handle.storage) != INVALID_HANDLE_VALUE;
+}
+
+size_t OS::get_file_size(FileHandle handle) {
+    DWORD result = GetFileSize(*((HANDLE *)handle.storage), 0);
+    return (size_t)result;
+}
+
+void OS::read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
+    assert(dest);
+    if (is_file_handle_valid(handle))
+    {
+        HANDLE win32handle = *((HANDLE *)handle.storage);
+        OVERLAPPED overlapped = {};
+        overlapped.Offset     = (u32)((offset >> 0)  & 0xFFFFFFFF);
+        overlapped.OffsetHigh = (u32)((offset >> 32) & 0xFFFFFFFF);
+        
+        u32 size32 = (u32)size;
+        assert(size32 == size);
+        
+        DWORD bytes_read;
+        if (ReadFile(win32handle, dest, size32, &bytes_read, &overlapped) &&
+            (size32 == bytes_read))
+        {
+            // Success        
+        }
+        else 
+        {
+            assert(false);
+        }
+    }
+}
+
+void OS::write_file(FileHandle handle, size_t offset, size_t size, const void *source) {
+    assert(source);
+    if (is_file_handle_valid(handle)) {
+        HANDLE win32handle = *((HANDLE *)handle.storage);
+        OVERLAPPED overlapped = {};
+        overlapped.Offset     = (u32)((offset >> 0)  & 0xFFFFFFFF);
+        overlapped.OffsetHigh = (u32)((offset >> 32) & 0xFFFFFFFF);
+        
+        u32 size32 = (u32)size;
+        assert(size32 == size);
+        
+        DWORD bytes_wrote;
+        if (WriteFile(win32handle, source, size32, &bytes_wrote, &overlapped) &&
+            (size32 == bytes_wrote))
+        {
+            // Success        
+        }
+        else 
+        {
+            assert(false);
+        }
+    }    
+}
+
+void OS::close_file(FileHandle handle) {
+    BOOL result = CloseHandle(*((HANDLE *)handle.storage));
+    assert(result);
+}
+
+FileWritetime OS::get_file_write_time(const char *name) {
+    WIN32_FILE_ATTRIBUTE_DATA data;
+    BOOL success = GetFileAttributesExA(name, GetFileExInfoStandard, &data);
+    assert(success);
+    FILETIME filetime = data.ftLastWriteTime;
+    FileWritetime result = {};
+    CT_ASSERT(sizeof(result.storage) >= sizeof(FILETIME));
+    memcpy(result.storage, &filetime, sizeof(filetime));
+    return result;
+}
+
+bool OS::file_write_time_cmp(FileWritetime a, FileWritetime b) {
+    LONG result = CompareFileTime((FILETIME *)a.storage, (FILETIME *)b.storage);
+    return result != 0;
 }

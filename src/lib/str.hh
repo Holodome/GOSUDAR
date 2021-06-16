@@ -120,15 +120,16 @@ struct Str {
         return strncmp(a, b, n);
     }
     
-    static void formatv(char *dst, size_t dst_size, const char *format, va_list args) {
-        ::vsnprintf(dst, dst_size, format, args);
+    static size_t formatv(char *dst, size_t dst_size, const char *format, va_list args) {
+        return ::vsnprintf(dst, dst_size, format, args);
     }
     
-    static void format(char *dst, size_t dst_size, const char *format, ...) {
+    static size_t format(char *dst, size_t dst_size, const char *format, ...) {
         va_list args;
         va_start(args, format);
-        ::vsnprintf(dst, dst_size, format, args);
+        size_t len = ::vsnprintf(dst, dst_size, format, args);
         va_end(args);
+        return len;
     }
     
 };

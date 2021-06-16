@@ -258,9 +258,11 @@ TextureData *Assets::get_tex_data(const char *name) {
     assert(info->kind == AssetKind::Image);
     if (info->state == AssetState::Loaded) {
     } else {
+        logprintln("Assets", "Loading texture '%s'", name);
         size_t idx = this->texture_datas.add(new TextureData(info->filename.data));
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
+        logprintln("Assets", "Loaded texture '%s'", name);
     }
     return this->texture_datas[info->array_entry_idx];
 }
@@ -275,10 +277,11 @@ FontData *Assets::get_font(const char *name) {
     FontData *result = 0;
     if (info->state == AssetState::Loaded) {
     } else {
+        logprintln("Assets", "Loading font '%s'", name);
         size_t idx = this->font_datas.add(new FontData(info->filename.data, 32));
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
+        logprintln("Assets", "Loaded font '%s'", name);
     }
-    result = this->font_datas[info->array_entry_idx];
-    return result;
+    return this->font_datas[info->array_entry_idx];
 }

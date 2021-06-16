@@ -124,6 +124,24 @@ struct Input {
     }
 };
 
+struct RealWorldTime {
+    u32 year;
+    u32 month;
+    u32 day;
+    u32 hour;
+    u32 minute;
+    u32 second;
+    u32 millisecond;
+};
+
+struct FileHandle {
+    u8 storage[8];
+};
+
+struct FileWritetime {
+    u8 storage[8];  
+};
+
 struct OS {
     // Platform-specific data
     OSInternal *internal = 0;
@@ -134,6 +152,17 @@ struct OS {
     
     f32 get_time() const;
     
+    static RealWorldTime get_real_world_time();
+    static void mkdir(const char *name);
+    static FileHandle open_file(const char *name, bool read = true);
+    static bool is_file_handle_valid(FileHandle handle);
+    static size_t get_file_size(FileHandle handle);
+    static void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
+    static void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
+    static void close_file(FileHandle handle);
+    static FileWritetime get_file_write_time(const char *name);
+    static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
+    
     // Loads all opengl functions
     void init_renderer_backend();
     void update_input(Input *input);
@@ -141,6 +170,8 @@ struct OS {
     
     void go_fullscreen(bool fullscreen);
 };
+
+extern OS *os;
 
 #define OS_H 1
 #endif

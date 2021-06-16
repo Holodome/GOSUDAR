@@ -1,3 +1,4 @@
+#include "framework/logger.cc"
 #include "framework/lexer.cc"
 #include "framework/os.cc"
 #include "framework/renderer.cc"

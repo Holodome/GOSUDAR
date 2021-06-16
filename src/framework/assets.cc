@@ -158,60 +158,44 @@ void Assets::init(const char *sprites_cfg_name) {
     Lexer lexer;
     lexer.init(text, size + 1);
     delete[] text;
-    Token *token = lexer.peek_tok();
+    const Token *token = lexer.peek_tok();
     AssetInfo current_info = {};
     bool has_info = false;
-    printf("here\n");
-    while (token->kind != TokenKind::EOS) {
-        if ((u8)token->kind == '[') {
+    while (!token->is_kind(TokenKind::EOS)) {
+        if (token->is_kind('[')) {
             if (has_info) {
                 this->asset_infos.set(current_info.name.data, current_info);
             }
             has_info = true;
-            lexer.eat_tok();
-            token = lexer.peek_tok();
-            assert(token->kind == TokenKind::Identifier);
-            current_info.name = token->ident;
-            lexer.eat_tok();
-            token = lexer.peek_tok();
-            assert((u8)token->kind == ']');
-            lexer.eat_tok();
-            token = lexer.peek_tok();
-        } else if (token->kind == TokenKind::Identifier) {
+            token = lexer.peek_next_tok();
+            assert(token->is_kind(TokenKind::Identifier));
+            current_info.name = token->get_ident();
+            token = lexer.peek_next_tok();
+            assert(token->is_kind(']'));
+            token = lexer.peek_next_tok();
+        } else if (token->is_kind(TokenKind::Identifier)) {
             assert(has_info);
-            if (token->ident.cmp("kind")) {
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                assert((u8)token->kind == '=');
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                assert(token->kind == TokenKind::Identifier);
-                if (token->ident.cmp("img")) {
+            if (token->get_ident().cmp("kind")) {
+                token = lexer.peek_next_tok();
+                assert(token->is_kind(TokenKind::Identifier));
+                if (token->get_ident().cmp("img")) {
                     current_info.kind = AssetKind::Image;
-                } else if (token->ident.cmp("font")) {
+                } else if (token->get_ident().cmp("font")) {
                     current_info.kind = AssetKind::Font;
                 } else {
                     assert(false);
                 }
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-            } else if (token->ident.cmp("filename")) {
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                assert((u8)token->kind == '=');
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                assert(token->kind == TokenKind::String);
-                current_info.filename = token->string;
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-            } else if (token->ident.cmp("size")) {
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                assert((u8)token->kind == '=');
-                lexer.eat_tok();
-                token = lexer.peek_tok();
-                // @TODO
+                token = lexer.peek_next_tok();
+            } else if (token->get_ident().cmp("filename")) {
+                token = lexer.peek_next_tok();
+                assert(token->is_kind(TokenKind::String));
+                current_info.filename = token->get_str();
+                token = lexer.peek_next_tok();
+            } else if (token->get_ident().cmp("height")) {
+                token = lexer.peek_next_tok();
+                assert(token->is_kind(TokenKind::Integer));
+                current_info.height = token->get_int();
+                token = lexer.peek_next_tok();
             } else {
                 assert(false);
             }
@@ -223,7 +207,6 @@ void Assets::init(const char *sprites_cfg_name) {
         this->asset_infos.set(current_info.name.data, current_info);
     }
     lexer.cleanup();
-    printf("here\n");
     for (size_t i = 0; i < this->asset_infos.num_entries; ++i) {
         AssetInfo *info = this->asset_infos.get_index(i);
         assert(info);
@@ -243,7 +226,12 @@ void Assets::init(const char *sprites_cfg_name) {
 }
 
 void Assets::cleanup() {
-    
+    for (size_t i = 0; i < this->texture_datas.len; ++i) {
+        delete this->texture_datas[i];
+    }
+    for (size_t i = 0; i < this->font_datas.len; ++i) {
+        delete this->font_datas[i];
+    }
 }
     
 AssetInfo *Assets::get_info(const char *name) {
@@ -278,7 +266,7 @@ FontData *Assets::get_font(const char *name) {
     if (info->state == AssetState::Loaded) {
     } else {
         logprintln("Assets", "Loading font '%s'", name);
-        size_t idx = this->font_datas.add(new FontData(info->filename.data, 32));
+        size_t idx = this->font_datas.add(new FontData(info->filename.data, info->height));
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
         logprintln("Assets", "Loaded font '%s'", name);

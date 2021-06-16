@@ -162,6 +162,7 @@ struct OS {
     static void close_file(FileHandle handle);
     static FileWritetime get_file_write_time(const char *name);
     static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
+    static void sleep(u32 ms);
     
     // Loads all opengl functions
     void init_renderer_backend();

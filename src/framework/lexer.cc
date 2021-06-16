@@ -1,5 +1,35 @@
 #include "framework/lexer.hh"
 
+
+const Str &Token::get_str() const {
+    assert(this->kind == TokenKind::String);
+    return this->string;    
+}
+
+const Str &Token::get_ident() const {
+    assert(this->kind == TokenKind::Identifier);
+    return this->ident;    
+}
+
+i64 Token::get_int() const {
+    assert(this->kind == TokenKind::Integer);
+    return this->integer;    
+}
+
+f64 Token::get_real() const {
+    assert(this->kind == TokenKind::Real);
+    return this->real;    
+}
+
+bool Token::is_kind(TokenKind kind) const {
+    return this->kind == kind;
+}
+
+bool Token::is_kind(int ascii) const {
+    assert(0 <= ascii && ascii <= 0xFF);
+    return (u8)this->kind == ascii;
+}
+
 void Lexer::init(const void *buffer, size_t buffer_size) {
     this->file_data = (u8 *)Mem::alloc(buffer_size);
     memcpy(this->file_data, buffer, buffer_size);
@@ -21,16 +51,20 @@ void Lexer::cleanup() {
     }
 }
     
-Token *Lexer::peek_tok() {
+const Token *Lexer::peek_tok() {
     if (this->active_token) {
         return this->active_token;
     }    
     
     Token *token = new Token;
+    if (!this->first_token) {
+        this->first_token = token;
+    }
     if (this->last_token) {
         this->last_token->next = token;
     }
     this->active_token = token;
+    this->last_token = token;
     
     for (;;) {
         if (!this->current_symb) {
@@ -110,4 +144,9 @@ void Lexer::advance_character() {
     ++this->current_char_number;
     ++this->cursor;
 	this->current_symb = *this->cursor;
+}
+
+const Token *Lexer::peek_next_tok() {
+    this->eat_tok();
+    return this->peek_tok();
 }

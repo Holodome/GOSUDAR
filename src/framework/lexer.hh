@@ -12,15 +12,22 @@ enum struct TokenKind {
 };
 
 struct Token {
+private:
+    Token *next = 0;
     TokenKind kind = TokenKind::None;
-    
-    u32 utf32; 
     Str ident;
     i64 integer;
     f64 real;
     Str string;
+    friend struct Lexer;
+public:
+    const Str &get_str() const;
+    const Str &get_ident() const;
+    i64 get_int() const;
+    f64 get_real() const;
     
-    Token *next = 0;
+    bool is_kind(TokenKind kind) const;
+    bool is_kind(int ascii) const;
 };
 
 struct Lexer {
@@ -39,8 +46,9 @@ struct Lexer {
     void init(const void *buffer, size_t buffer_size);
     void cleanup();
     
-    Token *peek_tok();
+    const Token *peek_tok();
     void eat_tok();
+    const Token *peek_next_tok();
     
     void advance_character();
 };

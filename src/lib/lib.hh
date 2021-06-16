@@ -10,6 +10,7 @@
 #include "lib/array.hh"
 #include "lib/misc.hh"
 #include "lib/hash_table.hh"
+#include "framework/profiler.hh"
 #include "framework/logger.hh"
 
 extern struct Game *game;

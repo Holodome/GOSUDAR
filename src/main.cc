@@ -1,14 +1,16 @@
 #include "game/game.hh"
 
 int main(int argc, char **argv) {
+    profiler_init();
+    GAME_START;
     logger_init();
     logprintln("App", "start");
-    
     {
         Game local_game = Game();
         game = &local_game;
         game->init();
         while (game->is_running) {
+            FRAME_MARKER;
             game->update();
         }
         
@@ -24,8 +26,9 @@ int main(int argc, char **argv) {
     if (!mleak) {
         logprintln("Mem", "No memory leaks detected");
     }
-    
     logprintln("App", "end of main");
     logger_cleanup();
+    GAME_END;
+    profiler_cleanup();
     return 0;
 }

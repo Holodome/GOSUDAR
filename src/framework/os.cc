@@ -518,3 +518,7 @@ bool OS::file_write_time_cmp(FileWritetime a, FileWritetime b) {
     LONG result = CompareFileTime((FILETIME *)a.storage, (FILETIME *)b.storage);
     return result != 0;
 }
+
+void OS::sleep(u32 ms) {
+    Sleep(ms);
+}

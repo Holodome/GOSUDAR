@@ -51,12 +51,14 @@ enum struct AssetState {
 };
 
 struct AssetInfo {
+    Str name;  
     AssetKind kind = AssetKind::None;
     AssetState state = AssetState::Unloaded;
-    Str name;  
+    size_t array_entry_idx = (size_t)-1;
+    
     Str filename;
     Vec2 size;
-    size_t array_entry_idx;
+    f32 height;
 };
 
 struct Assets {

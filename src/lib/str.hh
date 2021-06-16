@@ -86,11 +86,11 @@ struct Str {
         return data[idx];
     }
     
-    bool cmp(const Str &other) {
+    bool cmp(const Str &other) const {
         return len == other.len && (strncmp(data, other.data, len) == 0);
     }
     
-    bool cmp(const char *other) {
+    bool cmp(const char *other) const {
         size_t ol = strlen(other);
         return ol == len && (strncmp(data, other, len) == 0);
     }

@@ -43,12 +43,12 @@ void World::add_player_enitity() {
     player.flags = EntityFlags_IsDrawable | EntityFlags_IsUpdatable;
     player.pos = Vec2(0, 0);
     player.texture_name = "dude";
-    this->player_entity_id = this->add_entity(&player);
+    this->player_id = this->add_entity(&player);
 }
 
 void World::init() {
     logprintln("World", "init");
-    for (u32 i = 0; i < 50; ++i) {
+    for (u32 i = 0; i < 20; ++i) {
         f32 r1 = (f32)rand() / RAND_MAX;
         f32 r2 = (f32)rand() / RAND_MAX;
         f32 x = r1 * this->tile_size * this->map_size.x;
@@ -95,7 +95,7 @@ void World::update() {
         }
     }
     
-    this->camera.center_pos = map_pos_to_world_pos(this->entities[this->player_entity_id].pos);
+    this->camera.center_pos = map_pos_to_world_pos(this->entities[this->player_id].pos);
     this->camera.update();
     this->camera.recalculate_matrices();
     
@@ -144,6 +144,20 @@ void World::render() {
         }
         drawable_entity_ids.add(entity->id);
     }
+    
+    auto sort_lambda = [](void *ctx, const void *a, const void *b){
+        World *world = (World *)ctx;
+        EntityId id1 = *((EntityId *)a);
+        EntityId id2 = *((EntityId *)b);
+        Entity *ae = &world->entities[id1];
+        Entity *be = &world->entities[id2];
+        int result = 0;
+        f32 a_v = Math::dot(world->camera.mvp.get_z(), map_pos_to_world_pos(ae->pos) - world->camera.pos);
+        f32 b_v = Math::dot(world->camera.mvp.get_z(), map_pos_to_world_pos(be->pos) - world->camera.pos);
+        result = (int)(a_v < b_v ? -1 : 1);
+        return (int)(-result);
+    };
+    qsort_s(drawable_entity_ids.data, drawable_entity_ids.len, sizeof(*drawable_entity_ids.data), sort_lambda, this);
     // Sort by distance to camera
     for (size_t drawable_idx = 0; drawable_idx < drawable_entity_ids.len; ++drawable_idx) {
         Entity *entity = &this->entities[drawable_entity_ids[drawable_idx]];

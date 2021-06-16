@@ -1,10 +1,10 @@
 - Make sliders and drags go into inputs on ctrl+click
 - Allow some settings for live updating using file watcing
-- Allow profiling 
 - Check how calling window with one name multiple times works
 - Find out reason for delay when interacting with ui (can be seen while moving window)
 - Save devui windows positions, remove rects from window creation 
-- Check texture library for perfomance
-- Find a way to save memory on textures in texture library (they are not freed until program end)
 - Check how hash tables react on storage overflowing
 - Something is causing to allocate a lot of memory while devui is working
+- Setting variables in a list that can be viewed and changed in console 
+- Free camera
+- Sorting algo

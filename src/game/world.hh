@@ -4,10 +4,12 @@
 
 #include "game/camera.hh"
 
+typedef u32 EntityId;
+
 enum struct EntityKind {
     None = 0x0,
     Player,
-    Tree
+    Tree,
 };  
 
 enum EntityFlags {
@@ -16,7 +18,7 @@ enum EntityFlags {
 };
 
 struct Entity {
-    u32 id = (u32)-1;
+    EntityId id = (EntityId)-1;
     EntityKind kind = EntityKind::None;
     u32 flags = 0; // EntityFlags
     
@@ -32,7 +34,8 @@ struct World {
     Vec3 point_on_plane = Vec3(0);
 
     Array<Entity> entities;
-    u32 player_entity_id;
+    EntityId player_id;
+    EntityId camera_id; 
     
     void init();
     void cleanup();

@@ -7,6 +7,4 @@
 - Check texture library for perfomance
 - Find a way to save memory on textures in texture library (they are not freed until program end)
 - Check how hash tables react on storage overflowing
-- Buttons press is not working properly.....
-- Select tiles on map
-- http://www.opengl-tutorial.org/ru/intermediate-tutorials/billboards-particles/billboards/ 
+- Something is causing to allocate a lot of memory while devui is working

@@ -9,11 +9,13 @@ void GameState::init() {
     
     this->local_dev_ui.init();
     dev_ui->font = assets->get_font("consolas");
+    this->world.init();
     logprintln("GameState", "Init end");
 }
 
 void GameState::cleanup() {
     logprintln("GameState", "Cleanup");
+    this->world.cleanup();
 }
 
 void GameState::update_logic() {

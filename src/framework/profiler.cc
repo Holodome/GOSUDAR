@@ -1,6 +1,8 @@
 #include "framework/profiler.hh"
 #include "framework/os.hh"
 
+#if ENABLE_PROFILER
+
 static FileHandle profile_file_handle = {};
 static size_t profile_file_idx = 0;
 
@@ -40,3 +42,5 @@ void profiler_record_event(ProfilerEvent event) {
     OS::write_file(profile_file_handle, profile_file_idx, cursor, buffer);
     profile_file_idx += cursor;
 }
+
+#endif

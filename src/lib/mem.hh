@@ -11,6 +11,7 @@
 
 namespace Mem {
     static u64 times_alloced = 0;
+    static u64 alloc_count = 0;
     
     void *alloc_base(size_t size) {
         assert(size);
@@ -19,6 +20,7 @@ namespace Mem {
         }
         size_t padded_size = (size + 0xF) & ~0xF;
         ++times_alloced;
+        ++alloc_count;
         return ::_aligned_malloc(padded_size, 16);
     }
     
@@ -49,6 +51,7 @@ namespace Mem {
     void *realloc(void *ptr, size_t new_size) {
         if (ptr == 0) {
             ++times_alloced;
+            ++alloc_count;
         }
         void *result = ::_aligned_realloc(ptr, new_size, 16);
         return result;

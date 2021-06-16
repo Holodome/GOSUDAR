@@ -4,7 +4,6 @@
 
 #include "lib/math.hh"
 #include "lib/mem.hh"
-#include "lib/memory_arena.hh"
 #include "lib/hashing.hh"
 #include "lib/str.hh"
 #include "lib/array.hh"

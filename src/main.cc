@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
     if (!mleak) {
         logprintln("Mem", "No memory leaks detected");
     }
+    logprintln("Mem", "Alloc called %llu times", Mem::alloc_count);
     logprintln("App", "end of main");
     logger_cleanup();
     GAME_END;

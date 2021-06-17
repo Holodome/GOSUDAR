@@ -37,16 +37,12 @@ struct World {
     EntityId player_id;
     EntityId camera_id; 
     
-    void init();
-    void cleanup();
-    
-    void update();
-    void render();
-    
     void get_billboard_positions(Vec3 mid_bottom, f32 width, f32 height, Vec3 out[4]);
     u32 add_entity(const Entity *entity);
     void add_tree_entity(Vec2 pos);
     void add_player_enitity();
+
+    static Vec3 map_pos_to_world_pos(Vec2 map);
 };  
 
 #define WORLD_HH 1

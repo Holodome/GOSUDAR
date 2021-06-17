@@ -4,16 +4,19 @@
 
 #include "game/world.hh"
 
-struct Settings {
-    bool fullscreen = false;
-    bool enable_devui = false; // Press f3 to enable, f8 to focus mouse 
-    bool focus_devui = true;
+enum DevMode {
+    DevMode_None           = 0x0,
+    DevMode_DevUI          = 0x1,
+    DevMode_DevUIFocused   = 0x2,
+    DevMode_FreeCamera     = 0x4,
+    DevMode_StopSimulation = 0x8
 };  
 
 struct GameState {
     DevUI local_dev_ui = {};
     
-    Settings settings = {};
+    bool fullscreen = false;
+    u32 dev_mode; // DevMode
     World world = {};
     
     void init();

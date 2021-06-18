@@ -8,8 +8,6 @@
 #define WIDGET_DEF_HEADER(...) CHECK_IS_ENABLED(__VA_ARGS__) CHECK_CUR_WIN_IS_PRESENT CHECK_WINDOW_IS_NOT_COLLAPSED(__VA_ARGS__)
 #define HAS_INPUT (this->is_enabled && this->is_focused)
 
-DevUI *dev_ui;
-
 static inline Vec4 color_from_bstate(const DevUIButtonState &bstate, Vec4 held, Vec4 hot, Vec4 idle) {
     return (bstate.is_held ? held : bstate.is_hot ? hot : idle);
 }
@@ -117,8 +115,8 @@ void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
         return;
     }
     
-    AssetInfo *font_info = assets->get_info(this->font_name);
-    FontData *font = assets->get_font(this->font_name);
+    AssetInfo *font_info = assets->get_info(this->font_id);
+    FontData *font = assets->get_font(this->font_id);
     f32 line_height = font_info->height * scale;
 	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
 	f32 rheight = 1.0f / (f32)font->tex_size.y;
@@ -146,7 +144,7 @@ void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
 }
 
 Vec2 DevUI::get_text_size(const char *text, size_t count) {
-    Vec2 size = assets->get_text_size(this->font_name, text, count, DEVUI_TEXT_SCALE);
+    Vec2 size = assets->get_text_size(this->font_id, text, count, DEVUI_TEXT_SCALE);
     // @HACK
     if (*text == '$') {
         size.x = 0;
@@ -191,7 +189,7 @@ void DevUI::begin_frame(Input *input) {
     this->input = input;
     // @HACK probably call font function for height 
     // @TODO change this to be set only when font is set
-    AssetInfo *font = assets->get_info(this->font_name);
+    AssetInfo *font = assets->get_info(this->font_id);
     this->text_height = font->height * DEVUI_TEXT_SCALE;
     this->hot_id = DevUIID::empty();
     this->hot_win = 0;
@@ -695,9 +693,6 @@ void DevUI::window_end() {
 }
 
 void DevUI::init() {
-    assert(!::dev_ui);
-    ::dev_ui = this;
-    
     this->id_stack_index = 0;
     this->clip_rect_stack_index = 0;
     this->window_count = 0;   
@@ -708,7 +703,7 @@ void DevUI::init() {
     this->hot_win = 0;
     this->hot_id = DevUIID::empty();
     this->active_id = DevUIID::empty();
-    this->font_name = "consolas";
+    this->font_id = Asset_Font;
     this->is_enabled = false;
     this->is_focused = false;
 }

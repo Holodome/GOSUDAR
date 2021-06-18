@@ -41,7 +41,7 @@ void World::add_tree_entity(Vec2 pos) {
     Entity tree = empty_entity();
     tree.kind = EntityKind::Tree;
     tree.flags = EntityFlags_IsDrawable;
-    tree.texture_name = "tree";
+    tree.texture_id = Asset_Tree;
     tree.pos = pos;
     tree.chops_left = 3;
     this->add_entity(&tree);
@@ -52,7 +52,7 @@ void World::add_player_enitity() {
     player.kind = EntityKind::Player;
     player.flags = EntityFlags_IsDrawable | EntityFlags_IsUpdatable;
     player.pos = Vec2(0, 0);
-    player.texture_name = "dude";
+    player.texture_id = Asset_Dude;
     player.health = 100;
     this->player_id = this->add_entity(&player);
 }

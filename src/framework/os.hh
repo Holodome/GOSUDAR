@@ -150,7 +150,6 @@ struct OS {
     void init();
     void cleanup();
     
-    f32 get_time() const;
     
     // Loads all opengl functions
     void init_renderer_backend();
@@ -159,7 +158,9 @@ struct OS {
     
     void go_fullscreen(bool fullscreen);
     
+    f32 get_time() const;
     static RealWorldTime get_real_world_time();
+    
     static void mkdir(const char *name);
     static void sleep(u32 ms);
     

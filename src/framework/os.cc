@@ -12,8 +12,6 @@
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
 
-OS *os;
-
 struct OSInternal {
     HINSTANCE instance;
     HWND hwnd;
@@ -103,8 +101,6 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
 
 void OS::init() {
     logprintln("OS", "Init start");
-    assert(!::os);
-    ::os = this;
     this->internal = new OSInternal;
     memset(this->internal, 0, sizeof(*this->internal));
     

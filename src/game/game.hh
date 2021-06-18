@@ -28,7 +28,7 @@ struct Game {
     Assets assets;
     
     bool is_running;
-    DevUI local_dev_ui;
+    DevUI dev_ui;
     
     bool draw_sprite_frames;
     bool fullscreen;

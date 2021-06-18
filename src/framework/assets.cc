@@ -13,9 +13,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "thirdparty/stb_truetype.h"
 
-
-Assets *assets;
-
 const char *ASSET_KINDS[] = {
     "None",
     "Image",
@@ -29,108 +26,50 @@ const char *ASSET_STATES[] = {
 
 void Assets::init(const char *sprites_cfg_name) {
     logprintln("Assets", "Init start");
-    assert(!::assets);
-    ::assets = this;
     
-    this->sprites_cfg_name = Str(sprites_cfg_name);
-    FILE *file = fopen(sprites_cfg_name, "rb");
-    assert(file);
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    this->asset_infos[Asset_White].filename = "white.png";
+    this->asset_infos[Asset_White].kind = AssetKind::Image;
+    this->asset_infos[Asset_White].state = AssetState::Unloaded;
     
-    char *text = new char[size + 1];
-    fread(text, 1, size, file);
-    text[size] = 0;
-    fclose(file);
-    Lexer lexer;
-    lexer.init(text, size + 1);
-    delete[] text;
-    const Token *token = lexer.peek_tok();
-    AssetInfo current_info = {};
-    bool has_info = false;
-    while (!token->is_kind(TokenKind::EOS)) {
-        if (token->is_kind('[')) {
-            if (has_info) {
-                this->asset_infos.set(current_info.name.c_str(), current_info);
-            }
-            has_info = true;
-            token = lexer.peek_next_tok();
-            assert(token->is_kind(TokenKind::Identifier));
-            current_info.name = token->get_ident();
-            token = lexer.peek_next_tok();
-            assert(token->is_kind(']'));
-            token = lexer.peek_next_tok();
-        } else if (token->is_kind(TokenKind::Identifier)) {
-            assert(has_info);
-            if (token->get_ident().cmp("kind")) {
-                token = lexer.peek_next_tok();
-                assert(token->is_kind(TokenKind::Identifier));
-                if (token->get_ident().cmp("img")) {
-                    current_info.kind = AssetKind::Image;
-                } else if (token->get_ident().cmp("font")) {
-                    current_info.kind = AssetKind::Font;
-                } else {
-                    assert(false);
-                }
-                token = lexer.peek_next_tok();
-            } else if (token->get_ident().cmp("filename")) {
-                token = lexer.peek_next_tok();
-                assert(token->is_kind(TokenKind::String));
-                current_info.filename = token->get_str();
-                token = lexer.peek_next_tok();
-            } else if (token->get_ident().cmp("height")) {
-                token = lexer.peek_next_tok();
-                assert(token->is_kind(TokenKind::Integer));
-                current_info.height = token->get_int();
-                token = lexer.peek_next_tok();
-            } else {
-                assert(false);
-            }
-        } else {
-            assert(false);
-        }
-    }
-    if (has_info) {
-        this->asset_infos.set(current_info.name.c_str(), current_info);
-    }
-    lexer.cleanup();
-    for (size_t i = 0; i < this->asset_infos.num_entries; ++i) {
-        AssetInfo *info = this->asset_infos.get_index(i);
-        assert(info);
-        logprint("Assets", "Loaded asset info for '%s': ", info->name.c_str());
-        print("kind: '%s' ", ASSET_KINDS[(u32)info->kind]);
-        if (info->kind == AssetKind::Font) {
-            print("filename: '%s' ", info->filename.c_str());
-        } else if (info->kind == AssetKind::Image) {
-            print("filename: '%s' ", info->filename.c_str());
-        }
-        print("\n");
-    }
+    this->asset_infos[Asset_Dude].filename = "dude.png";
+    this->asset_infos[Asset_Dude].kind = AssetKind::Image;
+    this->asset_infos[Asset_Dude].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_Grass].filename = "grass.png";
+    this->asset_infos[Asset_Grass].kind = AssetKind::Image;
+    this->asset_infos[Asset_Grass].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_Tree].filename = "tree.png";
+    this->asset_infos[Asset_Tree].kind = AssetKind::Image;
+    this->asset_infos[Asset_Tree].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_Font].filename = "c:/windows/fonts/consola.ttf";
+    this->asset_infos[Asset_Font].kind = AssetKind::Font;
+    this->asset_infos[Asset_Font].state = AssetState::Unloaded;
+    this->asset_infos[Asset_Font].height = 32;
     
     // @CLEAN
-    this->get_tex("white");
+    this->get_tex(Asset_White);
     logprintln("Assets", "Init end");
 }
 
 void Assets::cleanup() {
 }
     
-AssetInfo *Assets::get_info(const char *name) {
-    AssetInfo *result = 0;
-    bool found = this->asset_infos.get(name, &result);
-    assert(found);
+AssetInfo *Assets::get_info(AssetID id) {
+    assert(id < Asset_Count);
+    AssetInfo *result = &this->asset_infos[id];
     return result;
 }
 
-Texture Assets::get_tex(const char *name) {
-    AssetInfo *info = this->get_info(name);
+Texture Assets::get_tex(AssetID id) {
+    AssetInfo *info = this->get_info(id);
     assert(info->kind == AssetKind::Image);
     if (info->state == AssetState::Loaded) {
     } else {
-        logprintln("Assets", "Loading texture '%s'", name);
+        // logprintln("Assets", "Loading texture '%s'", name);
         
-        FileHandle file = OS::open_file(info->filename.c_str());
+        FileHandle file = OS::open_file(info->filename);
         assert(OS::is_file_handle_valid(file));
         size_t file_size = OS::get_file_size(file);
         void *buffer = Mem::alloc(file_size);
@@ -142,25 +81,26 @@ Texture Assets::get_tex(const char *name) {
         Mem::free(buffer);
         
         Texture tex = renderer->create_texture(data, tex_size);
-        size_t array_idx = this->textures.add(tex);
+        size_t idx = this->texture_count++;
+        this->textures[idx] = tex;
         Mem::free(data);
         
         info->state = AssetState::Loaded;
-        info->array_entry_idx = array_idx;
-        logprintln("Assets", "Loaded texture '%s'", name);
+        info->array_entry_idx = idx;
+        // logprintln("Assets", "Loaded texture '%s'", name);
     }
     return this->textures[info->array_entry_idx];
 }
 
-FontData *Assets::get_font(const char *name) {
-    AssetInfo *info = this->get_info(name);
+FontData *Assets::get_font(AssetID id) {
+    AssetInfo *info = this->get_info(id);
     assert(info->kind == AssetKind::Font);
     FontData *result = 0;
     if (info->state == AssetState::Loaded) {
     } else {
-        logprintln("Assets", "Loading font '%s'", name);
+        // logprintln("Assets", "Loading font '%s'", name);
          
-        FileHandle file = OS::open_file(info->filename.c_str());
+        FileHandle file = OS::open_file(info->filename);
         assert(OS::is_file_handle_valid(file));
         size_t file_size = OS::get_file_size(file);
         void *buffer = Mem::alloc(file_size);
@@ -191,7 +131,7 @@ FontData *Assets::get_font(const char *name) {
         }
         delete[] loaded_atlas_data;
         
-        size_t array_idx = this->fonts.add({});
+        size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
         font->tex = renderer->create_texture(atlas_data, Vec2i(atlas_width, atlas_height));
         delete[] atlas_data;
@@ -214,17 +154,16 @@ FontData *Assets::get_font(const char *name) {
             font->glyphs[i].x_advance = glyphs[i].xadvance;
         }
         delete glyphs;
-        logprintln("Fonts", "Loaded font '%s'", info->filename.c_str());
         info->state = AssetState::Loaded;
         info->array_entry_idx = array_idx;
-        logprintln("Assets", "Loaded font '%s'", name);
+        logprintln("Fonts", "Loaded font '%s'", info->filename);
     }
     return &this->fonts[info->array_entry_idx];
 }
 
-Vec2 Assets::get_text_size(const char *name, const char *text, size_t count, f32 scale) {
-    AssetInfo *info = this->get_info(name);
-    FontData *font = this->get_font(name);
+Vec2 Assets::get_text_size(AssetID id, const char *text, size_t count, f32 scale) {
+    AssetInfo *info = this->get_info(id);
+    FontData *font = this->get_font(id);
     
     if (!count) {
         count = strlen(text);

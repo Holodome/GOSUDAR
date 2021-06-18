@@ -105,6 +105,9 @@ struct DevUITextEditState {
 struct DevUI {
     MemoryArena arena;
     
+    // @CLEAN
+    AssetID font_id;  
+    Assets *assets;
     Input *input;
     // Стек ID, который используется для создания вложеных систем
     DevUIID id_stack[5];
@@ -122,7 +125,6 @@ struct DevUI {
     u32 *windows_order;
     DevUIWindow *cur_win, *hot_win;
     DevUIID hot_id, active_id;
-    const char *font_name;
     f32 text_height;
     DevUITextEditState text_edit;
     

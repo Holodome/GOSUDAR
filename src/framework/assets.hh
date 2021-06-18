@@ -4,6 +4,17 @@
 #include "framework/lexer.hh"
 #include "framework/renderer.hh"
 
+typedef u32 AssetID;
+
+enum AssetCategory {
+    Asset_White,
+    Asset_Dude,
+    Asset_Tree,
+    Asset_Font,
+    Asset_Grass,
+    Asset_Count
+};  
+
 struct FontGlyph {
 	u32 utf32;
 	u16 min_x;
@@ -36,35 +47,36 @@ enum struct AssetState {
 };
 
 struct AssetInfo {
-    Str name;  
     AssetKind kind;
     AssetState state;
     size_t array_entry_idx;
     
-    Str filename;
+    const char *filename;
     Vec2 size;
     f32 height;
 };
 
+
 struct Assets {
+    MemoryArena arena;
     // This should only be texture creating-related stuff
     Renderer *renderer;
     
-    Str sprites_cfg_name;
-    HashTable<AssetInfo> asset_infos;
-    
-    Array<Texture> textures;
-    Array<FontData> fonts;
+    AssetInfo asset_infos[Asset_Count];
+    size_t texture_count;
+    Texture textures[128];
+    size_t font_count;
+    FontData fonts[128];
     
     void init(const char *sprites_cfg_name);
     void cleanup();
     
-    AssetInfo *get_info(const char *name);
+    AssetInfo *get_info(AssetID id);
     
-    Texture get_tex(const char *name);
-    FontData *get_font(const char *name);
+    Texture get_tex(AssetID id);
+    FontData *get_font(AssetID id);
     
-    Vec2 get_text_size(const char *name, const char *text, size_t count = 0, f32 scale = 1.0f);
+    Vec2 get_text_size(AssetID id, const char *text, size_t count = 0, f32 scale = 1.0f);
 };
 
 #define ASSETS_HH 1

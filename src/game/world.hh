@@ -23,7 +23,7 @@ struct Entity {
     u32 flags; // EntityFlags
     
     Vec2 pos;
-    const char *texture_name;
+    AssetID texture_id;
     f32 health;
     u32 chops_left;
 };

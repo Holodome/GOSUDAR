@@ -11,6 +11,7 @@ void Game::init() {
     size_t renderer_arena_size = MEGABYTES(256);
     renderer.arena.init(Mem::alloc(renderer_arena_size), renderer_arena_size);
     renderer.init();
+    // @CLEAN
     this->assets.renderer = &this->renderer;
     this->assets.init("assets.cfg");
     this->renderer.white_texture = this->assets.get_tex("white");

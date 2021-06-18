@@ -67,7 +67,5 @@ struct Assets {
     Vec2 get_text_size(const char *name, const char *text, size_t count = 0, f32 scale = 1.0f);
 };
 
-extern Assets *assets;
-
 #define ASSETS_HH 1
 #endif

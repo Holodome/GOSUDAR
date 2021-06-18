@@ -169,7 +169,5 @@ struct DevUI {
     Rect get_new_window_rect();
 };
 
-extern DevUI *dev_ui;
-
 #define DEVUI_HH 1
 #endif

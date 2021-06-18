@@ -272,6 +272,7 @@ void RenderGroup::begin(Renderer *renderer, Mat4x4 mvp) {
     
     this->renderer = renderer;
     
+    this->has_depth = true;
     this->mvp = mvp;
     this->imvp = Mat4x4::inverse(mvp);    
     this->texture = renderer->white_texture;

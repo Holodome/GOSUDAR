@@ -78,7 +78,7 @@ bool DevUI::is_text_input_key_pressed(Key key) {
 }
 
 
-void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
+void DevUI::push_rect(Rect rect, Vec4 color, Texture tex, Rect uv_rect) {
     CHECK_CUR_WIN_IS_PRESENT;
     // Transform coordinates and uv accoring to clipping
     Rect clip_rect = clip_rect_stack[clip_rect_stack_index - 1];
@@ -107,7 +107,8 @@ void DevUI::push_rect(Rect rect, Vec4 color, Texture *tex, Rect uv_rect) {
     entry.v[3].uv = clipped_uv.bottom_right();
     entry.v[3].c = color;
     entry.tex = tex;
-    this->cur_win->draw_queue.add(entry);
+    assert(this->cur_win->draw_queue_size < DEVUI_WINDOW_DRAW_QUEUE_MAX_SIZE);
+    this->cur_win->draw_queue[this->cur_win->draw_queue_size++] = entry;
 }
 
 void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
@@ -116,9 +117,11 @@ void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
         return;
     }
     
-    f32 line_height = font->size * scale;
-	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
-	f32 rheight = 1.0f / (f32)font->tex->size.y;
+    AssetInfo *font_info = assets->get_info(this->font_name);
+    FontData *font = assets->get_font(this->font_name);
+    f32 line_height = font_info->height * scale;
+	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
+	f32 rheight = 1.0f / (f32)font->tex_size.y;
 	Vec3 offset = Vec3(p, 0);
 	offset.y += line_height;
 	for (const char *scan = text; *scan; ++scan) {
@@ -143,7 +146,7 @@ void DevUI::push_text(Vec2 p, const char *text, Vec4 color, f32 scale) {
 }
 
 Vec2 DevUI::get_text_size(const char *text, size_t count) {
-    Vec2 size = this->font->get_text_size(text, count, DEVUI_TEXT_SCALE);
+    Vec2 size = assets->get_text_size(this->font_name, text, count, DEVUI_TEXT_SCALE);
     // @HACK
     if (*text == '$') {
         size.x = 0;
@@ -185,15 +188,15 @@ void DevUI::label(const char *label) {
 }
 
 void DevUI::begin_frame() {
-    assert(this->font);
     // @HACK probably call font function for height 
     // @TODO change this to be set only when font is set
-    this->text_height = this->font->size * DEVUI_TEXT_SCALE;
+    AssetInfo *font = assets->get_info(this->font_name);
+    this->text_height = font->height * DEVUI_TEXT_SCALE;
     this->hot_id = DevUIID::empty();
     this->hot_win = 0;
     
     if (HAS_INPUT) {
-        for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
+        for (size_t window_id_idx = 0; window_id_idx < windows_order_size; ++window_id_idx) {
             DevUIWindow *window = &windows[windows_order[window_id_idx]];
             if (window->whole_rect.collide(game->input.mpos)) {
                 hot_win = window;
@@ -202,23 +205,35 @@ void DevUI::begin_frame() {
  
         if (hot_win) {
             if (game->input.is_key_pressed(Key::MouseLeft)) {
-                windows_order.remove(hot_win->array_idx);
-                windows_order.add(hot_win->array_idx);
+                size_t found_idx = (size_t)-1;
+                for (size_t i = 0; i < this->windows_order_size; ++i) {
+                    if (this->windows_order[i] == hot_win->array_idx) {
+                        found_idx = i;
+                        break;
+                    }
+                }
+                assert(found_idx != (size_t)-1);
+                memmove(this->windows_order + found_idx, this->windows_order + found_idx + 1,
+                        sizeof(u32) * (this->windows_order_size - found_idx - 1));
+                this->windows_order[this->windows_order_size - 1] = hot_win->array_idx;
             }
         }
+    }
+    for (u32 i = 0; i < window_count; ++i) {
+        DevUIWindow *test_win = &windows[i];
+        test_win->draw_queue_size = 0;
     }
 }
 
 void DevUI::end_frame() {
     if (!this->is_enabled) {
-        // assert(draw_queue.len == 0);
     } else {
-        for (size_t window_id_idx = 0; window_id_idx < windows_order.len; ++window_id_idx) {
-            DevUIWindow &window = windows[windows_order[window_id_idx]];
+        for (size_t window_id_idx = 0; window_id_idx < windows_order_size; ++window_id_idx) {
+            DevUIWindow *window = &this->windows[windows_order[window_id_idx]];
             renderer->set_renderering_2d(game->input.winsize);
             renderer->set_shader(renderer->standard_shader);
-            for (u32 i = 0; i < window.draw_queue.len; ++i) {
-                DevUIDrawQueueEntry *entry = &window.draw_queue[i];
+            for (u32 i = 0; i < window->draw_queue_size; ++i) {
+                DevUIDrawQueueEntry *entry = &window->draw_queue[i];
                 renderer->imm_begin();
                 renderer->set_texture(entry->tex);
                 renderer->imm_vertex(entry->v[3]);
@@ -229,7 +244,7 @@ void DevUI::end_frame() {
                 renderer->imm_vertex(entry->v[3]);
                 renderer->imm_flush();
             }
-            window.draw_queue.clear();
+            window->draw_queue_size = 0;
         }
     }
 }
@@ -245,7 +260,7 @@ void DevUI::text(const char *text) {
 void DevUI::textv(const char *format, va_list args) {
     WIDGET_DEF_HEADER();
     char buffer[1024];
-    Str::formatv(buffer, sizeof(buffer), format, args);
+    vsnprintf(buffer, sizeof(buffer), format, args);
     text(buffer);
 }
 void DevUI::textf(const char *format, ...) {
@@ -412,7 +427,7 @@ bool DevUI::input_float(const char *label, f32 *value) {
     
     bool is_value_changed = false;
     char buffer[64];
-    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    snprintf(buffer, sizeof(buffer), "%.3f", *value);
     if (input_text(label, buffer, sizeof(buffer), DEVUI_INPUT_FLAG_DECIMAL)) {
         *value = atof(buffer);
         is_value_changed = true;
@@ -454,7 +469,7 @@ bool DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
     this->push_rect(grab_rect, color);
     
     char buffer[64];
-    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    snprintf(buffer, sizeof(buffer), "%.3f", *value);
     Vec2 value_size = this->get_text_size(buffer);
     Vec2 value_pos = Vec2(slider_zone_rect.middle_x() - value_size.x * 0.5f, frame_rect.y);
     this->push_text(value_pos, buffer);
@@ -482,13 +497,18 @@ bool DevUI::drag_float(const char *label, f32 *value, f32 speed) {
     this->push_rect(frame_rect, DEVUI_COLOR_WIDGET_BACKGROUND);
     this->push_clip_rect(frame_rect);
     char buffer[64];
-    Str::format(buffer, sizeof(buffer), "%.3f", *value);
+    snprintf(buffer, sizeof(buffer), "%.3f", *value);
     Vec2 value_size = this->get_text_size(buffer);
     Vec2 value_pos = Vec2(slider_zone_rect.middle_x() - value_size.x * 0.5f, frame_rect.y);
     this->push_text(value_pos, buffer);
     this->pop_clip_rect();
     this->label(label);
     return is_value_changed;
+}
+
+void DevUI::value(const char *label, i32 value) {
+    WIDGET_DEF_HEADER();
+    this->textf("%s: %d", label, value);
 }
 
 void DevUI::value(const char *label, f32 value) {
@@ -568,8 +588,8 @@ Rect DevUI::get_new_window_rect() {
         Rect(0, 450, 400, 400),
         Rect(450, 450, 400, 400),
     };
-    assert(this->windows.len <= ARRAY_SIZE(rects));
-    return rects[this->windows.len - 1];
+    assert(this->window_count <= ARRAY_SIZE(rects));
+    return rects[this->window_count - 1];
 }
     
 void DevUI::window(const char *title) {
@@ -581,7 +601,7 @@ void DevUI::window(const char *title) {
     
     DevUIWindow *win = 0;
     bool use_new_slot = true;
-    for (u32 i = 0; i < windows.len; ++i) {
+    for (u32 i = 0; i < window_count; ++i) {
         DevUIWindow *test_win = &windows[i];
         if (test_win->title.cmp(title)) {
             assert(!win);
@@ -592,14 +612,16 @@ void DevUI::window(const char *title) {
     
     if (use_new_slot) {
         assert(!win);
-        win = &windows[windows.add(DevUIWindow())];
+        assert(this->window_count < DEVUI_MAX_WINDOW_COUNT);
+        win = &this->windows[this->window_count++];
         win->id = make_id(title, title_len);
-        win->array_idx = windows.len - 1;
+        win->array_idx = this->window_count - 1;
         win->title = Str(title);
         Rect rect = this->get_new_window_rect();
         win->whole_rect = rect;
+        win->draw_queue = (DevUIDrawQueueEntry *)this->arena.alloc(sizeof(DevUIDrawQueueEntry) * DEVUI_WINDOW_DRAW_QUEUE_MAX_SIZE);
         
-        windows_order.add(win->array_idx);
+        this->windows_order[this->windows_order_size++] = win->array_idx;
     }
     this->cur_win = win;
     push_id(win->id);
@@ -644,7 +666,7 @@ void DevUI::window(const char *title) {
         push_rect(resize_rect, resize_color);
     }
     push_rect(win->title_bar_rect, DEVUI_COLOR_WINDOW_TITLEBAR);
-    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), win->title.data);
+    push_text(win->title_bar_rect.p + Vec2(DEVUI_FRAME_PADDING.x, 0), win->title.c_str());
     push_rect(collapse_rect, collapse_color);
     
     win->cursor = win->rect.p + DEVUI_WINDOW_PADDING;
@@ -657,7 +679,7 @@ void DevUI::window_end() {
     CHECK_IS_ENABLED();    
     CHECK_CUR_WIN_IS_PRESENT;
     // @CLEAN
-    if (!active_id && !hot_id && this->windows_order[this->windows_order.len - 1] == cur_win->array_idx && cur_win->title_bar_rect.collide(game->input.mpos)
+    if (!active_id && !hot_id && this->windows_order[this->windows_order_size - 1] == cur_win->array_idx && cur_win->title_bar_rect.collide(game->input.mpos)
         && game->input.is_key_held(Key::MouseLeft) && HAS_INPUT) {
         active_id = make_id("$MOVE");
     }
@@ -671,4 +693,7 @@ void DevUI::window_end() {
 void DevUI::init() {
     assert(!::dev_ui);
     ::dev_ui = this;
+    
+    this->windows = (DevUIWindow *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(DevUIWindow));
+    this->windows_order = (u32 *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(u32));
 }

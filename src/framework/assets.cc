@@ -1,5 +1,7 @@
 #include "framework/assets.hh"
 
+#include "framework/os.hh"
+
 #define STBI_MALLOC Mem::alloc
 #define STBI_REALLOC Mem::realloc
 #define STBI_FREE Mem::free
@@ -10,6 +12,7 @@
 #define STBTT_free(x,u)    ((void)(u),Mem::free(x))
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "thirdparty/stb_truetype.h"
+
 
 Assets *assets;
 
@@ -23,121 +26,6 @@ const char *ASSET_STATES[] = {
     "Unloaded",
     "Loaded"  
 };
-
-TextureData::TextureData(const char *filename) {
-    this->filename = Str(filename);
-    FILE *file = fopen(filename, "rb");
-    assert(file);
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    char *text = new char[size + 1];
-    fread(text, 1, size, file);
-    text[size] = 0;
-    fclose(file);
-    
-    // stbi_set_flip_vertically_on_load(true);
-    int w, h;
-    this->data = stbi_load(filename, &w, &h, 0, 4);
-    this->size = Vec2i(w, h);
-    this->texture = Texture(this->data, this->size);
-    delete[] text;
-}
-
-TextureData::TextureData(void *data, Vec2i size) {
-    this->filename;
-    this->data = data;
-    this->size = size;
-    this->texture = Texture(this->data, this->size);
-}
-
-TextureData::~TextureData() {
-    Mem::free(data);
-}
-
-FontData::FontData(const char *filename, f32 height) {
-    FILE *file = fopen(filename, "rb");
-    assert(file);
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    char *text = new char[size + 1];
-    fread(text, 1, size, file);
-    text[size] = 0;
-    fclose(file);
-    
-    const u32 atlas_width  = 512;
-	const u32 atlas_height = 512;
-	const u32 first_codepoint = 32;
-	const u32 codepoint_count = 95;  
-    stbtt_packedchar *glyphs = new stbtt_packedchar[codepoint_count];
-    
-    u8 *loaded_atlas_data = new u8[atlas_width * atlas_height];
-    stbtt_pack_context context = {};
-	stbtt_PackBegin(&context, loaded_atlas_data, atlas_width, atlas_height, 0, 1, 0);
-	stbtt_PackSetOversampling(&context, 2, 2);
-	stbtt_PackFontRange(&context, (u8 *)text, 0, height, first_codepoint, codepoint_count, glyphs);
-	stbtt_PackEnd(&context);
-
-    u8 *atlas_data = new u8[atlas_width * atlas_height * 4];
-	for (u32 i = 0; i < atlas_width * atlas_height; ++i) {
-		u8 *dest = (u8 *)(atlas_data + i * 4);
-		dest[0] = 255;
-		dest[1] = 255;
-		dest[2] = 255;
-		// dest[3] = loaded_atlas_data[i];
-		dest[3] = loaded_atlas_data[i];
-	}
-    delete[] loaded_atlas_data;
-    tex = new Texture(atlas_data, Vec2i(atlas_width, atlas_height));
-    delete[] atlas_data;
-    
-	this->first_codepoint = first_codepoint;
-	this->size = height;
-    this->glyphs.resize(codepoint_count);
-
-	for (u32 i = 0; i < codepoint_count; ++i) {
-		++this->glyphs.len;
-		this->glyphs[i].utf32 = first_codepoint + i;
-		this->glyphs[i].min_x = glyphs[i].x0;
-		this->glyphs[i].min_y = glyphs[i].y0;
-		this->glyphs[i].max_x = glyphs[i].x1;
-		this->glyphs[i].max_y = glyphs[i].y1;
-		this->glyphs[i].offset1_x = glyphs[i].xoff;
-		this->glyphs[i].offset1_y = glyphs[i].yoff;
-		this->glyphs[i].offset2_x = glyphs[i].xoff2;
-		this->glyphs[i].offset2_y = glyphs[i].yoff2;
-		this->glyphs[i].x_advance = glyphs[i].xadvance;
-	}
-    delete glyphs;
-    delete text;
-    logprintln("Fonts", "Loaded font '%s'", filename);
-}
-
-FontData::~FontData() {
-    delete tex;
-}
-
-Vec2 FontData::get_text_size(const char *text, size_t count, f32 scale) {
-    if (!count) {
-        count = strlen(text);
-    }
-    
-    Vec2 result = {};
-    for (u32 i = 0; i < count; ++i) {
-        char s = text[i];
-        if (s >= first_codepoint && s < (first_codepoint + glyphs.len)) {
-            FontGlyph *glyph = &glyphs[s - first_codepoint];
-            // FontGlyph *glyph = &glyphs[first_codepoint];
-            result.x += glyph->x_advance * scale;
-        }
-    }
-    result.y = size * scale;
-    
-    return result;
-}
 
 void Assets::init(const char *sprites_cfg_name) {
     logprintln("Assets", "Init start");
@@ -164,7 +52,7 @@ void Assets::init(const char *sprites_cfg_name) {
     while (!token->is_kind(TokenKind::EOS)) {
         if (token->is_kind('[')) {
             if (has_info) {
-                this->asset_infos.set(current_info.name.data, current_info);
+                this->asset_infos.set(current_info.name.c_str(), current_info);
             }
             has_info = true;
             token = lexer.peek_next_tok();
@@ -204,18 +92,18 @@ void Assets::init(const char *sprites_cfg_name) {
         }
     }
     if (has_info) {
-        this->asset_infos.set(current_info.name.data, current_info);
+        this->asset_infos.set(current_info.name.c_str(), current_info);
     }
     lexer.cleanup();
     for (size_t i = 0; i < this->asset_infos.num_entries; ++i) {
         AssetInfo *info = this->asset_infos.get_index(i);
         assert(info);
-        logprint("Assets", "Loaded asset info for '%s': ", info->name.data);
+        logprint("Assets", "Loaded asset info for '%s': ", info->name.c_str());
         print("kind: '%s' ", ASSET_KINDS[(u32)info->kind]);
         if (info->kind == AssetKind::Font) {
-            print("filename: '%s' ", info->filename.data);
+            print("filename: '%s' ", info->filename.c_str());
         } else if (info->kind == AssetKind::Image) {
-            print("filename: '%s' ", info->filename.data);
+            print("filename: '%s' ", info->filename.c_str());
         }
         print("\n");
     }
@@ -226,12 +114,6 @@ void Assets::init(const char *sprites_cfg_name) {
 }
 
 void Assets::cleanup() {
-    for (size_t i = 0; i < this->texture_datas.len; ++i) {
-        delete this->texture_datas[i];
-    }
-    for (size_t i = 0; i < this->font_datas.len; ++i) {
-        delete this->font_datas[i];
-    }
 }
     
 AssetInfo *Assets::get_info(const char *name) {
@@ -241,22 +123,33 @@ AssetInfo *Assets::get_info(const char *name) {
     return result;
 }
 
-TextureData *Assets::get_tex_data(const char *name) {
+Texture Assets::get_tex(const char *name) {
     AssetInfo *info = this->get_info(name);
     assert(info->kind == AssetKind::Image);
     if (info->state == AssetState::Loaded) {
     } else {
         logprintln("Assets", "Loading texture '%s'", name);
-        size_t idx = this->texture_datas.add(new TextureData(info->filename.data));
+        
+        FileHandle file = OS::open_file(info->filename.c_str());
+        assert(OS::is_file_handle_valid(file));
+        size_t file_size = OS::get_file_size(file);
+        void *buffer = Mem::alloc(file_size);
+        OS::read_file(file, 0, file_size, buffer);
+        
+        int w, h;
+        void *data = stbi_load_from_memory((const stbi_uc *)buffer, file_size, &w, &h, 0, 4);
+        Vec2i tex_size = Vec2i(w, h);
+        Mem::free(buffer);
+        
+        Texture tex = renderer->create_texture(data, tex_size);
+        size_t array_idx = this->textures.add(tex);
+        Mem::free(data);
+        
         info->state = AssetState::Loaded;
-        info->array_entry_idx = idx;
+        info->array_entry_idx = array_idx;
         logprintln("Assets", "Loaded texture '%s'", name);
     }
-    return this->texture_datas[info->array_entry_idx];
-}
-
-Texture *Assets::get_tex(const char *name) {
-    return &this->get_tex_data(name)->texture;
+    return this->textures[info->array_entry_idx];
 }
 
 FontData *Assets::get_font(const char *name) {
@@ -266,10 +159,87 @@ FontData *Assets::get_font(const char *name) {
     if (info->state == AssetState::Loaded) {
     } else {
         logprintln("Assets", "Loading font '%s'", name);
-        size_t idx = this->font_datas.add(new FontData(info->filename.data, info->height));
+         
+        FileHandle file = OS::open_file(info->filename.c_str());
+        assert(OS::is_file_handle_valid(file));
+        size_t file_size = OS::get_file_size(file);
+        void *buffer = Mem::alloc(file_size);
+        OS::read_file(file, 0, file_size, buffer);
+        
+        const u32 atlas_width  = 512;
+        const u32 atlas_height = 512;
+        const u32 first_codepoint = 32;
+        const u32 codepoint_count = 95;  
+        stbtt_packedchar *glyphs = new stbtt_packedchar[codepoint_count];
+        
+        u8 *loaded_atlas_data = new u8[atlas_width * atlas_height];
+        stbtt_pack_context context = {};
+        stbtt_PackBegin(&context, loaded_atlas_data, atlas_width, atlas_height, 0, 1, 0);
+        stbtt_PackSetOversampling(&context, 2, 2);
+        stbtt_PackFontRange(&context, (u8 *)buffer, 0, info->height, first_codepoint, codepoint_count, glyphs);
+        stbtt_PackEnd(&context);
+        
+        Mem::free(buffer);
+
+        u8 *atlas_data = new u8[atlas_width * atlas_height * 4];
+        for (u32 i = 0; i < atlas_width * atlas_height; ++i) {
+            u8 *dest = (u8 *)(atlas_data + i * 4);
+            dest[0] = 0xFF;
+            dest[1] = 0xFF;
+            dest[2] = 0xFF;
+            dest[3] = loaded_atlas_data[i];
+        }
+        delete[] loaded_atlas_data;
+        
+        size_t array_idx = this->fonts.add({});
+        FontData *font = &this->fonts[array_idx];
+        font->tex = renderer->create_texture(atlas_data, Vec2i(atlas_width, atlas_height));
+        delete[] atlas_data;
+        
+        font->tex_size = Vec2i(atlas_width, atlas_height);
+        font->first_codepoint = first_codepoint;
+        font->glyphs.resize(codepoint_count);
+
+        for (u32 i = 0; i < codepoint_count; ++i) {
+            ++font->glyphs.len;
+            font->glyphs[i].utf32 = first_codepoint + i;
+            font->glyphs[i].min_x = glyphs[i].x0;
+            font->glyphs[i].min_y = glyphs[i].y0;
+            font->glyphs[i].max_x = glyphs[i].x1;
+            font->glyphs[i].max_y = glyphs[i].y1;
+            font->glyphs[i].offset1_x = glyphs[i].xoff;
+            font->glyphs[i].offset1_y = glyphs[i].yoff;
+            font->glyphs[i].offset2_x = glyphs[i].xoff2;
+            font->glyphs[i].offset2_y = glyphs[i].yoff2;
+            font->glyphs[i].x_advance = glyphs[i].xadvance;
+        }
+        delete glyphs;
+        logprintln("Fonts", "Loaded font '%s'", info->filename.c_str());
         info->state = AssetState::Loaded;
-        info->array_entry_idx = idx;
+        info->array_entry_idx = array_idx;
         logprintln("Assets", "Loaded font '%s'", name);
     }
-    return this->font_datas[info->array_entry_idx];
+    return &this->fonts[info->array_entry_idx];
+}
+
+Vec2 Assets::get_text_size(const char *name, const char *text, size_t count, f32 scale) {
+    AssetInfo *info = this->get_info(name);
+    FontData *font = this->get_font(name);
+    
+    if (!count) {
+        count = strlen(text);
+    }
+    
+    Vec2 result = {};
+    for (u32 i = 0; i < count; ++i) {
+        char s = text[i];
+        if (s >= font->first_codepoint && s < (font->first_codepoint + font->glyphs.len)) {
+            FontGlyph *glyph = &font->glyphs[s - font->first_codepoint];
+            // FontGlyph *glyph = &glyphs[first_codepoint];
+            result.x += glyph->x_advance * scale;
+        }
+    }
+    result.y = info->height * scale;
+    
+    return result;   
 }

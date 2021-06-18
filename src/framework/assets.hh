@@ -4,17 +4,6 @@
 #include "framework/lexer.hh"
 #include "framework/renderer.hh"
 
-struct TextureData {
-    Str filename;
-    void *data;
-    Vec2i size;  
-    Texture texture;
-    
-    TextureData(const char *filename);
-    TextureData(void *data, Vec2i size);
-    ~TextureData();
-};
-
 struct FontGlyph {
 	u32 utf32;
 	u16 min_x;
@@ -29,14 +18,10 @@ struct FontGlyph {
 };
 
 struct FontData {
-    f32 size;
-    Texture *tex;  
+    Vec2i tex_size;
+    Texture tex;  
     Array<FontGlyph> glyphs;
     u32 first_codepoint;
-    
-    FontData(const char *filename, f32 size); 
-    ~FontData();
-    Vec2 get_text_size(const char *text, size_t count = 0, f32 scale = 1.0f);   
 };
 
 enum struct AssetKind {
@@ -52,9 +37,9 @@ enum struct AssetState {
 
 struct AssetInfo {
     Str name;  
-    AssetKind kind = AssetKind::None;
-    AssetState state = AssetState::Unloaded;
-    size_t array_entry_idx = (size_t)-1;
+    AssetKind kind;
+    AssetState state;
+    size_t array_entry_idx;
     
     Str filename;
     Vec2 size;
@@ -65,17 +50,18 @@ struct Assets {
     Str sprites_cfg_name;
     HashTable<AssetInfo> asset_infos;
     
-    Array<TextureData *> texture_datas;
-    Array<FontData *> font_datas;
+    Array<Texture> textures;
+    Array<FontData> fonts;
     
     void init(const char *sprites_cfg_name);
     void cleanup();
     
     AssetInfo *get_info(const char *name);
     
-    TextureData *get_tex_data(const char *name);
-    Texture *get_tex(const char *name);
+    Texture get_tex(const char *name);
     FontData *get_font(const char *name);
+    
+    Vec2 get_text_size(const char *name, const char *text, size_t count = 0, f32 scale = 1.0f);
 };
 
 extern Assets *assets;

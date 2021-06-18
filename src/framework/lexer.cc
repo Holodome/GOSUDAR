@@ -100,10 +100,10 @@ const Token *Lexer::peek_tok() {
             Str tok = Str((const char *)ident_start, this->cursor - ident_start); 
             if (is_real) {
                 token->kind = TokenKind::Real;
-                token->real = atof(tok.data);
+                token->real = atof(tok.c_str());
             } else {
                 token->kind = TokenKind::Integer;
-                token->integer = atoi(tok.data);
+                token->integer = atoi(tok.c_str());
             }
             break;
         } else if (isalpha(this->current_symb) && this->current_symb < 0xFF) {

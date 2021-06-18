@@ -7,7 +7,7 @@ static size_t log_file_index = 0;
 void logger_init() {
     char buffer[64];
     RealWorldTime time = OS::get_real_world_time();
-    Str::format(buffer, sizeof(buffer), "logs/%u.%u.%u.%u.%u.%u.log", time.year, time.month, time.day, time.hour, time.second, time.millisecond);
+    snprintf(buffer, sizeof(buffer), "logs/%u.%u.%u.%u.%u.%u.log", time.year, time.month, time.day, time.hour, time.second, time.millisecond);
     os->mkdir("logs");
     log_file_handle = OS::open_file(buffer, false);
     assert(OS::is_file_handle_valid(log_file_handle));
@@ -19,7 +19,7 @@ void logger_cleanup() {
 
 void printv(const char *format, va_list args) {
     static char buffer[4096];
-    size_t len = Str::formatv(buffer, sizeof(buffer), format, args);
+    size_t len = vsnprintf(buffer, sizeof(buffer), format, args);
     vprintf(buffer, args);
     OS::write_file(log_file_handle, log_file_index, len, buffer);
     log_file_index += len;

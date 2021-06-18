@@ -152,24 +152,26 @@ struct OS {
     
     f32 get_time() const;
     
-    static RealWorldTime get_real_world_time();
-    static void mkdir(const char *name);
-    static FileHandle open_file(const char *name, bool read = true);
-    static bool is_file_handle_valid(FileHandle handle);
-    static size_t get_file_size(FileHandle handle);
-    static void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
-    static void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
-    static void close_file(FileHandle handle);
-    static FileWritetime get_file_write_time(const char *name);
-    static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
-    static void sleep(u32 ms);
-    
     // Loads all opengl functions
     void init_renderer_backend();
     void update_input(Input *input);
     void update_window();
     
     void go_fullscreen(bool fullscreen);
+    
+    static RealWorldTime get_real_world_time();
+    static void mkdir(const char *name);
+    static void sleep(u32 ms);
+    
+    static FileHandle open_file(const char *name, bool read = true);
+    static bool is_file_handle_valid(FileHandle handle);
+    static size_t get_file_size(FileHandle handle);
+    static void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
+    static void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
+    static void close_file(FileHandle handle);
+    
+    static FileWritetime get_file_write_time(const char *name);
+    static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
 };
 
 extern OS *os;

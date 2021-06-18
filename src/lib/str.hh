@@ -87,7 +87,7 @@ struct Str {
     }
     
     bool cmp(const Str &other) const {
-        return len == other.len && (strncmp(data, other.data, len) == 0);
+        return len == other.len && (strncmp(this->c_str(), other.c_str(), len) == 0);
     }
     
     bool cmp(const char *other) const {
@@ -111,27 +111,9 @@ struct Str {
         len = l;
     }
     
-    // Library funcions placed here  
-    static bool cmp(const char *a, const char *b) {
-        return strcmp(a, b);
+    const char *c_str() const {
+        return this->data;
     }
-    
-    static bool cmpn(const char *a, const char *b, size_t n) {
-        return strncmp(a, b, n);
-    }
-    
-    static size_t formatv(char *dst, size_t dst_size, const char *format, va_list args) {
-        return ::vsnprintf(dst, dst_size, format, args);
-    }
-    
-    static size_t format(char *dst, size_t dst_size, const char *format, ...) {
-        va_list args;
-        va_start(args, format);
-        size_t len = ::vsnprintf(dst, dst_size, format, args);
-        va_end(args);
-        return len;
-    }
-    
 };
 
 #define STR_HH 1

@@ -39,7 +39,7 @@ const u32 DEVUI_INPUT_FLAG_DECIMAL = 0x1;
 // На данный момент все элементы, которые рисует DevUI, могут быть представлены в виде четырехугольников
 struct DevUIDrawQueueEntry {
     Vertex v[4];
-    Texture *tex;
+    Texture tex;
 };
 
 struct DevUIID {
@@ -67,6 +67,8 @@ struct DevUIID {
     }
 };
 
+#define DEVUI_WINDOW_DRAW_QUEUE_MAX_SIZE 1024
+
 struct DevUIWindow {
     Str title = {};
     DevUIID id = DevUIID::empty();
@@ -76,7 +78,8 @@ struct DevUIWindow {
     Rect whole_rect = {}, rect = {}, title_bar_rect = {};
     Vec2 cursor = {}, last_line_cursor = {};
     f32 line_height = 0, last_line_height = 0;
-    Array<DevUIDrawQueueEntry> draw_queue = {};
+    size_t draw_queue_size = 0;
+    DevUIDrawQueueEntry *draw_queue;
     // Used whem making complex widgets, like single widget edit for 3-component vector
     f32 item_width = 0, default_item_width = 0;
 };
@@ -97,7 +100,10 @@ struct DevUITextEditState {
     u32 selection_end;
 };  
 
+#define DEVUI_MAX_WINDOW_COUNT 64
+
 struct DevUI {
+    MemoryArena arena;
     // Стек ID, который используется для создания вложеных систем
     DevUIID id_stack[5] = {};
     u32 id_stack_index = 0;
@@ -107,12 +113,14 @@ struct DevUI {
     u32 clip_rect_stack_index = 0;
     // @TODO: проверить на эффективность памяти
     // Array<DevUIDrawQueueEntry> draw_queue = {};
-    Array<DevUIWindow> windows = {};
+    size_t window_count;
+    DevUIWindow *windows;
     // Очередь, в которой окна рисуются на экран. Последний id в списке - верхнее окно
-    Array<u32> windows_order = {};
+    size_t windows_order_size;
+    u32 *windows_order;
     DevUIWindow *cur_win = 0, *hot_win = 0;
     DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();
-    FontData *font = 0;
+    const char *font_name = "consolas";
     f32 text_height = 0;
     DevUITextEditState text_edit = {};
     
@@ -136,6 +144,8 @@ struct DevUI {
     bool drag_float(const char *label, f32 *value, f32 speed = 0.2f);
     bool drag_float3(const char *label, f32 value[3], f32 speed = 0.2f);
     
+    
+    void value(const char *label, i32 value);
     void value(const char *label, f32 value);
     void value(const char *label, Vec2 value);
     void value(const char *label, Vec3 value);
@@ -151,7 +161,7 @@ struct DevUI {
     void element_size(Vec2 size, Vec2 *adjust_start_offset = 0);
     void same_line(f32 spacing_w = DEVUI_ITEM_SPACING.x);
     DevUIButtonState update_button(Rect rect, DevUIID id, bool repeat_when_held = false);
-    void push_rect(Rect rect, Vec4 color, Texture *tex = 0, Rect uv_rect = Rect(0, 0, 1, 1));
+    void push_rect(Rect rect, Vec4 color, Texture tex = Texture::invalid(), Rect uv_rect = Rect(0, 0, 1, 1));
     void push_text(Vec2 p, const char *text, Vec4 color = DEVUI_COLOR_TEXT, f32 scale = DEVUI_TEXT_SCALE);
     bool is_text_input_key_pressed(Key key);
     Rect get_new_window_rect();

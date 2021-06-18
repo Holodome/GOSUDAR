@@ -15,9 +15,13 @@ enum DevMode {
 struct GameState {
     DevUI local_dev_ui = {};
     
+    bool draw_sprite_frames = false;
     bool fullscreen = false;
     u32 dev_mode; // DevMode
+    i32 wood_count = 0;
     World world = {};
+    
+    MemoryArena frame_arena;
     
     void init();
     void cleanup();

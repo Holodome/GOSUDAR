@@ -9,6 +9,7 @@
 #include "lib/array.hh"
 #include "lib/misc.hh"
 #include "lib/hash_table.hh"
+#include "lib/memory_arena.hh"
 #include "framework/profiler.hh"
 #include "framework/logger.hh"
 

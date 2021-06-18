@@ -29,7 +29,7 @@ struct Entity {
 };
 
 struct World {
-    Camera camera = {};
+    Camera camera;
 
     f32 tile_size = 2.0f;
     Vec2i map_size = Vec2i(10, 10);

@@ -226,17 +226,19 @@ void DevUI::begin_frame(Input *input) {
     }
 }
 
-void DevUI::end_frame() {
+void DevUI::end_frame(Renderer *renderer) {
     if (!this->is_enabled) {
     } else {
+        RenderGroup render_group;
+        render_group.begin(renderer, Mat4x4::ortographic_2d(0, this->input->winsize.x, this->input->winsize.y, 0));
+        render_group.has_depth = false;
         for (size_t window_id_idx = 0; window_id_idx < windows_order_size; ++window_id_idx) {
             DevUIWindow *window = &this->windows[windows_order[window_id_idx]];
-            renderer->set_renderering_2d(this->input->winsize);
-            renderer->set_shader(renderer->standard_shader);
             for (u32 i = 0; i < window->draw_queue_size; ++i) {
                 DevUIDrawQueueEntry *entry = &window->draw_queue[i];
+                Texture textue = entry->tex;
+                render_group.set_texture(entry->tex);
                 renderer->imm_begin();
-                renderer->set_texture(entry->tex);
                 renderer->imm_vertex(entry->v[3]);
                 renderer->imm_vertex(entry->v[1]);
                 renderer->imm_vertex(entry->v[0]);
@@ -247,6 +249,7 @@ void DevUI::end_frame() {
             }
             window->draw_queue_size = 0;
         }
+        render_group.end();
     }
 }
 

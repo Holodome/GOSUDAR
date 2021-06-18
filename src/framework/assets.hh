@@ -47,6 +47,9 @@ struct AssetInfo {
 };
 
 struct Assets {
+    // This should only be texture creating-related stuff
+    Renderer *renderer;
+    
     Str sprites_cfg_name;
     HashTable<AssetInfo> asset_infos;
     

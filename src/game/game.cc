@@ -3,6 +3,7 @@
 void Game::init() {
     logprintln("Game", "Init start");
     this->is_running = true;   
+    this->dev_mode = 0;
     
     os.init();
     os.init_renderer_backend();
@@ -10,7 +11,9 @@ void Game::init() {
     size_t renderer_arena_size = MEGABYTES(256);
     renderer.arena.init(Mem::alloc(renderer_arena_size), renderer_arena_size);
     renderer.init();
+    this->assets.renderer = &this->renderer;
     this->assets.init("assets.cfg");
+    this->renderer.white_texture = this->assets.get_tex("white");
     
     size_t frame_arena_size = MEGABYTES(8);
     this->frame_arena.init(Mem::alloc(frame_arena_size), frame_arena_size);
@@ -21,7 +24,6 @@ void Game::init() {
     this->world.max_entity_count = 4096;
     this->world.entities = (Entity *)this->world.world_arena.alloc(sizeof(Entity) * this->world.max_entity_count);
     
-    this->dev_mode = 0;
     size_t devui_arena_size = MEGABYTES(8);
     this->local_dev_ui.arena.init(Mem::alloc(devui_arena_size), devui_arena_size);
     this->local_dev_ui.init();
@@ -151,20 +153,23 @@ void Game::update() {
     // @TODO find way to assert no calls to renderer made before this point...
     renderer.set_draw_region(input.winsize);
     renderer.clear(Vec4(0.2));
-    renderer.set_renderering_3d(this->world.camera.mvp);
+    
+    RenderGroup world_render_group;
+    world_render_group.begin(&this->renderer, this->world.camera.mvp);
+    world_render_group.has_depth = true;
     // Draw map
     for (size_t y = 0; y < this->world.map_size.y; ++y) {
         for (size_t x = 0; x < this->world.map_size.x; ++x) {
             Vec3 tilev[4];
             this->world.get_tile_v(Vec2i(x, y), tilev);
-            renderer.imm_draw_quad(tilev, assets.get_tex("grass"));
+            renderer.imm_draw_quad(&world_render_group, tilev, assets.get_tex("grass"));
         }
     }
     if (Math::length(this->world.point_on_plane - Vec3(0, 1, 0)) > 0.001f) {
         i32 x = this->world.point_on_plane.x / this->world.tile_size;
         i32 y = this->world.point_on_plane.z / this->world.tile_size;
         if (0 <= x && x < this->world.map_size.x && 0 <= y && y < this->world.map_size.y) {
-            renderer.imm_draw_quad_outline(Vec3(x, 0, y) * this->world.tile_size, Vec3(x, 0, y + 1) * this->world.tile_size,
+            renderer.imm_draw_quad_outline(&world_render_group, Vec3(x, 0, y) * this->world.tile_size, Vec3(x, 0, y + 1) * this->world.tile_size,
                                             Vec3(x + 1, 0, y) * this->world.tile_size, Vec3(x + 1, 0, y + 1) * this->world.tile_size,
                                             Colors::black, 0.02f);
         }
@@ -200,13 +205,14 @@ void Game::update() {
         Entity *entity = &this->world.entities[drawable_entity_ids[drawable_idx]];
         Vec3 billboard[4];
         this->world.get_billboard_positions(World::map_pos_to_world_pos(entity->pos), 0.5f, 0.5f, billboard);
-        renderer.imm_draw_quad(billboard, assets.get_tex(entity->texture_name));
+        renderer.imm_draw_quad(&world_render_group, billboard, assets.get_tex(entity->texture_name));
         if (this->draw_sprite_frames) {
-            renderer.imm_draw_quad_outline(billboard[0], billboard[1], billboard[2], billboard[3], Colors::black, 0.01f);   
+            renderer.imm_draw_quad_outline(&world_render_group, billboard[0], billboard[1], billboard[2], billboard[3], Colors::black, 0.01f);   
         }
     }
     temp_memory_end(zsort);
-    dev_ui->end_frame(); 
+    world_render_group.end();
+    dev_ui->end_frame(&this->renderer); 
     
     // renderer.render();
     os.update_window();

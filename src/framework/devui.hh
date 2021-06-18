@@ -130,7 +130,7 @@ struct DevUI {
     
     void init(); 
     void begin_frame(Input *input);
-    void end_frame();
+    void end_frame(Renderer *renderer);
     // Widget functions
     void window(const char *title);
     void window_end();

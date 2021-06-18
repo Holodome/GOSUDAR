@@ -55,6 +55,8 @@ struct RendererStatistics {
 };
 
 struct Renderer {
+    MemoryArena arena;
+    
     Shader standard_shader;
     Shader terrain_shader;
     
@@ -64,7 +66,9 @@ struct Renderer {
     Shader current_shader = Shader::invalid();
     GLuint immediate_vao = GL_INVALID_ID;
     GLuint immediate_vbo = GL_INVALID_ID;
-    Array<Vertex> vertices = {};
+    size_t vertex_count;
+    size_t max_vertex_count;
+    Vertex *vertices = {};
     
     Mat4x4 mvp               = Mat4x4::identity();
     Mat4x4 imvp              = Mat4x4::identity();

@@ -82,6 +82,10 @@ void main() {
     assert(!::renderer);
     ::renderer = this;
     logprint("Renderer", "Init end\n");
+    
+    this->vertex_count = 0;
+    this->max_vertex_count = 1 << 16;
+    this->vertices = (Vertex *)this->arena.alloc(this->max_vertex_count * sizeof(Vertex));
 }
 
 void Renderer::cleanup() {
@@ -103,8 +107,7 @@ void Renderer::set_draw_region(Vec2 window_size) {
 }
 
 void Renderer::imm_begin() {
-    // @UNSAFE
-    vertices.clear();
+    this->vertex_count = 0;
     this->current_shader = this->default_shader;
     if (immediate_vao == GL_INVALID_ID) {
         glGenVertexArrays(1, &immediate_vao);
@@ -114,7 +117,7 @@ void Renderer::imm_begin() {
 }
 
 void Renderer::imm_flush() {
-    if (!vertices.len) { return; }
+    if (!vertex_count) { return; }
     
     Shader shader = current_shader;
     assert(shader != Shader::invalid());
@@ -127,7 +130,7 @@ void Renderer::imm_flush() {
     
     glBindVertexArray(immediate_vao);
     glBindBuffer(GL_ARRAY_BUFFER, immediate_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.len, vertices.data, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * this->vertex_count, this->vertices, GL_STREAM_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
@@ -138,11 +141,12 @@ void Renderer::imm_flush() {
     glEnableVertexAttribArray(3);
     
     ++current_statistics.draw_call_count;
-    glDrawArrays(GL_TRIANGLES, 0, vertices.len);
+    glDrawArrays(GL_TRIANGLES, 0, this->vertex_count);
 }
 
 void Renderer::imm_vertex(const Vertex &v) {
-    vertices.add(v);
+    assert(this->vertex_count < this->max_vertex_count);
+    this->vertices[this->vertex_count++] = v;
 }
 
 void Renderer::set_mvp(const Mat4x4 &mvp) {
@@ -252,7 +256,7 @@ void Renderer::set_renderering_3d(const Mat4x4 &mvp) {
 }
 
 void Renderer::set_renderering_2d(Vec2 winsize) {
-    Mat4x4 win_proj = Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0);
+    Mat4x4 win_proj = Mat4x4::ortographic_2d(0, winsize.x, winsize.y, 0);
     renderer->set_mvp(win_proj);
     glDisable(GL_DEPTH_TEST);
 }

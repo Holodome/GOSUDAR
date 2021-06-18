@@ -62,11 +62,11 @@ DevUIID DevUI::make_id(const char *text, size_t count) {
 
 bool DevUI::is_text_input_key_pressed(Key key) {
     bool result = false;
-    f32 time_pressed = game->input.keys_down_time[(u32)key];
+    f32 time_pressed = this->input->keys_down_time[(u32)key];
     if (time_pressed > DEVUI_KEY_REPEAT_DELAY) {
         f32 half_repeate_rate = DEVUI_KEY_REPEAT_RATE * 0.5f;
         f32 press_mod = fmodf(time_pressed - DEVUI_KEY_REPEAT_DELAY, DEVUI_KEY_REPEAT_RATE);
-        f32 abs_mod = fmodf(time_pressed - DEVUI_KEY_REPEAT_DELAY - game->input.dt, DEVUI_KEY_REPEAT_RATE);
+        f32 abs_mod = fmodf(time_pressed - DEVUI_KEY_REPEAT_DELAY - this->input->dt, DEVUI_KEY_REPEAT_RATE);
         if ((press_mod > half_repeate_rate) != (abs_mod > half_repeate_rate)) {
             result = true;
         }
@@ -187,7 +187,8 @@ void DevUI::label(const char *label) {
     }
 }
 
-void DevUI::begin_frame() {
+void DevUI::begin_frame(Input *input) {
+    this->input = input;
     // @HACK probably call font function for height 
     // @TODO change this to be set only when font is set
     AssetInfo *font = assets->get_info(this->font_name);
@@ -198,13 +199,13 @@ void DevUI::begin_frame() {
     if (HAS_INPUT) {
         for (size_t window_id_idx = 0; window_id_idx < windows_order_size; ++window_id_idx) {
             DevUIWindow *window = &windows[windows_order[window_id_idx]];
-            if (window->whole_rect.collide(game->input.mpos)) {
+            if (window->whole_rect.collide(this->input->mpos)) {
                 hot_win = window;
             }
         }
  
         if (hot_win) {
-            if (game->input.is_key_pressed(Key::MouseLeft)) {
+            if (this->input->is_key_pressed(Key::MouseLeft)) {
                 size_t found_idx = (size_t)-1;
                 for (size_t i = 0; i < this->windows_order_size; ++i) {
                     if (this->windows_order[i] == hot_win->array_idx) {
@@ -230,7 +231,7 @@ void DevUI::end_frame() {
     } else {
         for (size_t window_id_idx = 0; window_id_idx < windows_order_size; ++window_id_idx) {
             DevUIWindow *window = &this->windows[windows_order[window_id_idx]];
-            renderer->set_renderering_2d(game->input.winsize);
+            renderer->set_renderering_2d(this->input->winsize);
             renderer->set_shader(renderer->standard_shader);
             for (u32 i = 0; i < window->draw_queue_size; ++i) {
                 DevUIDrawQueueEntry *entry = &window->draw_queue[i];
@@ -318,16 +319,16 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size, u32 
     Rect frame_rect = Rect(this->cur_win->cursor, Vec2(this->cur_win->item_width, this->text_height) + DEVUI_FRAME_PADDING * 2);
     element_size(frame_rect.size());
     
-    bool is_ctrl_down = game->input.is_key_held(Key::Ctrl);
-    bool is_shift_down = game->input.is_key_held(Key::Shift);
+    bool is_ctrl_down = this->input->is_key_held(Key::Ctrl);
+    bool is_shift_down = this->input->is_key_held(Key::Shift);
     // @TODO make this use update_button or something
-    bool is_hot = this->hot_win == this->cur_win && !hot_id && frame_rect.collide(game->input.mpos);
+    bool is_hot = this->hot_win == this->cur_win && !hot_id && frame_rect.collide(this->input->mpos);
     if (is_hot) {
         this->hot_id = id;
     }
     
     DevUITextEditState *te = &this->text_edit;
-    if (game->input.is_key_pressed(Key::MouseLeft)) {
+    if (this->input->is_key_pressed(Key::MouseLeft)) {
         if (is_hot) {
             if (this->active_id != id) {
                 memset(te, 0, sizeof(*te));
@@ -372,10 +373,10 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size, u32 
             if (te->cursor < length) {
                 ++te->cursor;
             }
-        } else if (game->input.utf32) {
+        } else if (this->input->utf32) {
             bool is_valid = true;
             if (flags & DEVUI_INPUT_FLAG_DECIMAL) {
-                u32 c = game->input.utf32;
+                u32 c = this->input->utf32;
                 is_valid = (isdigit(c) || c == '.' || c == '-' || c == '+');
             }
             
@@ -383,7 +384,7 @@ bool DevUI::input_text(const char *label, void *buffer, size_t buffer_size, u32 
                 char *buffer_end = te->text + te->max_length;
                 if (buffer_end - (te->text + length + 1) >= 1) {
                     memmove(te->text + te->cursor + 1, te->text + te->cursor, length - te->cursor);
-                    te->text[te->cursor] = game->input.utf32;
+                    te->text[te->cursor] = this->input->utf32;
                     ++te->cursor;
                 }
             }
@@ -451,7 +452,7 @@ bool DevUI::slider_float(const char *label, f32 *value, f32 minv, f32 maxv) {
     
     bool is_value_changed = false;
     if (slider_state.is_held) {
-        f32 slider_pos = Math::clamp((game->input.mpos.x - slider_workzone_min_x) / slider_workzone_width, 0.0f, 1.0f);
+        f32 slider_pos = Math::clamp((this->input->mpos.x - slider_workzone_min_x) / slider_workzone_width, 0.0f, 1.0f);
         f32 new_value = Math::lerp(minv, maxv, slider_pos);
         if (*value != new_value) {
             *value = new_value;
@@ -487,7 +488,7 @@ bool DevUI::drag_float(const char *label, f32 *value, f32 speed) {
     bool is_value_changed = false;
     DevUIButtonState slider_state = this->update_button(slider_zone_rect, id, true);
     if (slider_state.is_held) {
-        f32 new_value = *value + game->input.mdelta.x * speed;
+        f32 new_value = *value + this->input->mdelta.x * speed;
         if (*value != new_value) {
             *value = new_value;
             is_value_changed = true;
@@ -549,10 +550,10 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
     
     CHECK_CUR_WIN_IS_PRESENT;
     DevUIWindow *win = cur_win;
-    bool is_hot = (this->hot_win == win) && !this->hot_id && rect.collide(game->input.mpos);
+    bool is_hot = (this->hot_win == win) && !this->hot_id && rect.collide(this->input->mpos);
     if (is_hot) {
         this->hot_id = id;
-        if (game->input.is_key_held(Key::MouseLeft) && !this->active_id) {
+        if (this->input->is_key_held(Key::MouseLeft) && !this->active_id) {
             this->active_id = id;
         } 
     }
@@ -560,7 +561,7 @@ DevUIButtonState DevUI::update_button(Rect rect, DevUIID id, bool repeat_when_he
     bool is_pressed = false;
     bool is_held = false;
     if (this->active_id == id) {
-        if (game->input.is_key_held(Key::MouseLeft)) {
+        if (this->input->is_key_held(Key::MouseLeft)) {
             is_held = true;
             if (repeat_when_held && is_hot) {
                 is_pressed = true;
@@ -628,8 +629,8 @@ void DevUI::window(const char *title) {
     
     DevUIID move_id = make_id("$MOVE");
     if (this->active_id == move_id) {
-        if (game->input.is_key_held(Key::MouseLeft) && HAS_INPUT) {
-            win->whole_rect = Rect::move(win->whole_rect, game->input.mdelta);
+        if (this->input->is_key_held(Key::MouseLeft) && HAS_INPUT) {
+            win->whole_rect = Rect::move(win->whole_rect, this->input->mdelta);
         } else {
             this->active_id = DevUIID::empty();
         }
@@ -640,8 +641,8 @@ void DevUI::window(const char *title) {
     DevUIButtonState resize_state = update_button(resize_rect, resize_id, true);
     Vec4 resize_color = color_from_bstate(resize_state, DEVUI_COLOR_BUTTON_ACTIVE, DEVUI_COLOR_BUTTON_HOT, DEVUI_COLOR_BUTTON); 
     if (resize_state.is_held) {
-        Vec2 size_change = Vec2(Math::max(win->whole_rect.w + game->input.mdelta.x, DEVUI_MIN_WINDOW_SIZE.x), 
-                                Math::max(win->whole_rect.h + game->input.mdelta.y, DEVUI_MIN_WINDOW_SIZE.y))
+        Vec2 size_change = Vec2(Math::max(win->whole_rect.w + this->input->mdelta.x, DEVUI_MIN_WINDOW_SIZE.x), 
+                                Math::max(win->whole_rect.h + this->input->mdelta.y, DEVUI_MIN_WINDOW_SIZE.y))
             - win->whole_rect.s;
         resize_rect.p += size_change;
         win->whole_rect.s += size_change;
@@ -679,8 +680,8 @@ void DevUI::window_end() {
     CHECK_IS_ENABLED();    
     CHECK_CUR_WIN_IS_PRESENT;
     // @CLEAN
-    if (!active_id && !hot_id && this->windows_order[this->windows_order_size - 1] == cur_win->array_idx && cur_win->title_bar_rect.collide(game->input.mpos)
-        && game->input.is_key_held(Key::MouseLeft) && HAS_INPUT) {
+    if (!active_id && !hot_id && this->windows_order[this->windows_order_size - 1] == cur_win->array_idx && cur_win->title_bar_rect.collide(this->input->mpos)
+        && this->input->is_key_held(Key::MouseLeft) && HAS_INPUT) {
         active_id = make_id("$MOVE");
     }
     cur_win = 0;
@@ -694,6 +695,17 @@ void DevUI::init() {
     assert(!::dev_ui);
     ::dev_ui = this;
     
+    this->id_stack_index = 0;
+    this->clip_rect_stack_index = 0;
+    this->window_count = 0;   
     this->windows = (DevUIWindow *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(DevUIWindow));
+    this->windows_order_size = 0;
     this->windows_order = (u32 *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(u32));
+    this->cur_win = 0;
+    this->hot_win = 0;
+    this->hot_id = DevUIID::empty();
+    this->active_id = DevUIID::empty();
+    this->font_name = "consolas";
+    this->is_enabled = false;
+    this->is_focused = false;
 }

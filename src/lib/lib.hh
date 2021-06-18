@@ -13,7 +13,5 @@
 #include "framework/profiler.hh"
 #include "framework/logger.hh"
 
-extern struct Game *game;
-
 #define LIB_HH 1
 #endif

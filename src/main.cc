@@ -6,15 +6,14 @@ int main(int argc, char **argv) {
     logger_init();
     logprintln("App", "start");
     {
-        Game local_game = Game();
-        game = &local_game;
-        game->init();
-        while (game->is_running) {
+        Game game;
+        game.init();
+        while (game.is_running) {
             FRAME_MARKER;
-            game->update();
+            game.update();
         }
         
-        game->cleanup();
+        game.cleanup();
     }
     
     bool mleak = false;

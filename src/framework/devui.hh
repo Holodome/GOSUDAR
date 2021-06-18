@@ -104,13 +104,15 @@ struct DevUITextEditState {
 
 struct DevUI {
     MemoryArena arena;
+    
+    Input *input;
     // Стек ID, который используется для создания вложеных систем
-    DevUIID id_stack[5] = {};
-    u32 id_stack_index = 0;
+    DevUIID id_stack[5];
+    u32 id_stack_index;
     // Стек прямоугольников, ограничивающих область отрисовки
     // Например, если часть текста выходит за окна, ограничивающие прямогуольники обрежут ненужный текст
-    Rect clip_rect_stack[5] = {};
-    u32 clip_rect_stack_index = 0;
+    Rect clip_rect_stack[5];
+    u32 clip_rect_stack_index;
     // @TODO: проверить на эффективность памяти
     // Array<DevUIDrawQueueEntry> draw_queue = {};
     size_t window_count;
@@ -118,16 +120,16 @@ struct DevUI {
     // Очередь, в которой окна рисуются на экран. Последний id в списке - верхнее окно
     size_t windows_order_size;
     u32 *windows_order;
-    DevUIWindow *cur_win = 0, *hot_win = 0;
-    DevUIID hot_id = DevUIID::empty(), active_id = DevUIID::empty();
-    const char *font_name = "consolas";
-    f32 text_height = 0;
-    DevUITextEditState text_edit = {};
+    DevUIWindow *cur_win, *hot_win;
+    DevUIID hot_id, active_id;
+    const char *font_name;
+    f32 text_height;
+    DevUITextEditState text_edit;
     
-    bool is_enabled = false, is_focused = false;
+    bool is_enabled, is_focused;
     
     void init(); 
-    void begin_frame();
+    void begin_frame(Input *input);
     void end_frame();
     // Widget functions
     void window(const char *title);

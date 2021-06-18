@@ -6,28 +6,44 @@
 #include "framework/renderer.hh"
 #include "framework/assets.hh"
 #include "framework/devui.hh"
-#include "game/game_state.hh"
+
+#include "game/world.hh"
+
+enum DevMode {
+    DevMode_None           = 0x0,
+    DevMode_DevUI          = 0x1,
+    DevMode_DevUIFocused   = 0x2,
+    DevMode_FreeCamera     = 0x4,
+    DevMode_StopSimulation = 0x8
+};  
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
 // Game state is the logic of the game
 // It decides how to use all data recived from input, what to render when to close etc.
 struct Game {
-    bool is_running = false;
-    OS os = OS();
-    Renderer renderer = Renderer();
-    Input input = Input();
-    Assets assets = Assets();
+    OS os;
+    Renderer renderer;
+    Input input;
+    Assets assets;
     
-    GameState game_state = GameState();
+    bool is_running;
+    DevUI local_dev_ui;
+    
+    bool draw_sprite_frames;
+    bool fullscreen;
+    u32 dev_mode; // DevMode
+    i32 wood_count;
+    World world;
+    
+    MemoryArena frame_arena;
     
     void init();
     void cleanup();
     
+    void update_logic(Input *input);
     void update();  
 };
-
-extern Game *game;
 
 #define GAME_H 1
 #endif

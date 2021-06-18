@@ -174,7 +174,5 @@ struct OS {
     static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
 };
 
-extern OS *os;
-
 #define OS_H 1
 #endif

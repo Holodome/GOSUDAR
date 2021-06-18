@@ -4,17 +4,27 @@
 #include "game/ray_casting.hh"
 
 void Camera::init() {
-    
+    fov = Math::rad(60.0f);
+    near_plane = 0.1f;
+    far_plane = 100.0f;
+    center_pos = Vec3(0);
+    pos = Vec3(0);
+    pitch = 0.0f;
+    yaw = 0.0f;
+    distance_from_player = 5.0f;
+    view = Mat4x4::identity();
+    projection = Mat4x4::identity();
+    mvp = Mat4x4::identity();
 }
 
-void Camera::update() {
-    this->distance_from_player -= game->input.mwheel;
+void Camera::update(Input *input) {
+    this->distance_from_player -= input->mwheel;
     
-    if (game->input.is_key_held(Key::MouseLeft)) {
-        f32 x_view_coef = 1.0f * game->input.dt;
-        f32 y_view_coef = 0.6f * game->input.dt;
-        f32 x_angle_change = game->input.mdelta.x * x_view_coef;
-        f32 y_angle_change = game->input.mdelta.y * y_view_coef;
+    if (input->is_key_held(Key::MouseLeft)) {
+        f32 x_view_coef = 1.0f * input->dt;
+        f32 y_view_coef = 0.6f * input->dt;
+        f32 x_angle_change = input->mdelta.x * x_view_coef;
+        f32 y_angle_change = input->mdelta.y * y_view_coef;
         this->yaw += x_angle_change;
         this->yaw = Math::unwind_rad(this->yaw);
         this->pitch += y_angle_change;
@@ -30,15 +40,15 @@ void Camera::update() {
     this->pos.y = vert_distance;
 }
 
-void Camera::recalculate_matrices() {
-    this->projection = Mat4x4::perspective(this->fov, game->input.winsize.aspect_ratio(), this->near_plane, this->far_plane);
+void Camera::recalculate_matrices(Vec2 winsize) {
+    this->projection = Mat4x4::perspective(this->fov, winsize.aspect_ratio(), this->near_plane, this->far_plane);
     this->view = Mat4x4::identity() * Mat4x4::rotation(this->pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(this->yaw, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
     this->mvp = this->projection * this->view;
 }
 
-Vec3 Camera::screen_to_world(Vec2 screen) {
-    f32 x = (2.0f * screen.x) / game->input.winsize.x - 1.0f;
-    f32 y = 1.0f - (2.0f * screen.y) / game->input.winsize.y;
+Vec3 Camera::screen_to_world(Vec2 winsize, Vec2 screen) {
+    f32 x = (2.0f * screen.x) / winsize.x - 1.0f;
+    f32 y = 1.0f - (2.0f * screen.y) / winsize.y;
     return uv_to_world(Vec2(x, y));
 }
 

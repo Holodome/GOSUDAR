@@ -8,7 +8,7 @@ void logger_init() {
     char buffer[64];
     RealWorldTime time = OS::get_real_world_time();
     snprintf(buffer, sizeof(buffer), "logs/%u.%u.%u.%u.%u.%u.log", time.year, time.month, time.day, time.hour, time.second, time.millisecond);
-    os->mkdir("logs");
+    OS::mkdir("logs");
     log_file_handle = OS::open_file(buffer, false);
     assert(OS::is_file_handle_valid(log_file_handle));
 }

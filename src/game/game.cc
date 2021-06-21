@@ -19,14 +19,18 @@ void game_init(Game *game) {
     game->assets.init();
     game->renderer.white_texture = game->assets.get_tex(Asset_White);
     
-    size_t frame_arena_size = MEGABYTES(8);
+    size_t frame_arena_size = MEGABYTES(256);
     arena_init(&game->frame_arena, os_alloc(frame_arena_size), frame_arena_size);
-    size_t world_arena_size = MEGABYTES(8);
+    size_t world_arena_size = MEGABYTES(256);
     arena_init(&game->world.world_arena, os_alloc(world_arena_size), world_arena_size);
     
     game->world.frame_arena = &game->frame_arena;
     world_init(&game->world);
     f32 init_end = game->os.get_time();
+    
+    size_t dev_ui_arena_size = MEGABYTES(8);
+    arena_init(&game->dev_ui.arena, os_alloc(dev_ui_arena_size), dev_ui_arena_size);
+    dev_ui_init(&game->dev_ui, &game->assets);
     // Effectively it is not whole init time, but time of game initialization-related routines,
     // cause there is little point in recording time spend on os-related stuff. It should be profiled separately
     // and is (probably) inconsistent due to tf os does 
@@ -49,10 +53,13 @@ void game_update_and_render(Game *game) {
     arena_clear(&game->frame_arena);
     game->os.update_input(&game->input);
     game->input.update();
+    DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
     
     if (game->input.is_quit_requested) {
         game->is_running = false;
     }
+    
+    dev_ui_labelf(&dev_ui, "FPS: %f; DT: %ums", 1.0f / game->input.dt, (u32)(game->input.dt * 1000));
     
     game->renderer.begin_frame();
     game->renderer.set_draw_region(game->input.winsize);
@@ -68,19 +75,6 @@ void game_update_and_render(Game *game) {
     RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,
         Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0));
     interface_render_group.has_depth = false;
-    
-    f32 interface_tile_size = 30.0f;
-    imm_draw_rect(&interface_render_group, Rect((game->input.winsize.x) * 0.5f - interface_tile_size, game->input.winsize.y - interface_tile_size,
-                                                         interface_tile_size * 2.0f, interface_tile_size), Vec4(0.4f, 0.4f, 0.4f, 0.8f));
-    imm_draw_rect(&interface_render_group, Rect((game->input.winsize.x) * 0.5f - interface_tile_size, game->input.winsize.y - interface_tile_size,
-                                                         interface_tile_size, interface_tile_size), Colors::white, Rect(0, 0, 1, 1),
-                                                         Asset_WoodIcon);
-    // char wood_count_display[32];
-    // snprintf(wood_count_display, sizeof(wood_count_display), "%u", game->world.wood_count);
-    // imm_draw_text(&interface_render_group, Vec2(game->input.winsize.x * 0.5f, game->input.winsize.y - interface_tile_size), Colors::black, wood_count_display,
-    //                        Asset_Font, 1.0f);
-    // render_group_end(&interface_render_group);
-    
-    // renderer.render();
+    dev_ui_end(&dev_ui, &interface_render_group);
     game->os.update_window();
 }

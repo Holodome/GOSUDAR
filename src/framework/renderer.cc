@@ -147,6 +147,18 @@ void Renderer::imm_vertex(const Vertex &v) {
     this->vertices[this->vertex_count++] = v;
 }
 
+void imm_draw_v(RenderGroup *render_group, Vertex vertices[4], AssetID texture_id) {
+    render_group_set_texture(render_group, texture_id);
+    render_group->renderer->imm_begin();
+    render_group->renderer->imm_vertex(vertices[3]);
+    render_group->renderer->imm_vertex(vertices[1]);
+    render_group->renderer->imm_vertex(vertices[0]);
+    render_group->renderer->imm_vertex(vertices[0]);
+    render_group->renderer->imm_vertex(vertices[2]);
+    render_group->renderer->imm_vertex(vertices[3]);
+    render_group->renderer->imm_flush(render_group->shader, render_group->texture, render_group->mvp, render_group->has_depth);                  
+}
+
 void imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
                              Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
                              Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,

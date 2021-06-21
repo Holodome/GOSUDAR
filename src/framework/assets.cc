@@ -56,7 +56,7 @@ void Assets::init() {
     this->asset_infos[Asset_Font].filename = "c:/windows/fonts/consola.ttf";
     this->asset_infos[Asset_Font].kind = AssetKind::Font;
     this->asset_infos[Asset_Font].state = AssetState::Unloaded;
-    this->asset_infos[Asset_Font].height = 32;
+    this->asset_infos[Asset_Font].height = 16;
 
     this->asset_infos[Asset_FontAtlas].kind = AssetKind::Image;
     this->asset_infos[Asset_FontAtlas].state = AssetState::Unloaded;

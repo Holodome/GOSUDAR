@@ -107,6 +107,8 @@ struct Renderer {
     void imm_vertex(const Vertex &v);
 };
 
+
+void imm_draw_v(RenderGroup *render_group, Vertex vertices[4], AssetID texture_id);
 void imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
                     Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
                     Vec2 uv00 = Vec2(0, 0), Vec2 uv01 = Vec2(0, 1), Vec2 uv10 = Vec2(1, 0), Vec2 uv11 = Vec2(1, 1),

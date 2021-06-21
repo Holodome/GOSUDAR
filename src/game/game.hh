@@ -5,7 +5,7 @@
 #include "framework/os.hh"
 #include "framework/renderer.hh"
 #include "framework/assets.hh"
-#include "framework/devui.hh"
+#include "framework/dev_ui.hh"
 
 #include "game/world.hh"
 
@@ -26,6 +26,7 @@ struct Game {
     Renderer renderer;
     Input input;
     Assets assets;
+    DevUI dev_ui;
     
     bool is_running;
     

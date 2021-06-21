@@ -75,7 +75,7 @@ struct World {
     // Linked list free entry
     ChunkEntityBlock *first_free;
     // Chunks hash table. Implemented with external collision resolving (other chunks are allocated separately)
-    Chunk chunk_hash[128];
+    Chunk chunk_hash[4096];
     
     size_t max_entity_count;
     size_t entity_count;
@@ -83,8 +83,6 @@ struct World {
     
     SimCamera camera;
     EntityID camera_followed_entity_id;
-    
-    // Camera camera;
 };  
 
 void world_init(World *world);
@@ -101,11 +99,10 @@ Chunk *get_world_chunk(World *world, Vec2i coord);
 struct SimRegion {
     MemoryArena *frame_arena;
     World *world;
-
     // So in case player positions are some huge float numbers,
     // map entities from world position to sim position and back after sim end
     WorldPosition origin;
-    
+    // Local space camera
     SimCamera cam;
     Vec3 cam_p;
     Mat4x4 cam_mvp;

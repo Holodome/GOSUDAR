@@ -180,16 +180,16 @@ void world_init(World *world) {
     world->camera.pitch = 0.0f;
     world->camera.yaw = 0.0f;
     world->camera_followed_entity_id = add_player(world);
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 1000; ++i) {
         WorldPosition tree_p;
-        tree_p.chunk.x = 0;
-        tree_p.chunk.y = 0;
+        tree_p.chunk.x = rand() % 10;
+        tree_p.chunk.y = rand() % 10;
         tree_p.offset.x = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
         tree_p.offset.y = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
         add_tree(world, tree_p);
     }
-    for (size_t i = 0; i < TILES_IN_CHUNK; ++i) {
-        for (size_t j = 0; j < TILES_IN_CHUNK; ++j) {
+    for (size_t i = 0; i < TILES_IN_CHUNK * 10; ++i) {
+        for (size_t j = 0; j < TILES_IN_CHUNK * 10; ++j) {
             Vec2i tile_pos = Vec2i(j, i);
             add_tile(world, tile_pos);
         }

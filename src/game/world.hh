@@ -4,53 +4,98 @@
 
 #include "game/camera.hh"
 
-typedef u32 EntityId;
+typedef u32 EntityID;
 
 enum struct EntityKind {
     None = 0x0,
+    Ground,
     Player,
     Tree,
+    GroundTile
 };  
 
 enum EntityFlags {
-    EntityFlags_IsUpdatable = 0x1,
-    EntityFlags_IsDrawable  = 0x2
+    EntityFlags_IsBillboard = 0x1,
+    EntityFlags_IsDeleted = 0x2,
 };
 
-struct Entity {
-    EntityId id;
+const f32 CHUNK_SIZE = 16.0f;
+#define TILES_IN_CHUNK 16
+#define TILE_SIZE (CHUNK_SIZE / (f32)TILES_IN_CHUNK)
+
+struct WorldPosition {
+    Vec2i chunk;
+    Vec2 offset;
+};  
+
+struct SimEntity {
+    bool is_alive;
+    EntityID id;
     EntityKind kind;
     u32 flags; // EntityFlags
-    
-    Vec2 pos;
+    // For sim
     AssetID texture_id;
-    f32 health;
-    u32 chops_left;
+    Vec2 size; // texture size multiplier
+    Vec2 p;    // 
+    Vec2i tile_pos;
+};  
+
+struct Entity {
+    SimEntity sim;
+    WorldPosition world_pos;
+};
+
+struct ChunkEntityBlock {
+    u32 entity_count;
+    EntityID entity_ids[16];
+    ChunkEntityBlock *next;
+};  
+
+struct Chunk {
+    ChunkEntityBlock entity_block;
+    Vec2i coord;
+    
+    bool is_initialized;
+    Chunk *next_in_hash;
 };
 
 struct World {
     Camera camera;
+    
+    ChunkEntityBlock *first_free;
+    Chunk chunks[128];
 
-    f32 tile_size = 2.0f;
-    Vec2i map_size = Vec2i(10, 10);
-    Vec3 point_on_plane = Vec3(0);
-
-    EntityId player_id;
-    EntityId camera_id;
+    EntityID player_id;
     
     MemoryArena world_arena;
-    Entity *entities;
-    size_t entity_count;
     size_t max_entity_count;
+    size_t entity_count;
+    Entity *entities;
+
+    u32 wood_count;
     
-    void get_billboard_positions(Vec3 mid_bottom, f32 width, f32 height, Vec3 out[4]);
-    u32 add_entity(const Entity *entity);
-    void add_tree_entity(Vec2 pos);
-    void add_player_enitity();
-    void get_tile_v(Vec2i coord, Vec3 out[4]);
-    
-    static Vec3 map_pos_to_world_pos(Vec2 map);
+    MemoryArena *frame_arena;
 };  
+
+void world_init(World *world);
+void world_update(World *world, Input *input);
+void world_render(World *world, Renderer *renderer, Assets *assets);
+Entity *get_entity(World *world, EntityID id);
+Chunk *get_world_chunk(World *world, Vec2i coord);
+void change_entity_position(World *world, EntityID id, WorldPosition *old_p, WorldPosition *new_p);
+
+struct SimRegion {
+    MemoryArena *frame_arena;
+    World *world;
+    
+    size_t max_entity_count;
+    size_t entity_count;
+    SimEntity *entities;
+};  
+
+SimRegion *begin_sim(MemoryArena *sim_arena, World *world);
+void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) ;
+void end_sim(SimRegion *region);
 
 #define WORLD_HH 1
 #endif

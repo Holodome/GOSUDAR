@@ -1,19 +1,16 @@
 #include "game/game.hh"
 
 int main(int argc, char **argv) {
-    profiler_init();
-    GAME_START;
     logger_init();
     logprintln("App", "start");
     {
         Game game;
-        game.init();
+        game_init(&game);
         while (game.is_running) {
-            FRAME_MARKER;
-            game.update();
+            game_update_and_render(&game);
         }
         
-        game.cleanup();
+        game_cleanup(&game);
     }
     
     bool mleak = false;
@@ -28,7 +25,5 @@ int main(int argc, char **argv) {
     logprintln("Mem", "Alloc called %llu times", Mem::alloc_count);
     logprintln("App", "end of main");
     logger_cleanup();
-    GAME_END;
-    profiler_cleanup();
     return 0;
 }

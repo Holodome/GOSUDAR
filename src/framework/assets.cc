@@ -24,9 +24,11 @@ const char *ASSET_STATES[] = {
     "Loaded"  
 };
 
-void Assets::init(const char *sprites_cfg_name) {
+void Assets::init() {
     logprintln("Assets", "Init start");
     
+    this->font_count = 0;
+    this->texture_count = 0;
     this->asset_infos[Asset_White].filename = "white.png";
     this->asset_infos[Asset_White].kind = AssetKind::Image;
     this->asset_infos[Asset_White].state = AssetState::Unloaded;
@@ -43,10 +45,21 @@ void Assets::init(const char *sprites_cfg_name) {
     this->asset_infos[Asset_Tree].kind = AssetKind::Image;
     this->asset_infos[Asset_Tree].state = AssetState::Unloaded;
     
+    this->asset_infos[Asset_WoodIcon].filename = "wood_icon.png";
+    this->asset_infos[Asset_WoodIcon].kind = AssetKind::Image;
+    this->asset_infos[Asset_WoodIcon].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_Building].filename = "building.png";
+    this->asset_infos[Asset_Building].kind = AssetKind::Image;
+    this->asset_infos[Asset_Building].state = AssetState::Unloaded;
+    
     this->asset_infos[Asset_Font].filename = "c:/windows/fonts/consola.ttf";
     this->asset_infos[Asset_Font].kind = AssetKind::Font;
     this->asset_infos[Asset_Font].state = AssetState::Unloaded;
     this->asset_infos[Asset_Font].height = 32;
+
+    this->asset_infos[Asset_FontAtlas].kind = AssetKind::Image;
+    this->asset_infos[Asset_FontAtlas].state = AssetState::Unloaded;
     
     // @CLEAN
     this->get_tex(Asset_White);
@@ -133,9 +146,14 @@ FontData *Assets::get_font(AssetID id) {
         
         size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
-        font->tex = renderer->create_texture(atlas_data, Vec2i(atlas_width, atlas_height));
+        this->textures[this->texture_count] = renderer->create_texture(atlas_data, Vec2i(atlas_width, atlas_height));
+        AssetInfo *tex_info = this->get_info(Asset_FontAtlas);
+        tex_info->state = AssetState::Loaded;
+        tex_info->array_entry_idx = this->texture_count;
+        ++this->texture_count;
         delete[] atlas_data;
         
+        font->texture_id = Asset_FontAtlas;
         font->tex_size = Vec2i(atlas_width, atlas_height);
         font->first_codepoint = first_codepoint;
         font->glyphs.resize(codepoint_count);

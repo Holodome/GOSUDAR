@@ -79,7 +79,7 @@ void main() {
     
     this->vertex_count = 0;
     this->max_vertex_count = 1 << 16;
-    this->vertices = (Vertex *)this->arena.alloc(this->max_vertex_count * sizeof(Vertex));
+    this->vertices = (Vertex *)arena_alloc(&this->arena, this->max_vertex_count * sizeof(Vertex));
     logprint("Renderer", "Init end\n");
 }
 
@@ -111,18 +111,16 @@ void Renderer::imm_begin() {
     }
 }
 
-void Renderer::imm_flush() {
+void Renderer::imm_flush(Shader shader, Texture texture, Mat4x4 mvp, bool has_depth) {
     if (!vertex_count) { return; }
     
-    Shader shader = this->current_render_group->shader;
     assert(shader != Shader::invalid());
     bind_shader(&shader);
-    glUniformMatrix4fv(glGetUniformLocation(shader.id, "mvp"), 1, false, this->current_render_group->mvp.value_ptr());
-    Texture texture = this->current_render_group->texture;
+    glUniformMatrix4fv(glGetUniformLocation(shader.id, "mvp"), 1, false, mvp.value_ptr());
 	assert(texture != Texture::invalid());
     bind_texture(&texture);
     glUniform1i(glGetUniformLocation(shader.id, "tex"), 0);
-    if (this->current_render_group->has_depth) {
+    if (has_depth) {
         glEnable(GL_DEPTH_TEST);
     } else {
         glDisable(GL_DEPTH_TEST);
@@ -149,12 +147,12 @@ void Renderer::imm_vertex(const Vertex &v) {
     this->vertices[this->vertex_count++] = v;
 }
 
-void Renderer::imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+void imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
                              Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
                              Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,
-                             Texture texture) {
-    render_group->set_texture(texture);
-    this->imm_begin();
+                             AssetID texture_id) {
+    render_group_set_texture(render_group, texture_id);
+    render_group->renderer->imm_begin();
     Vertex v0, v1, v2, v3;
     v0.p = v00;
     v0.uv = uv00;
@@ -168,69 +166,73 @@ void Renderer::imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3
     v3.p = v11;
     v3.uv = uv11;
     v3.c = c11;
-    this->imm_vertex(v3);
-    this->imm_vertex(v1);
-    this->imm_vertex(v0);
-    this->imm_vertex(v0);
-    this->imm_vertex(v2);
-    this->imm_vertex(v3);
-    this->imm_flush();                  
+    render_group->renderer->imm_vertex(v3);
+    render_group->renderer->imm_vertex(v1);
+    render_group->renderer->imm_vertex(v0);
+    render_group->renderer->imm_vertex(v0);
+    render_group->renderer->imm_vertex(v2);
+    render_group->renderer->imm_vertex(v3);
+    render_group->renderer->imm_flush(render_group->shader, render_group->texture, render_group->mvp, render_group->has_depth);                  
 }
 
-void Renderer::imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-                             Vec4 c, Texture texture) {
-    this->imm_draw_quad(render_group, v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture);
+void imm_draw_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
+                             Vec4 c, AssetID texture_id) {
+    imm_draw_quad(render_group, v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture_id);
 }
 
-void Renderer::imm_draw_quad(RenderGroup *render_group, Vec3 v[4], Texture texture) {
-    this->imm_draw_quad(render_group, v[0], v[1], v[2], v[3], Colors::white, Colors::white, Colors::white, Colors::white,
-                        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture);
+void imm_draw_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id) {
+    imm_draw_quad(render_group, v[0], v[1], v[2], v[3], Colors::white, Colors::white, Colors::white, Colors::white,
+                        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), texture_id);
 }
 
-void Renderer::imm_draw_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, Texture texture) {
+void imm_draw_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, AssetID texture_id) {
     Vec3 v[4]; 
     rect.store_points(v);
     Vec2 uvs[4];
     uv_rect.store_points(uvs);
-    this->imm_draw_quad(render_group, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], texture);
+    imm_draw_quad(render_group, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], texture_id);
 }
 
-// void Renderer::imm_draw_text(Vec2 p, Vec4 color, const char *text, Font *font, f32 scale) {
-//     f32 line_height = font->size * scale;
+void imm_draw_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale) {
+    AssetInfo *info = render_group->assets->get_info(font_id);
+    f32 font_height = info->height;
+    f32 line_height = font_height * scale;
+    FontData *font = render_group->assets->get_font(font_id);
+    AssetID texture_id = font->texture_id;
 
-// 	f32 rwidth  = 1.0f / (f32)font->tex->size.x;
-// 	f32 rheight = 1.0f / (f32)font->tex->size.y;
+	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
+	f32 rheight = 1.0f / (f32)font->tex_size.y;
 
-// 	Vec3 offset = Vec3(p, 0);
-// 	offset.y += line_height;
+	Vec3 offset = Vec3(p, 0);
+	offset.y += line_height;
     
-//     set_shader();
-// 	for (const char *scan = text; *scan; ++scan) {
-// 		char symbol = *scan;
+	for (const char *scan = text; *scan; ++scan) {
+		char symbol = *scan;
 
-// 		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
-// 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
+		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
+			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 
-// 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
-// 			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
+			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
+			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
 
-// 			f32 y1 = offset.y + glyph->offset1_y * scale;
-// 			f32 y2 = y1 + glyph_height;
-// 			f32 x1 = offset.x + glyph->offset1_x * scale;
-// 			f32 x2 = x1 + glyph_width;
+			f32 y1 = offset.y + glyph->offset1_y * scale;
+			f32 y2 = y1 + glyph_height;
+			f32 x1 = offset.x + glyph->offset1_x * scale;
+			f32 x2 = x1 + glyph_width;
 
-// 			f32 s1 = glyph->min_x * rwidth;
-// 			f32 t1 = glyph->min_y * rheight;
-// 			f32 s2 = glyph->max_x * rwidth;
-// 			f32 t2 = glyph->max_y * rheight;
-//             this->imm_draw_rect(Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1), font->tex);
-// 			f32 char_advance = glyph->x_advance * scale;
-// 			offset.x += char_advance;
-// 		}
-// 	}
-// }
+			f32 s1 = glyph->min_x * rwidth;
+			f32 t1 = glyph->min_y * rheight;
+			f32 s2 = glyph->max_x * rwidth;
+			f32 t2 = glyph->max_y * rheight;
+            
+            imm_draw_rect(render_group, Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1), texture_id);
+			f32 char_advance = glyph->x_advance * scale;
+			offset.x += char_advance;
+		}
+	}
+}
 
-void Renderer::imm_draw_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
+void imm_draw_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
     // Vec3 cam_z = this->imvp.v[2].xyz;
     Vec3 cam_z = render_group->mvp.get_z();
@@ -242,22 +244,22 @@ void Renderer::imm_draw_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 col
     // other_perp = Math::normalize(other_perp);
     line_perp *= thickness;
     // other_perp *= thickness;
-    this->imm_draw_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
+    imm_draw_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
     // this->imm_draw_quad(a - other_perp, a + other_perp, b - other_perp, b + other_perp, color);
     
 }
 
-void Renderer::imm_draw_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {
-    this->imm_draw_line(render_group, v00, v01, color, thickness);
-    this->imm_draw_line(render_group, v01, v11, color, thickness);
-    this->imm_draw_line(render_group, v11, v10, color, thickness);
-    this->imm_draw_line(render_group, v10, v00, color, thickness);
+void imm_draw_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {
+    imm_draw_line(render_group, v00, v01, color, thickness);
+    imm_draw_line(render_group, v01, v11, color, thickness);
+    imm_draw_line(render_group, v11, v10, color, thickness);
+    imm_draw_line(render_group, v10, v00, color, thickness);
 }
 
-void Renderer::imm_draw_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color, f32 thickness) {
+void imm_draw_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color, f32 thickness) {
     Vec3 v[4]; 
     rect.store_points(v);
-    this->imm_draw_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
+    imm_draw_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
 }
 
 Texture Renderer::create_texture(void *buffer, Vec2i size) {
@@ -265,29 +267,35 @@ Texture Renderer::create_texture(void *buffer, Vec2i size) {
     return tex;
 }
 
-void RenderGroup::begin(Renderer *renderer, Mat4x4 mvp) {
+RenderGroup render_group_begin(Renderer *renderer, Assets *assets, Mat4x4 mvp) {
+    RenderGroup result = {};
     assert(!renderer->has_render_group);
     renderer->has_render_group = true;
-    renderer->current_render_group = this;
     
-    this->renderer = renderer;
+    result.renderer = renderer;
+    result.assets = assets;
     
-    this->has_depth = true;
-    this->mvp = mvp;
-    this->imvp = Mat4x4::inverse(mvp);    
-    this->texture = renderer->white_texture;
-    this->shader = renderer->default_shader;
+    result.has_depth = true;
+    result.mvp = mvp;
+    result.imvp = Mat4x4::inverse(mvp);    
+    result.texture = renderer->white_texture;
+    result.shader = renderer->default_shader;
+    return result;
 }
 
-void RenderGroup::set_texture(Texture texture) {
-    if (texture == Texture::invalid()) {
-        texture = this->renderer->white_texture;
+void render_group_set_texture(RenderGroup *group, AssetID texture_id) {
+    // @CLEAN
+    if (texture_id == INVALID_ASSET_ID) {
+        texture_id = Asset_White;
     }
-    this->texture = texture;    
+    Texture texture = group->assets->get_tex(texture_id);
+    if (texture == Texture::invalid()) {
+        texture = group->renderer->white_texture;
+    }
+    group->texture = texture;    
 }
 
-void RenderGroup::end() {
-    assert(renderer->has_render_group);
-    renderer->has_render_group = false;
-    renderer->current_render_group = 0;
+void render_group_end(RenderGroup *group) {
+    assert(group->renderer->has_render_group);
+    group->renderer->has_render_group = false;
 }

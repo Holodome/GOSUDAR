@@ -4,14 +4,15 @@
 #include "framework/lexer.hh"
 #include "framework/renderer.hh"
 
-typedef u32 AssetID;
-
 enum AssetCategory {
     Asset_White,
     Asset_Dude,
     Asset_Tree,
     Asset_Font,
+    Asset_FontAtlas,
     Asset_Grass,
+    Asset_WoodIcon,
+    Asset_Building,
     Asset_Count
 };  
 
@@ -30,7 +31,7 @@ struct FontGlyph {
 
 struct FontData {
     Vec2i tex_size;
-    Texture tex;  
+    AssetID texture_id;
     Array<FontGlyph> glyphs;
     u32 first_codepoint;
 };
@@ -68,7 +69,7 @@ struct Assets {
     size_t font_count;
     FontData fonts[128];
     
-    void init(const char *sprites_cfg_name);
+    void init();
     void cleanup();
     
     AssetInfo *get_info(AssetID id);

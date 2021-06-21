@@ -621,7 +621,7 @@ void DevUI::window(const char *title) {
         win->title = Str(title);
         Rect rect = this->get_new_window_rect();
         win->whole_rect = rect;
-        win->draw_queue = (DevUIDrawQueueEntry *)this->arena.alloc(sizeof(DevUIDrawQueueEntry) * DEVUI_WINDOW_DRAW_QUEUE_MAX_SIZE);
+        win->draw_queue = (DevUIDrawQueueEntry *)arena_alloc(&this->arena, sizeof(DevUIDrawQueueEntry) * DEVUI_WINDOW_DRAW_QUEUE_MAX_SIZE);
         
         this->windows_order[this->windows_order_size++] = win->array_idx;
     }
@@ -696,9 +696,9 @@ void DevUI::init() {
     this->id_stack_index = 0;
     this->clip_rect_stack_index = 0;
     this->window_count = 0;   
-    this->windows = (DevUIWindow *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(DevUIWindow));
+    this->windows = (DevUIWindow *)arena_alloc(&this->arena, DEVUI_MAX_WINDOW_COUNT * sizeof(DevUIWindow));
     this->windows_order_size = 0;
-    this->windows_order = (u32 *)this->arena.alloc(DEVUI_MAX_WINDOW_COUNT * sizeof(u32));
+    this->windows_order = (u32 *)arena_alloc(&this->arena, DEVUI_MAX_WINDOW_COUNT * sizeof(u32));
     this->cur_win = 0;
     this->hot_win = 0;
     this->hot_id = DevUIID::empty();

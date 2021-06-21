@@ -28,22 +28,18 @@ struct Game {
     Assets assets;
     
     bool is_running;
-    DevUI dev_ui;
     
     bool draw_sprite_frames;
     bool fullscreen;
     u32 dev_mode; // DevMode
-    i32 wood_count;
     World world;
     
     MemoryArena frame_arena;
-    
-    void init();
-    void cleanup();
-    
-    void update_logic(Input *input);
-    void update();  
 };
+
+void game_init(Game *game);
+void game_cleanup(Game *game);
+void game_update_and_render(Game *game);
 
 #define GAME_H 1
 #endif

@@ -20,7 +20,8 @@ void Camera::init() {
 void Camera::update(Input *input) {
     this->distance_from_player -= input->mwheel;
     
-    if (input->is_key_held(Key::MouseLeft)) {
+    // if (input->is_key_held(Key::MouseLeft)) {
+    {
         f32 x_view_coef = 1.0f * input->dt;
         f32 y_view_coef = 0.6f * input->dt;
         f32 x_angle_change = input->mdelta.x * x_view_coef;

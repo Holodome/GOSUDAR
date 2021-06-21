@@ -159,6 +159,13 @@ namespace Math {
             return (*this = *this / v);
         }
         
+        bool operator==(Vec2G<T> other) {
+            return this->x == other.x && this->y == other.y;
+        }
+        bool operator!=(Vec2G<T> other) {
+            return !(*this == other);
+        }
+        
         f32 aspect_ratio() const {
             return (f32)x / (f32)y;
         }
@@ -326,6 +333,11 @@ namespace Math {
 
     // Design decision for vectors was that functions related to them should not be members of structs
     // because there are integer vectors and there is no point in adding stuff like cross product into them
+
+    inline f32 dot(Vec2 a, Vec2 b) {
+        f32 result = a.x * b.x + a.y * b.y;
+        return result;
+    }
 
     inline f32 dot(Vec3 a, Vec3 b) {
         f32 result = a.x * b.x + a.y * b.y + a.z * b.z;

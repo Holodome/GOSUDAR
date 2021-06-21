@@ -6,9 +6,17 @@
 
 typedef u32 EntityID;
 
+#define CHUNK_SIZE 16.0f
+#define TILES_IN_CHUNK 16
+#define TILE_SIZE (CHUNK_SIZE / (f32)TILES_IN_CHUNK)
+
+struct WorldPosition {
+    Vec2i chunk; // Chunk coordinate
+    Vec2 offset; // Offset in chunk, world coordinate units in [0; CHUNK_SIZE]
+};  
+
 enum struct EntityKind {
     None = 0x0,
-    Ground,
     Player,
     Tree,
     GroundTile
@@ -19,17 +27,8 @@ enum EntityFlags {
     EntityFlags_IsDeleted = 0x2,
 };
 
-const f32 CHUNK_SIZE = 16.0f;
-#define TILES_IN_CHUNK 16
-#define TILE_SIZE (CHUNK_SIZE / (f32)TILES_IN_CHUNK)
-
-struct WorldPosition {
-    Vec2i chunk;
-    Vec2 offset;
-};  
-
 struct SimEntity {
-    bool is_alive;
+    // ID in world storage
     EntityID id;
     EntityKind kind;
     u32 flags; // EntityFlags
@@ -40,8 +39,10 @@ struct SimEntity {
     Vec2i tile_pos;
 };  
 
+// Entity stored in world
 struct Entity {
     SimEntity sim;
+    // Stores data of chunk entity is in
     WorldPosition world_pos;
 };
 
@@ -51,6 +52,9 @@ struct ChunkEntityBlock {
     ChunkEntityBlock *next;
 };  
 
+// World is split into chunks by entity position
+// Enitites in chunk are stored in ChunkEntityBlock
+// It is linked list with 16 entities in block
 struct Chunk {
     ChunkEntityBlock entity_block;
     Vec2i coord;
@@ -60,21 +64,19 @@ struct Chunk {
 };
 
 struct World {
-    Camera camera;
-    
-    ChunkEntityBlock *first_free;
-    Chunk chunks[128];
-
-    EntityID player_id;
-    
     MemoryArena world_arena;
+    MemoryArena *frame_arena;
+    // Linked list free entry
+    ChunkEntityBlock *first_free;
+    // Chunks hash table. Implemented with external collision resolving (other chunks are allocated separately)
+    Chunk chunk_hash[128];
+    
     size_t max_entity_count;
     size_t entity_count;
     Entity *entities;
-
-    u32 wood_count;
     
-    MemoryArena *frame_arena;
+    EntityID player_id;
+    Camera camera;
 };  
 
 void world_init(World *world);

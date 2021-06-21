@@ -65,11 +65,6 @@ void game_update_and_render(Game *game) {
     end_sim(sim);
     temp_memory_end(sim_memory);
 
-    Vec2 player_pos = get_entity(&game->world, game->world.player_id)->sim.p;
-    game->world.camera.center_pos = Vec3(player_pos.x, 0, player_pos.y);
-    game->world.camera.update(&game->input);
-    game->world.camera.recalculate_matrices(game->input.winsize);
-    
     RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,
         Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0));
     interface_render_group.has_depth = false;
@@ -80,11 +75,11 @@ void game_update_and_render(Game *game) {
     imm_draw_rect(&interface_render_group, Rect((game->input.winsize.x) * 0.5f - interface_tile_size, game->input.winsize.y - interface_tile_size,
                                                          interface_tile_size, interface_tile_size), Colors::white, Rect(0, 0, 1, 1),
                                                          Asset_WoodIcon);
-    char wood_count_display[32];
-    snprintf(wood_count_display, sizeof(wood_count_display), "%u", game->world.wood_count);
-    imm_draw_text(&interface_render_group, Vec2(game->input.winsize.x * 0.5f, game->input.winsize.y - interface_tile_size), Colors::black, wood_count_display,
-                           Asset_Font, 1.0f);
-    render_group_end(&interface_render_group);
+    // char wood_count_display[32];
+    // snprintf(wood_count_display, sizeof(wood_count_display), "%u", game->world.wood_count);
+    // imm_draw_text(&interface_render_group, Vec2(game->input.winsize.x * 0.5f, game->input.winsize.y - interface_tile_size), Colors::black, wood_count_display,
+    //                        Asset_Font, 1.0f);
+    // render_group_end(&interface_render_group);
     
     // renderer.render();
     game->os.update_window();

@@ -2,20 +2,10 @@
 
 #include "lib/lib.hh"
 
-struct Ray {
-    Vec3 orig;
-    Vec3 dir;  
-    
-    Ray(Vec3 orig, Vec3 dir) {
-        this->orig = orig;
-        this->dir = dir;
-    }
-};
-
-bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, const Ray &ray, f32 *t_out) {
-    f32 denom = Math::dot(plane_normal, ray.dir);
+inline bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, f32 *t_out) {
+    f32 denom = Math::dot(plane_normal, d);
     if (fabs(denom) > 0.001f) {
-        f32 t = (-plane_d - Math::dot(plane_normal, ray.orig)) / denom;
+        f32 t = (-plane_d - Math::dot(plane_normal, o)) / denom;
         *t_out = t;
         return true;
     }

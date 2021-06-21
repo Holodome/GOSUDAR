@@ -6,9 +6,9 @@
 
 typedef u32 EntityID;
 
-#define CHUNK_SIZE 16.0f
-#define TILES_IN_CHUNK 16
-#define TILE_SIZE (CHUNK_SIZE / (f32)TILES_IN_CHUNK)
+#define TILE_SIZE 1.0f
+#define TILES_IN_CHUNK 4
+#define CHUNK_SIZE (1.0f * TILES_IN_CHUNK)
 
 struct WorldPosition {
     Vec2i chunk; // Chunk coordinate
@@ -63,6 +63,12 @@ struct Chunk {
     Chunk *next_in_hash;
 };
 
+struct SimCamera {
+    f32 pitch;
+    f32 yaw;
+    f32 distance_from_player;
+};
+
 struct World {
     MemoryArena world_arena;
     MemoryArena *frame_arena;
@@ -75,8 +81,10 @@ struct World {
     size_t entity_count;
     Entity *entities;
     
-    EntityID player_id;
-    Camera camera;
+    SimCamera camera;
+    EntityID camera_followed_entity_id;
+    
+    // Camera camera;
 };  
 
 void world_init(World *world);
@@ -86,6 +94,11 @@ Entity *get_entity(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);
 void change_entity_position(World *world, EntityID id, WorldPosition *old_p, WorldPosition *new_p);
 
+// Represents part of the world that can be updated
+// While world is used for storing and accessing entities in different parts of the world,
+// sim region collates entities for similar postions, which is neccessary for updating due to floating point mistakes
+// Also it provides space partitioning
+// This is going to be very computationally heavy piece of data, so we better do copies here instead of using pointers to world
 struct SimRegion {
     MemoryArena *frame_arena;
     World *world;
@@ -93,6 +106,10 @@ struct SimRegion {
     // So in case player positions are some huge float numbers,
     // map entities from world position to sim position and back after sim end
     WorldPosition origin;
+    
+    SimCamera cam;
+    Vec3 cam_p;
+    Mat4x4 cam_mvp;
     
     size_t max_entity_count;
     size_t entity_count;

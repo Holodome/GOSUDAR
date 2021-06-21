@@ -116,9 +116,12 @@ void world_init(World *world) {
     world->entities = (Entity *)arena_alloc(&world->world_arena, sizeof(Entity) * world->max_entity_count);
     memset(world->chunk_hash, 0, sizeof(world->chunk_hash));
     
-    world->camera.init();
-    world->player_id = add_player(world);
-    for (size_t i = 0; i < 100; ++i) {
+    // world->camera.init();
+    world->camera.distance_from_player = 5.0f;
+    world->camera.pitch = 0.0f;
+    world->camera.yaw = 0.0f;
+    world->camera_followed_entity_id = add_player(world);
+    for (size_t i = 0; i < 10; ++i) {
         WorldPosition tree_p;
         tree_p.chunk.x = 0;
         tree_p.chunk.y = 0;
@@ -219,47 +222,9 @@ static Vec2 world_position_to_camera_position(WorldPosition pos) {
     return world_difference(pos, camera_pos);
 }
 
-static void get_camera_frustum_projection_in_chunk_space(Camera *camera, WorldPosition pos[4]) {
-    Vec3 rays[4] = {
-        camera->uv_to_world(Vec2(-1, -1)),
-        camera->uv_to_world(Vec2(-1, 1)),
-        camera->uv_to_world(Vec2(1, -1)),
-        camera->uv_to_world(Vec2(1, 1)),
-    };
-    f32 camera_t[4];
-    u32 n_projected = 0;
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[0], camera_t + 0);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[1], camera_t + 1);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[2], camera_t + 2);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[3], camera_t + 3);
-    assert(n_projected == 4);
-    Vec3 camera_proj[4] = {
-        camera->pos + rays[0] * camera_t[0],
-        camera->pos + rays[1] * camera_t[1],
-        camera->pos + rays[2] * camera_t[2],
-        camera->pos + rays[3] * camera_t[3],
-    };
-    Vec2 camera_proj_xz[4] = {
-        Vec2(camera_proj[0].x, camera_proj[0].z),  
-        Vec2(camera_proj[1].x, camera_proj[1].z),  
-        Vec2(camera_proj[2].x, camera_proj[2].z),  
-        Vec2(camera_proj[3].x, camera_proj[3].z),  
-    };
-    pos[0] = chunk_origin(map_into_chunk_space(camera_proj_xz[0]));
-    pos[1] = chunk_origin(map_into_chunk_space(camera_proj_xz[1]));
-    pos[2] = chunk_origin(map_into_chunk_space(camera_proj_xz[2]));
-    pos[3] = chunk_origin(map_into_chunk_space(camera_proj_xz[3]));
-}
-
-static void get_sim_region_bounds(Camera *camera, Vec2i *min, Vec2i *max) {
-    WorldPosition camera_proj[4];
-    get_camera_frustum_projection_in_chunk_space(camera, camera_proj);
-    i32 min_chunk_x = Math::min(camera_proj[0].chunk.x, Math::min(camera_proj[1].chunk.x, Math::min(camera_proj[2].chunk.x, camera_proj[3].chunk.x)));
-    i32 min_chunk_y = Math::min(camera_proj[0].chunk.y, Math::min(camera_proj[1].chunk.y, Math::min(camera_proj[2].chunk.y, camera_proj[3].chunk.y)));
-    i32 max_chunk_x = Math::max(camera_proj[0].chunk.x, Math::max(camera_proj[1].chunk.x, Math::max(camera_proj[2].chunk.x, camera_proj[3].chunk.x)));
-    i32 max_chunk_y = Math::max(camera_proj[0].chunk.y, Math::max(camera_proj[1].chunk.y, Math::max(camera_proj[2].chunk.y, camera_proj[3].chunk.y)));
-    *min = Vec2i(min_chunk_x, min_chunk_y);
-    *max = Vec2i(max_chunk_x, max_chunk_y);
+static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i *max) {
+    *min = Vec2i(camera_coord.chunk.x - 10, camera_coord.chunk.y - 10);
+    *max = Vec2i(camera_coord.chunk.x + 10, camera_coord.chunk.y + 10);
 }
 
 SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
@@ -268,18 +233,17 @@ SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
     sim->max_entity_count = 4096;
     sim->entity_count = 0;
     sim->entities = alloc_arr(sim_arena, sim->max_entity_count, SimEntity);
-    
+    // Since camera follows some entity and is never too far from it, we can assume that camera position is
+    // the position of followed entity
+    WorldPosition camera_position = get_entity(world, world->camera_followed_entity_id)->world_pos;
     Vec2i min_chunk_coord, max_chunk_coord;
-    get_sim_region_bounds(&world->camera, &min_chunk_coord, &max_chunk_coord);
-    // @TODO actual render distance stuff
-    assert(max_chunk_coord.x - min_chunk_coord.x < 10);
-    assert(max_chunk_coord.y - min_chunk_coord.y < 10);
-    sim->origin.offset = Vec2(0);
-    sim->origin.chunk = min_chunk_coord;
+    get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
+    sim->cam = world->camera;
     
     for (i32 chunk_y = min_chunk_coord.y; chunk_y <= max_chunk_coord.y; ++chunk_y) {
         for (i32 chunk_x = min_chunk_coord.x; chunk_x <= max_chunk_coord.x; ++chunk_x) {
             Vec2i chunk_coord = Vec2i(chunk_x, chunk_y);
+            
             Chunk *chunk = get_world_chunk(world, chunk_coord);
             for (ChunkEntityBlock *block = &chunk->entity_block;
                  block;
@@ -301,6 +265,7 @@ SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
 }
 
 void end_sim(SimRegion *sim, Input *input) {
+    sim->world->camera = sim->cam;
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = sim->entities + entity_idx;
         WorldPosition new_position = map_into_chunk_space(sim->origin, entity->p);
@@ -309,13 +274,6 @@ void end_sim(SimRegion *sim, Input *input) {
         world_ent->world_pos = new_position;
         world_ent->sim = *entity;
     }
-    
-    Vec2 camera_xz = Vec2(sim->world->camera.center_pos.x, sim->world->camera.center_pos.z);
-    WorldPosition camera_pos = map_into_chunk_space(sim->origin, camera_xz);
-    Vec2 new_camera_xz = global_position_from_world_position(camera_pos);
-    sim->world->camera.center_pos.x = new_camera_xz.x;
-    sim->world->camera.center_pos.z = new_camera_xz.y;
-    sim->world->camera.recalculate_matrices(input->winsize);
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -347,13 +305,15 @@ int z_camera_sort(void *ctx, const void *a, const void *b){
     int result = 0;
     Vec3 a_pos = Vec3(ae->p.x, 0, ae->p.y);
     Vec3 b_pos = Vec3(be->p.x, 0, be->p.y);
-    f32 a_v = Math::dot(sim->world->camera.mvp.get_z(), a_pos - sim->world->camera.pos);
-    f32 b_v = Math::dot(sim->world->camera.mvp.get_z(), b_pos - sim->world->camera.pos);
+    f32 a_v = Math::dot(sim->cam_mvp.get_z(), a_pos - sim->cam_p);
+    f32 b_v = Math::dot(sim->cam_mvp.get_z(), b_pos - sim->cam_p);
     result = (int)(a_v < b_v ? -1 : 1);
     return (int)(-result);
 };
 
 void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) {
+    // @TODO This is kinda stupid to do update here - what if we want to do sim twice
+    // Calculate player movement
     Vec2 player_delta = Vec2(0);
     f32 move_coef = 4.0f * input->dt;
     f32 z_speed = 0;
@@ -374,44 +334,47 @@ void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) {
     player_delta.x += x_speed * Math::cos(sim->world->camera.yaw);
     player_delta.y += x_speed * Math::sin(sim->world->camera.yaw);     
     
+    // Update camera input
+    f32 x_view_coef = 1.0f * input->dt;
+    f32 y_view_coef = 0.6f * input->dt;
+    f32 x_angle_change = input->mdelta.x * x_view_coef;
+    f32 y_angle_change = input->mdelta.y * y_view_coef;
+    sim->cam.yaw += x_angle_change;
+    sim->cam.yaw = Math::unwind_rad(sim->cam.yaw);
+    sim->cam.pitch += y_angle_change;
+    sim->cam.pitch = Math::clamp(sim->cam.pitch, 0.01f, Math::HALF_PI - 0.01f);
+    sim->cam.distance_from_player -= input->mwheel;
+    
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = &sim->entities[entity_idx];
         
         switch (entity->kind) {
             case EntityKind::Player: {
                 entity->p += player_delta;
-                sim->world->camera.center_pos = Vec3(entity->p.x, 0, entity->p.y);
-                sim->world->camera.update(input);
-                sim->world->camera.recalculate_matrices(input->winsize);
-                
-                // if (input->is_key_pressed(Key::MouseRight)) {
-                //     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
-                //         SimEntity *tree = &sim->entities[entity_idx];
-                //         if (tree->kind == EntityKind::Tree) {
-                //             // f32 distance_sq = Math::length_sq(tree->pos - entity->pos);
-                //             // f32 chop_distance_sq = 0.2f * 0.2f;
-                //             // if (distance_sq < chop_distance_sq) {
-                //             //     tree->chops_left -= 1;
-                //             //     if (tree->chops_left == 0) {
-                //             //         tree->is_alive = false;
-                //             //         ++world->wood_count;
-                //             //     }
-                //             // }
-                //         }
-                //     }
-                // }
-                // if (input->is_key_pressed(Key::MouseLeft)) {
-                //     // if (world->wood_count >= 10) {
-                //     //     world->wood_count -= 10;
-                //     //     add_building_entity(world, get_world_position_from_p(entity->pos));
-                //     // }
-                // }
-
             } break;
         }
+        
+        // Update camera movement
+        if (entity->id == sim->world->camera_followed_entity_id) {
+            Vec3 center_pos = Vec3(entity->p.x, 0, entity->p.y);
+            SimCamera *camera = &sim->cam;
+            f32 horiz_distance = sim->cam.distance_from_player * Math::cos(camera->pitch);
+            f32 vert_distance = camera->distance_from_player * Math::sin(camera->pitch);
+            f32 offsetx = horiz_distance * Math::sin(-camera->yaw);
+            f32 offsetz = horiz_distance * Math::cos(-camera->yaw);
+            sim->cam_p.x = offsetx + center_pos.x;
+            sim->cam_p.z = offsetz + center_pos.z;
+            sim->cam_p.y = vert_distance;
+        }
     }
+   
+    // set camera matrix
+    Mat4x4 projection = Mat4x4::perspective(Math::rad(60), input->winsize.aspect_ratio(), 0.001f, 100.0f);
+    Mat4x4 view = Mat4x4::identity() * Mat4x4::rotation(sim->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(sim->cam.yaw, Vec3(0, 1, 0))
+        * Mat4x4::translate(-sim->cam_p);
+    sim->cam_mvp = projection * view;
     
-    RenderGroup world_render_group = render_group_begin(renderer, assets, sim->world->camera.mvp);
+    RenderGroup world_render_group = render_group_begin(renderer, assets, sim->cam_mvp);
     world_render_group.has_depth = true;
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = &sim->entities[entity_idx];
@@ -440,7 +403,7 @@ void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) {
         SimEntity *entity = &sim->entities[drawable_entity_ids[drawable_idx]];
         Vec3 billboard[4];
         Vec3 pos = Vec3(entity->p.x, 0, entity->p.y);
-        get_billboard_positions(pos, sim->world->camera.mvp.get_x(), sim->world->camera.mvp.get_y(), entity->size.x, entity->size.y, billboard);
+        get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), entity->size.x, entity->size.y, billboard);
         imm_draw_quad(&world_render_group, billboard, entity->texture_id);
     }
     render_group_end(&world_render_group);    

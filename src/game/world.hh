@@ -92,7 +92,6 @@ void world_update(World *world, Input *input);
 void world_render(World *world, Renderer *renderer, Assets *assets);
 Entity *get_entity(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);
-void change_entity_position(World *world, EntityID id, WorldPosition *old_p, WorldPosition *new_p);
 
 // Represents part of the world that can be updated
 // While world is used for storing and accessing entities in different parts of the world,

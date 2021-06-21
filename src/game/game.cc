@@ -9,20 +9,20 @@ void game_init(Game *game) {
     game->os.init_renderer_backend();
     f32 init_start = game->os.get_time();
     size_t renderer_arena_size = MEGABYTES(256);
-    arena_init(&game->renderer.arena, Mem::alloc(renderer_arena_size), renderer_arena_size);
+    arena_init(&game->renderer.arena, os_alloc(renderer_arena_size), renderer_arena_size);
     game->renderer.init();
     
     size_t assets_arena_size = MEGABYTES(256);
-    arena_init(&game->assets.arena, Mem::alloc(assets_arena_size), assets_arena_size);
+    arena_init(&game->assets.arena, os_alloc(assets_arena_size), assets_arena_size);
     // @CLEAN
     game->assets.renderer = &game->renderer;
     game->assets.init();
     game->renderer.white_texture = game->assets.get_tex(Asset_White);
     
     size_t frame_arena_size = MEGABYTES(8);
-    arena_init(&game->frame_arena, Mem::alloc(frame_arena_size), frame_arena_size);
+    arena_init(&game->frame_arena, os_alloc(frame_arena_size), frame_arena_size);
     size_t world_arena_size = MEGABYTES(8);
-    arena_init(&game->world.world_arena, Mem::alloc(world_arena_size), world_arena_size);
+    arena_init(&game->world.world_arena, os_alloc(world_arena_size), world_arena_size);
     
     game->world.frame_arena = &game->frame_arena;
     world_init(&game->world);
@@ -35,13 +35,13 @@ void game_init(Game *game) {
 
 void game_cleanup(Game *game) {
     logprintln("Game", "Cleanup");
-    Mem::free(game->frame_arena.data);
-    Mem::free(game->world.world_arena.data);
+    os_free(game->frame_arena.data);
+    os_free(game->world.world_arena.data);
     // Mem::free(game->dev_ui.arena.data);
     game->assets.cleanup();
-    Mem::free(game->assets.arena.data);
+    os_free(game->assets.arena.data);
     game->renderer.cleanup();
-    Mem::free(game->renderer.arena.data);
+    os_free(game->renderer.arena.data);
     game->os.cleanup();
 }
 

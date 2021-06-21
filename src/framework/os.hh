@@ -175,5 +175,9 @@ struct OS {
     static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
 };
 
+// Virtual memory management
+void *os_alloc(size_t size);
+void os_free(void *ptr);
+
 #define OS_H 1
 #endif

@@ -518,3 +518,15 @@ bool OS::file_write_time_cmp(FileWritetime a, FileWritetime b) {
 void OS::sleep(u32 ms) {
     Sleep(ms);
 }
+
+void *os_alloc(size_t size) {
+    void *result = VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);    
+    assert(result);
+    return result;
+}
+
+void os_free(void *ptr) {
+    if (ptr) {
+        VirtualFree(ptr, 0, MEM_RELEASE);
+    }
+}

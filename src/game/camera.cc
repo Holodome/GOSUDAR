@@ -31,7 +31,9 @@ void Camera::update(Input *input) {
         this->pitch += y_angle_change;
         this->pitch = Math::clamp(this->pitch, 0.01f, Math::HALF_PI - 0.01f);
     }
-    
+}
+
+void Camera::recalculate_matrices(Vec2 winsize) {
     f32 horiz_distance = distance_from_player * Math::cos(this->pitch);
     f32 vert_distance = distance_from_player * Math::sin(this->pitch);
     f32 offsetx = horiz_distance * Math::sin(-this->yaw);
@@ -39,9 +41,6 @@ void Camera::update(Input *input) {
     this->pos.x = offsetx + this->center_pos.x;
     this->pos.z = offsetz + this->center_pos.z;
     this->pos.y = vert_distance;
-}
-
-void Camera::recalculate_matrices(Vec2 winsize) {
     this->projection = Mat4x4::perspective(this->fov, winsize.aspect_ratio(), this->near_plane, this->far_plane);
     this->view = Mat4x4::identity() * Mat4x4::rotation(this->pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(this->yaw, Vec3(0, 1, 0)) * Mat4x4::translate(-this->pos);
     this->mvp = this->projection * this->view;

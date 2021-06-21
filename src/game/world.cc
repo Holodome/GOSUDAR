@@ -1,23 +1,23 @@
 #include "game/world.hh"
 #include "game/game.hh"
 
-bool is_canonical(f32 chunk_rel) {
+static bool is_canonical(f32 chunk_rel) {
     bool result = ((chunk_rel >= -0.001f) && (chunk_rel <= CHUNK_SIZE + 0.001f));
     return result;
 }
 
-bool is_canonical(Vec2 offset) {
+static bool is_canonical(Vec2 offset) {
     return is_canonical(offset.x) && is_canonical(offset.y);
 }
 
-void recanonicalize_coord(i32 *chunk, f32 *chunk_rel) {
+static void recanonicalize_coord(i32 *chunk, f32 *chunk_rel) {
     i32 offset = (i32)floorf(*chunk_rel / CHUNK_SIZE);
     *chunk += offset;
     *chunk_rel -= offset * CHUNK_SIZE;
     assert(is_canonical(*chunk_rel));
 }
 
-WorldPosition map_into_chunk_space(WorldPosition base_pos, Vec2 offset) {
+static WorldPosition map_into_chunk_space(WorldPosition base_pos, Vec2 offset) {
     WorldPosition result = base_pos;
     result.offset += offset;
     recanonicalize_coord(&result.chunk.x, &result.offset.x);
@@ -25,19 +25,24 @@ WorldPosition map_into_chunk_space(WorldPosition base_pos, Vec2 offset) {
     return result;
 }
 
-WorldPosition map_into_chunk_space(Vec2 offset) {
+static WorldPosition map_into_chunk_space(Vec2 offset) {
     return map_into_chunk_space({}, offset);
 }
 
-Vec2 world_difference(WorldPosition *a, WorldPosition *b) {
-    Vec2 dcoord = Vec2(a->chunk - b->chunk);
-    Vec2 result = dcoord * CHUNK_SIZE + (a->offset - b->offset);
+static WorldPosition chunk_origin(WorldPosition pos) {
+    pos.offset = Vec2(0);
+    return pos;
+}
+
+Vec2 world_difference(WorldPosition a, WorldPosition b) {
+    Vec2 dcoord = Vec2(a.chunk - b.chunk);
+    Vec2 result = dcoord * CHUNK_SIZE + (a.offset - b.offset);
     return result;
 }
 
 Vec2 global_position_from_world_position(WorldPosition p) {
     WorldPosition origin = {};
-    return world_difference(&p, &origin);
+    return world_difference(p, origin);
 }
 
 bool is_same_chunk(WorldPosition a, WorldPosition b) {
@@ -211,14 +216,50 @@ void change_entity_position(World *world, EntityID id, WorldPosition *old_p, Wor
 
 static Vec2 world_position_to_camera_position(WorldPosition pos) {
     WorldPosition camera_pos = {};
-    return world_difference(&pos, &camera_pos);
+    return world_difference(pos, camera_pos);
 }
 
-static void add_entity(SimRegion *sim, Entity *entity) {
-    assert(sim->entity_count < sim->max_entity_count);
-    SimEntity *dest = sim->entities +sim->entity_count++;
-    *dest = entity->sim;
-    dest->p = world_position_to_camera_position(entity->world_pos);
+static void get_camera_frustum_projection_in_chunk_space(Camera *camera, WorldPosition pos[4]) {
+    Vec3 rays[4] = {
+        camera->uv_to_world(Vec2(-1, -1)),
+        camera->uv_to_world(Vec2(-1, 1)),
+        camera->uv_to_world(Vec2(1, -1)),
+        camera->uv_to_world(Vec2(1, 1)),
+    };
+    f32 camera_t[4];
+    u32 n_projected = 0;
+    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[0], camera_t + 0);
+    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[1], camera_t + 1);
+    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[2], camera_t + 2);
+    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, camera->pos, rays[3], camera_t + 3);
+    assert(n_projected == 4);
+    Vec3 camera_proj[4] = {
+        camera->pos + rays[0] * camera_t[0],
+        camera->pos + rays[1] * camera_t[1],
+        camera->pos + rays[2] * camera_t[2],
+        camera->pos + rays[3] * camera_t[3],
+    };
+    Vec2 camera_proj_xz[4] = {
+        Vec2(camera_proj[0].x, camera_proj[0].z),  
+        Vec2(camera_proj[1].x, camera_proj[1].z),  
+        Vec2(camera_proj[2].x, camera_proj[2].z),  
+        Vec2(camera_proj[3].x, camera_proj[3].z),  
+    };
+    pos[0] = chunk_origin(map_into_chunk_space(camera_proj_xz[0]));
+    pos[1] = chunk_origin(map_into_chunk_space(camera_proj_xz[1]));
+    pos[2] = chunk_origin(map_into_chunk_space(camera_proj_xz[2]));
+    pos[3] = chunk_origin(map_into_chunk_space(camera_proj_xz[3]));
+}
+
+static void get_sim_region_bounds(Camera *camera, Vec2i *min, Vec2i *max) {
+    WorldPosition camera_proj[4];
+    get_camera_frustum_projection_in_chunk_space(camera, camera_proj);
+    i32 min_chunk_x = Math::min(camera_proj[0].chunk.x, Math::min(camera_proj[1].chunk.x, Math::min(camera_proj[2].chunk.x, camera_proj[3].chunk.x)));
+    i32 min_chunk_y = Math::min(camera_proj[0].chunk.y, Math::min(camera_proj[1].chunk.y, Math::min(camera_proj[2].chunk.y, camera_proj[3].chunk.y)));
+    i32 max_chunk_x = Math::max(camera_proj[0].chunk.x, Math::max(camera_proj[1].chunk.x, Math::max(camera_proj[2].chunk.x, camera_proj[3].chunk.x)));
+    i32 max_chunk_y = Math::max(camera_proj[0].chunk.y, Math::max(camera_proj[1].chunk.y, Math::max(camera_proj[2].chunk.y, camera_proj[3].chunk.y)));
+    *min = Vec2i(min_chunk_x, min_chunk_y);
+    *max = Vec2i(max_chunk_x, max_chunk_y);
 }
 
 SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
@@ -228,47 +269,16 @@ SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
     sim->entity_count = 0;
     sim->entities = alloc_arr(sim_arena, sim->max_entity_count, SimEntity);
     
-    Vec3 rays[4] = {
-        world->camera.uv_to_world(Vec2(-1, -1)),
-        world->camera.uv_to_world(Vec2(-1, 1)),
-        world->camera.uv_to_world(Vec2(1, -1)),
-        world->camera.uv_to_world(Vec2(1, 1)),
-    };
-    f32 camera_t[4];
-    u32 n_projected = 0;
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, world->camera.pos, rays[0], camera_t + 0);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, world->camera.pos, rays[1], camera_t + 1);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, world->camera.pos, rays[2], camera_t + 2);
-    n_projected += (int)ray_intersect_plane(Vec3(0, 1, 0), 0, world->camera.pos, rays[3], camera_t + 3);
-    assert(n_projected == 4);
-    Vec3 camera_proj[4] = {
-        world->camera.pos + rays[0] * camera_t[0],
-        world->camera.pos + rays[1] * camera_t[1],
-        world->camera.pos + rays[2] * camera_t[2],
-        world->camera.pos + rays[3] * camera_t[3],
-    };
-    Vec2 camera_proj_xz[4] = {
-        Vec2(camera_proj[0].x, camera_proj[0].z),  
-        Vec2(camera_proj[1].x, camera_proj[1].z),  
-        Vec2(camera_proj[2].x, camera_proj[2].z),  
-        Vec2(camera_proj[3].x, camera_proj[3].z),  
-    };
-    WorldPosition camera_proj_world[4] = {
-        map_into_chunk_space(camera_proj_xz[0]),  
-        map_into_chunk_space(camera_proj_xz[1]),  
-        map_into_chunk_space(camera_proj_xz[2]),  
-        map_into_chunk_space(camera_proj_xz[3]),  
-    };
-    i32 min_chunk_x = Math::min(camera_proj_world[0].chunk.x, Math::min(camera_proj_world[1].chunk.x, Math::min(camera_proj_world[2].chunk.x, camera_proj_world[3].chunk.x)));
-    i32 min_chunk_y = Math::min(camera_proj_world[0].chunk.y, Math::min(camera_proj_world[1].chunk.y, Math::min(camera_proj_world[2].chunk.y, camera_proj_world[3].chunk.y)));
-    i32 max_chunk_x = Math::max(camera_proj_world[0].chunk.x, Math::max(camera_proj_world[1].chunk.x, Math::max(camera_proj_world[2].chunk.x, camera_proj_world[3].chunk.x)));
-    i32 max_chunk_y = Math::max(camera_proj_world[0].chunk.y, Math::max(camera_proj_world[1].chunk.y, Math::max(camera_proj_world[2].chunk.y, camera_proj_world[3].chunk.y)));
-    // @TODO do some render distance stuff or clamp camera movement
-    assert(max_chunk_y - min_chunk_y < 10);
-    assert(max_chunk_x - min_chunk_x < 10);
+    Vec2i min_chunk_coord, max_chunk_coord;
+    get_sim_region_bounds(&world->camera, &min_chunk_coord, &max_chunk_coord);
+    // @TODO actual render distance stuff
+    assert(max_chunk_coord.x - min_chunk_coord.x < 10);
+    assert(max_chunk_coord.y - min_chunk_coord.y < 10);
+    sim->origin.offset = Vec2(0);
+    sim->origin.chunk = min_chunk_coord;
     
-    for (i32 chunk_y = min_chunk_y; chunk_y <= max_chunk_y; ++chunk_y) {
-        for (i32 chunk_x = min_chunk_x; chunk_x <= max_chunk_x; ++chunk_x) {
+    for (i32 chunk_y = min_chunk_coord.y; chunk_y <= max_chunk_coord.y; ++chunk_y) {
+        for (i32 chunk_x = min_chunk_coord.x; chunk_x <= max_chunk_coord.x; ++chunk_x) {
             Vec2i chunk_coord = Vec2i(chunk_x, chunk_y);
             Chunk *chunk = get_world_chunk(world, chunk_coord);
             for (ChunkEntityBlock *block = &chunk->entity_block;
@@ -277,7 +287,11 @@ SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
                 for (size_t entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
                     EntityID id = block->entity_ids[entity_idx];
                     Entity *entity = get_entity(world, id);
-                    add_entity(sim, entity);
+                    
+                    assert(sim->entity_count < sim->max_entity_count);
+                    SimEntity *dest = sim->entities + sim->entity_count++;
+                    *dest = entity->sim;
+                    dest->p = world_difference(entity->world_pos, sim->origin);
                 }        
             }
         }
@@ -286,15 +300,22 @@ SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {
     return sim;
 }
 
-void end_sim(SimRegion *sim) {
+void end_sim(SimRegion *sim, Input *input) {
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = sim->entities + entity_idx;
-        WorldPosition new_position = map_into_chunk_space({}, entity->p);
-        change_entity_position(sim->world, entity->id, &get_entity(sim->world, entity->id)->world_pos, &new_position);
+        WorldPosition new_position = map_into_chunk_space(sim->origin, entity->p);
         Entity *world_ent = get_entity(sim->world, entity->id);
+        change_entity_position(sim->world, entity->id, &world_ent->world_pos, &new_position);
         world_ent->world_pos = new_position;
         world_ent->sim = *entity;
     }
+    
+    Vec2 camera_xz = Vec2(sim->world->camera.center_pos.x, sim->world->camera.center_pos.z);
+    WorldPosition camera_pos = map_into_chunk_space(sim->origin, camera_xz);
+    Vec2 new_camera_xz = global_position_from_world_position(camera_pos);
+    sim->world->camera.center_pos.x = new_camera_xz.x;
+    sim->world->camera.center_pos.z = new_camera_xz.y;
+    sim->world->camera.recalculate_matrices(input->winsize);
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -395,7 +416,7 @@ void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) {
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = &sim->entities[entity_idx];
         if (!(entity->flags & EntityFlags_IsBillboard)) {
-            Vec2i tile_pos = entity->tile_pos;
+            Vec2i tile_pos = entity->tile_pos - sim->origin.chunk * TILES_IN_CHUNK;
             Vec3 v[4];
             get_ground_tile_positions(tile_pos, v);
             imm_draw_quad(&world_render_group, v, entity->texture_id);

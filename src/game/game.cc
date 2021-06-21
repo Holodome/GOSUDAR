@@ -62,7 +62,7 @@ void game_update_and_render(Game *game) {
     SimRegion *sim = begin_sim(&game->frame_arena, &game->world);
     sim->frame_arena = &game->frame_arena;
     do_sim(sim, &game->input, &game->renderer, &game->assets);
-    end_sim(sim);
+    end_sim(sim, &game->input);
     temp_memory_end(sim_memory);
 
     RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,

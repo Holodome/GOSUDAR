@@ -33,9 +33,9 @@ struct SimEntity {
     EntityKind kind;
     u32 flags; // EntityFlags
     // For sim
+    Vec2 p;
     AssetID texture_id;
     Vec2 size; // texture size multiplier
-    Vec2 p;    // 
     Vec2i tile_pos;
 };  
 
@@ -89,6 +89,10 @@ void change_entity_position(World *world, EntityID id, WorldPosition *old_p, Wor
 struct SimRegion {
     MemoryArena *frame_arena;
     World *world;
+
+    // So in case player positions are some huge float numbers,
+    // map entities from world position to sim position and back after sim end
+    WorldPosition origin;
     
     size_t max_entity_count;
     size_t entity_count;
@@ -97,7 +101,7 @@ struct SimRegion {
 
 SimRegion *begin_sim(MemoryArena *sim_arena, World *world);
 void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) ;
-void end_sim(SimRegion *region);
+void end_sim(SimRegion *region, Input *input);
 
 #define WORLD_HH 1
 #endif

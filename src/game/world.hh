@@ -13,8 +13,6 @@ struct WorldPosition {
     Vec2 offset; // Offset in chunk, world coordinate units in [0; CHUNK_SIZE]
 };  
 
-// Chunk position that should never be reached
-inline WorldPosition null_position();
 // Add offset to base_pos and return new position
 inline WorldPosition pos_add(WorldPosition base_pos, Vec2 offset);
 inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);
@@ -81,8 +79,6 @@ struct ChunkEntityBlock {
 struct Chunk {
     ChunkEntityBlock entity_block;
     Vec2i coord;
-    
-    bool is_initialized;
     Chunk *next_in_hash;
 };
 
@@ -108,11 +104,13 @@ struct World {
     EntityID camera_followed_entity_idx;
 };  
 
-void world_init(World *world);
-void world_update(World *world, Input *input);
-void world_render(World *world, Renderer *renderer, Assets *assets);
+EntityID add_entity(World *world, EntityKind kind, WorldPosition pos);
 Entity *get_entity_by_id(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);
+void remove_entity_from_chunk(World *world, Chunk *chunk, EntityID id);
+// Place entity in new chunk and remove from previous if needed
+void change_entity_position_raw(World *world, EntityID entity_id, WorldPosition new_p, WorldPosition *old_p = 0);
+void change_entity_position(World *world, Entity *entity, WorldPosition new_p);
 
 struct SimEntityHash {
     SimEntity *ptr;
@@ -152,6 +150,15 @@ SimEntity *get_entity_by_id(SimRegion *sim, EntityID entity_id);
 SimEntity *add_entity_raw(SimRegion *sim, EntityID entity_id, Entity *source = 0);
 SimEntity *add_entity(SimRegion *sim, EntityID entity_id, Entity *source);
 
+struct EntityIterator {
+    size_t idx;
+    SimEntity *ptr;
+};
+
+// Iterate all not deleted entities
+EntityIterator iterate_all_entities(SimRegion *region);
+void advance(SimRegion *sim, EntityIterator *iter);
+
 // void load_entity_reference(SimRegion *sim, EntityReference *ref);
 // void store_entity_reference(EntityReference *ref);
 
@@ -164,6 +171,7 @@ struct GameState {
     u32 wood_count;
 };
 
+void world_init(World *world);
 void update_and_render_world(GameState *game_state, Input *input, Renderer *renderer, Assets *assets);
 
 #define WORLD_HH 1

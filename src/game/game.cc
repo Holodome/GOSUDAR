@@ -80,7 +80,7 @@ void game_update_and_render(Game *game) {
     Entity *player = get_entity_by_id(game->game_state.world, game->game_state.world->camera_followed_entity_idx);
     dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->sim.p.x, player->sim.p.y,
         player->world_pos.chunk.x, player->world_pos.chunk.y);
-    
+    dev_ui_labelf(&dev_ui, "Wood: %u", game->game_state.wood_count);    
     dev_ui_end(&dev_ui, &interface_render_group);
     game->os.update_window();
 }

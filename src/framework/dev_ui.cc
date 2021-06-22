@@ -174,7 +174,8 @@ bool dev_ui_button(DevUILayout *layout, const char *label) {
 
 static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
     assert(is_set(id));
-    u32 hash_slot = id.v % ARRAY_SIZE(ui->view_hash);
+    u32 hash_slot_init = id.v % ARRAY_SIZE(ui->view_hash);
+    u32 hash_slot = hash_slot_init;
     DevUIView *view = ui->view_hash + hash_slot;
     for (;;) {
         if (is_same(view->id, id)) {
@@ -184,6 +185,11 @@ static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
             view = view->next_in_hash;
         } else {
             DevUIView *new_view = ui->view_hash + (++hash_slot % ARRAY_SIZE(ui->view_hash));
+            if (hash_slot_init == hash_slot) {
+                assert(!"Out of space");
+                view = 0;
+                break;
+            }
             if (is_same(new_view->id, id_empty())) {
                 view->next_in_hash = new_view;
                 view = new_view;

@@ -30,12 +30,7 @@ struct Game {
     
     bool is_running;
     
-    bool draw_sprite_frames;
-    bool fullscreen;
-    u32 dev_mode; // DevMode
-    World world;
-    
-    MemoryArena frame_arena;
+    GameState game_state;
 };
 
 void game_init(Game *game);

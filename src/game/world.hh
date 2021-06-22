@@ -4,8 +4,6 @@
 
 #include "game/camera.hh"
 
-typedef u32 EntityID;
-
 #define TILE_SIZE 1.0f
 #define TILES_IN_CHUNK 4
 #define CHUNK_SIZE (1.0f * TILES_IN_CHUNK)
@@ -14,6 +12,14 @@ struct WorldPosition {
     Vec2i chunk; // Chunk coordinate
     Vec2 offset; // Offset in chunk, world coordinate units in [0; CHUNK_SIZE]
 };  
+
+// Chunk position that should never be reached
+inline WorldPosition null_position();
+// Add offset to base_pos and return new position
+inline WorldPosition pos_add(WorldPosition base_pos, Vec2 offset);
+inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);
+inline bool is_same_chunk(WorldPosition a, WorldPosition b);
+inline WorldPosition world_position_from_tile_position(Vec2i tile_position);
 
 enum struct EntityKind {
     None = 0x0,
@@ -27,17 +33,34 @@ enum EntityFlags {
     EntityFlags_IsDeleted = 0x2,
 };
 
+struct EntityID {
+    u32 value;    
+};  
+
+inline EntityID null_id();
+inline bool is_same(EntityID a, EntityID b);
+inline EntityID entity_id_from_storage_index(u32 index);
+
+// struct EntityReference {
+//     EntityID entity_id;
+//     struct SimEntity *ptr;
+// };  
+
 struct SimEntity {
-    // ID in world storage
-    EntityID id;
+    EntityID entity_id;
     EntityKind kind;
     u32 flags; // EntityFlags
     // For sim
+    // EntityReference ref;
     Vec2 p;
     AssetID texture_id;
     Vec2 size; // texture size multiplier
     Vec2i tile_pos;
 };  
+
+inline void add_flags(SimEntity *entity, u32 flags);
+inline void remove_flags(SimEntity *entity, u32 flags);
+inline bool is_set(SimEntity *entity, u32 flag);
 
 // Entity stored in world
 struct Entity {
@@ -48,7 +71,7 @@ struct Entity {
 
 struct ChunkEntityBlock {
     u32 entity_count;
-    EntityID entity_ids[16];
+    EntityID entity_storage_indices[16];
     ChunkEntityBlock *next;
 };  
 
@@ -70,7 +93,7 @@ struct SimCamera {
 };
 
 struct World {
-    MemoryArena world_arena;
+    MemoryArena *world_arena;
     MemoryArena *frame_arena;
     // Linked list free entry
     ChunkEntityBlock *first_free;
@@ -82,15 +105,22 @@ struct World {
     Entity *entities;
     
     SimCamera camera;
-    EntityID camera_followed_entity_id;
+    EntityID camera_followed_entity_idx;
 };  
 
 void world_init(World *world);
 void world_update(World *world, Input *input);
 void world_render(World *world, Renderer *renderer, Assets *assets);
-Entity *get_entity(World *world, EntityID id);
+Entity *get_entity_by_id(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);
 
+struct SimEntityHash {
+    SimEntity *ptr;
+    EntityID id;
+};
+
+#define SIM_REGION_ENTITY_COUNT 4096
+CT_ASSERT(IS_POW2(SIM_REGION_ENTITY_COUNT));
 // Represents part of the world that can be updated
 // While world is used for storing and accessing entities in different parts of the world,
 // sim region collates entities for similar postions, which is neccessary for updating due to floating point mistakes
@@ -110,11 +140,31 @@ struct SimRegion {
     size_t max_entity_count;
     size_t entity_count;
     SimEntity *entities;
+    // Mapping from EntityID, which is storage index in world to entity in sim region
+    // get_entity_by_id can be used to get sim entity by world id
+    SimEntityHash entity_hash[SIM_REGION_ENTITY_COUNT];
 };  
 
 SimRegion *begin_sim(MemoryArena *sim_arena, World *world);
-void do_sim(SimRegion *sim, Input *input, Renderer *renderer, Assets *assets) ;
-void end_sim(SimRegion *region, Input *input);
+void end_sim(SimRegion *region);
+SimEntityHash *get_hash_from_storage_index(SimRegion *sim, EntityID entity_id);
+SimEntity *get_entity_by_id(SimRegion *sim, EntityID entity_id);
+SimEntity *add_entity_raw(SimRegion *sim, EntityID entity_id, Entity *source = 0);
+SimEntity *add_entity(SimRegion *sim, EntityID entity_id, Entity *source);
+
+// void load_entity_reference(SimRegion *sim, EntityReference *ref);
+// void store_entity_reference(EntityReference *ref);
+
+// All game-related data is stored here. Like player resources, debug thigs etc.
+struct GameState {
+    MemoryArena arena;
+    MemoryArena frame_arena;
+    
+    World *world;
+    u32 wood_count;
+};
+
+void update_and_render_world(GameState *game_state, Input *input, Renderer *renderer, Assets *assets);
 
 #define WORLD_HH 1
 #endif

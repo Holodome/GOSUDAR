@@ -1,4 +1,3 @@
-#include "framework/profiler.cc"
 #include "framework/logger.cc"
 #include "framework/lexer.cc"
 #include "framework/os.cc"

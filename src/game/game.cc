@@ -3,7 +3,6 @@
 void game_init(Game *game) {
     logprintln("Game", "Init start");
     game->is_running = true;   
-    game->dev_mode = 0;
     
     game->os.init();
     game->os.init_renderer_backend();
@@ -20,12 +19,14 @@ void game_init(Game *game) {
     game->renderer.white_texture = game->assets.get_tex(Asset_White);
     
     size_t frame_arena_size = MEGABYTES(256);
-    arena_init(&game->frame_arena, os_alloc(frame_arena_size), frame_arena_size);
+    arena_init(&game->game_state.frame_arena, os_alloc(frame_arena_size), frame_arena_size);
     size_t world_arena_size = MEGABYTES(256);
-    arena_init(&game->world.world_arena, os_alloc(world_arena_size), world_arena_size);
-    
-    game->world.frame_arena = &game->frame_arena;
-    world_init(&game->world);
+    arena_init(&game->game_state.arena, os_alloc(world_arena_size), world_arena_size);
+    game->game_state.world = alloc_struct(&game->game_state.arena, World);
+    game->game_state.world->world_arena = &game->game_state.arena;
+    game->game_state.world->frame_arena = &game->game_state.frame_arena;
+    game->game_state.wood_count = 0;
+    world_init(game->game_state.world);
     f32 init_end = game->os.get_time();
     
     size_t dev_ui_arena_size = MEGABYTES(8);
@@ -39,8 +40,8 @@ void game_init(Game *game) {
 
 void game_cleanup(Game *game) {
     logprintln("Game", "Cleanup");
-    os_free(game->frame_arena.data);
-    os_free(game->world.world_arena.data);
+    os_free(game->game_state.frame_arena.data);
+    os_free(game->game_state.arena.data);
     // Mem::free(game->dev_ui.arena.data);
     game->assets.cleanup();
     os_free(game->assets.arena.data);
@@ -50,7 +51,6 @@ void game_cleanup(Game *game) {
 }
 
 void game_update_and_render(Game *game) {
-    arena_clear(&game->frame_arena);
     game->os.update_input(&game->input);
     game->input.update();
 #define MIN_DT 0.001f
@@ -64,13 +64,8 @@ void game_update_and_render(Game *game) {
     game->renderer.begin_frame();
     game->renderer.set_draw_region(game->input.winsize);
     game->renderer.clear(Vec4(0.2));
-    
-    TempMemory sim_memory = temp_memory_begin(&game->frame_arena);
-    SimRegion *sim = begin_sim(&game->frame_arena, &game->world);
-    sim->frame_arena = &game->frame_arena;
-    do_sim(sim, &game->input, &game->renderer, &game->assets);
-    end_sim(sim, &game->input);
-    temp_memory_end(sim_memory);
+
+    update_and_render_world(&game->game_state, &game->input, &game->renderer, &game->assets);
 
     RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,
         Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0));
@@ -81,8 +76,8 @@ void game_update_and_render(Game *game) {
     game->dev_ui.is_mouse_pressed = game->input.is_key_held(Key::MouseLeft);
     DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
-        game->renderer.statistics.draw_call_count, game->world.entity_count);
-    Entity *player = get_entity(&game->world, game->world.camera_followed_entity_id);
+        game->renderer.statistics.draw_call_count, game->game_state.world->entity_count);
+    Entity *player = get_entity_by_id(game->game_state.world, game->game_state.world->camera_followed_entity_idx);
     dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->sim.p.x, player->sim.p.y,
         player->world_pos.chunk.x, player->world_pos.chunk.y);
     

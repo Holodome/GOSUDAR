@@ -11,6 +11,8 @@
 #undef min
 #endif 
 
+#define IS_POW2(_x) (!(_x & (_x - 1)))
+
 namespace Math {
     const f32 HALF_PI = 1.57079632679f;
     const f32 PI = 3.14159265359f;

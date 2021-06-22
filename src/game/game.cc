@@ -53,13 +53,13 @@ void game_update_and_render(Game *game) {
     arena_clear(&game->frame_arena);
     game->os.update_input(&game->input);
     game->input.update();
-    DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
+#define MIN_DT 0.001f
+#define MAX_DT 0.1f
+    game->input.dt = Math::clamp(game->input.dt, MIN_DT, MAX_DT);
     
     if (game->input.is_quit_requested) {
         game->is_running = false;
     }
-    
-    dev_ui_labelf(&dev_ui, "FPS: %f; DT: %ums", 1.0f / game->input.dt, (u32)(game->input.dt * 1000));
     
     game->renderer.begin_frame();
     game->renderer.set_draw_region(game->input.winsize);
@@ -75,6 +75,17 @@ void game_update_and_render(Game *game) {
     RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,
         Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0));
     interface_render_group.has_depth = false;
+    
+    game->dev_ui.mouse_d = game->input.mdelta;
+    game->dev_ui.mouse_p = game->input.mpos;
+    game->dev_ui.is_mouse_pressed = game->input.is_key_held(Key::MouseLeft);
+    DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
+    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
+        game->renderer.statistics.draw_call_count, game->world.entity_count);
+    Entity *player = get_entity(&game->world, game->world.camera_followed_entity_id);
+    dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->sim.p.x, player->sim.p.y,
+        player->world_pos.chunk.x, player->world_pos.chunk.y);
+    
     dev_ui_end(&dev_ui, &interface_render_group);
     game->os.update_window();
 }

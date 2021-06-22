@@ -230,8 +230,9 @@ static Vec2 world_position_to_camera_position(WorldPosition pos) {
 }
 
 static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i *max) {
-    *min = Vec2i(camera_coord.chunk.x - 10, camera_coord.chunk.y - 10);
-    *max = Vec2i(camera_coord.chunk.x + 10, camera_coord.chunk.y + 10);
+#define REGION_CHUNK_RADIUS 3
+    *min = Vec2i(camera_coord.chunk.x - REGION_CHUNK_RADIUS, camera_coord.chunk.y - REGION_CHUNK_RADIUS);
+    *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
 
 SimRegion *begin_sim(MemoryArena *sim_arena, World *world) {

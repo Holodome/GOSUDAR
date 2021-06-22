@@ -9,6 +9,12 @@ struct DevUIID {
     u32 v;
 };  
 
+struct DevUIView {
+    DevUIID id;
+    bool is_opened;
+    DevUIView *next_in_hash;
+};
+
 struct DevUI {
     MemoryArena arena;
     
@@ -17,6 +23,7 @@ struct DevUI {
     bool is_mouse_pressed;
     
     DevUIID active_id;
+    DevUIView view_hash[128];
     
     AssetInfo *font_info;
     FontData *font;
@@ -46,6 +53,8 @@ DevUILayout dev_ui_begin(DevUI *dev_ui);
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout);
+bool dev_ui_section(DevUILayout *layout, const char *name);
+void dev_ui_end_section(DevUILayout *layout);
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group);
 
 #define DEVUI_HH 1

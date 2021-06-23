@@ -41,9 +41,25 @@ void Assets::init() {
     this->asset_infos[Asset_Grass].kind = AssetKind::Image;
     this->asset_infos[Asset_Grass].state = AssetState::Unloaded;
     
-    this->asset_infos[Asset_Tree].filename = "tree.png";
-    this->asset_infos[Asset_Tree].kind = AssetKind::Image;
-    this->asset_infos[Asset_Tree].state = AssetState::Unloaded;
+    this->asset_infos[Asset_TreeForest].filename = "tree.png";
+    this->asset_infos[Asset_TreeForest].kind = AssetKind::Image;
+    this->asset_infos[Asset_TreeForest].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_TreeJungle].filename = "jungle.png";
+    this->asset_infos[Asset_TreeJungle].kind = AssetKind::Image;
+    this->asset_infos[Asset_TreeJungle].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_TreeDesert].filename = "cactus.png";
+    this->asset_infos[Asset_TreeDesert].kind = AssetKind::Image;
+    this->asset_infos[Asset_TreeDesert].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_GoldVein].filename = "gold.png";
+    this->asset_infos[Asset_GoldVein].kind = AssetKind::Image;
+    this->asset_infos[Asset_GoldVein].state = AssetState::Unloaded;
+    
+    this->asset_infos[Asset_SelectCircle].filename = "select.png";
+    this->asset_infos[Asset_SelectCircle].kind = AssetKind::Image;
+    this->asset_infos[Asset_SelectCircle].state = AssetState::Unloaded;
     
     this->asset_infos[Asset_WoodIcon].filename = "wood_icon.png";
     this->asset_infos[Asset_WoodIcon].kind = AssetKind::Image;

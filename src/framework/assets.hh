@@ -7,7 +7,11 @@
 enum AssetCategory {
     Asset_White,
     Asset_Dude,
-    Asset_Tree,
+    Asset_TreeForest,
+    Asset_TreeJungle,
+    Asset_TreeDesert,
+    Asset_SelectCircle,
+    Asset_GoldVein,
     Asset_Font,
     Asset_FontAtlas,
     Asset_Grass,

@@ -152,8 +152,9 @@ struct SimRegion {
     Vec2i max_chunk;
     // Local space camera
     SimCamera cam;
+    // @CLEAN this is here only because we couldn't do zsort ourselves!
     Vec3 cam_p;
-    Mat4x4 cam_mvp;
+    Mat4x4 cam_mvp; 
     
     size_t max_entity_count;
     size_t entity_count;

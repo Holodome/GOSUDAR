@@ -351,9 +351,9 @@ void game_state_init(GameState *game_state) {
     // Initialize game_state params
     game_state->min_chunk = Vec2i(0);
     game_state->max_chunk = Vec2i(9);
-    game_state->camera.distance_from_player = 5.0f;
-    game_state->camera.pitch = 0.0f;
-    game_state->camera.yaw = 0.0f;
+    game_state->camera.distance_from_player = 3.0f;
+    game_state->camera.pitch = Math::HALF_PI * 0.5f;
+    game_state->camera.yaw = Math::HALF_PI * 1.5f;
     game_state->wood_count = 0;
     game_state->gold_count = 0;
     // Initialize world struct
@@ -476,7 +476,9 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
         sim->cam.yaw += x_angle_change;
         sim->cam.yaw = Math::unwind_rad(sim->cam.yaw);
         sim->cam.pitch += y_angle_change;
-        sim->cam.pitch = Math::clamp(sim->cam.pitch, 0.01f, Math::HALF_PI - 0.01f);
+#define MIN_CAM_PITCH (Math::HALF_PI * 0.1f)
+#define MAX_CAM_PITCH (Math::HALF_PI * 0.9f)
+        sim->cam.pitch = Math::clamp(sim->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         sim->cam.distance_from_player -= input->mwheel;
     }
     

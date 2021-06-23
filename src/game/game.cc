@@ -74,7 +74,7 @@ void game_update_and_render(Game *game) {
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
         game->renderer.statistics.draw_call_count, game->game_state.world->entity_count);
     Entity *player = get_world_entity(game->game_state.world, game->game_state.camera_followed_entity_id);
-    dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->sim.p.x, player->sim.p.y,
+    dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->world_pos.offset.x, player->world_pos.offset.y,
         player->world_pos.chunk.x, player->world_pos.chunk.y);
     dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game->game_state.wood_count, game->game_state.gold_count);    
     dev_ui_end(&dev_ui, &interface_render_group);

@@ -461,7 +461,7 @@ static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i 
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
 
-void update_and_render(GameState *game_state, Input *input, Renderer *renderer, Assets *assets) {
+void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets) {
     arena_clear(&game_state->frame_arena);
     // Since camera follows some entity and is never too far from it, we can assume that camera position is
     // the position of followed entity
@@ -602,8 +602,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
     
-    RenderGroup world_render_group = render_group_begin(renderer, assets, sim->cam_mvp);
-    world_render_group.has_depth = true;
+    RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
     // Draw ground
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
         for (i32 chunk_y = sim->min_chunk.y; chunk_y <= sim->max_chunk.y; ++chunk_y) {
@@ -616,7 +615,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
                     Vec2i tile_pos = (Vec2i(chunk_x, chunk_y) - sim->min_chunk) * TILES_IN_CHUNK + Vec2i(tile_x, tile_y);
                     Vec3 tile_v[4];
                     get_ground_tile_positions(tile_pos, tile_v);
-                    imm_draw_quad(&world_render_group, tile_v, Asset_Grass);
+                    push_quad(&world_render_group, tile_v, Asset_Grass);
                 }
             }
         }
@@ -631,7 +630,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
             Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
             Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
             Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-            imm_draw_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, WORLD_EPSILON);
+            push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, WORLD_EPSILON);
         }
     }
     // Highlight selected entity    
@@ -644,7 +643,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
         v[1] = xz(entity_p + Vec2(-half_size.x, half_size.y), WORLD_EPSILON);
         v[2] = xz(entity_p + Vec2(half_size.x, -half_size.y), WORLD_EPSILON);
         v[3] = xz(entity_p + Vec2(half_size.x, half_size.y), WORLD_EPSILON);
-        imm_draw_quad(&world_render_group, v, Asset_SelectCircle);
+        push_quad(&world_render_group, v, Asset_SelectCircle);
     }
     size_t max_drawable_count = sim->entity_count;
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
@@ -699,7 +698,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
         Vec3 billboard[4];
         Vec3 pos = Vec3(entity->p.x, 0, entity->p.y);
         get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), size.x, size.y, billboard);
-        imm_draw_quad(&world_render_group, billboard, texture_id);
+        push_quad(&world_render_group, billboard, texture_id);
     }
     render_group_end(&world_render_group); 
     game_state->DEBUG_last_frame_sim_region_entity_count = sim->entity_count;

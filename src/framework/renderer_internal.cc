@@ -130,23 +130,3 @@ opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GL
     fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n",
 			source_str, type_str, severity_str, id, message);
 }
-
-Texture create_texture_internal(const void *buffer, Vec2i size) {
-    GLuint id;
-    glGenTextures(1, &id);
-    glBindTexture(GL_TEXTURE_2D, id);
-    glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureStorage2D(id, 1, GL_RGBA8, size.x, size.y);
-    glTextureSubImage2D(id, 0, 0, 0, size.x, size.y, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-    Texture result;
-    result.id = id;
-    return result;
-}
-
-void bind_texture(Texture *texture, u32 unit = 0) {
-    glActiveTexture(GL_TEXTURE0 + unit);
-    glBindTexture(GL_TEXTURE_2D, texture->id);
-}

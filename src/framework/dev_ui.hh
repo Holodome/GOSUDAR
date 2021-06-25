@@ -17,6 +17,7 @@ struct DevUIView {
 
 struct DevUI {
     MemoryArena arena;
+    Assets *assets;
     
     Vec2 mouse_p;
     Vec2 mouse_d;
@@ -31,7 +32,7 @@ struct DevUI {
 
 struct DevUIDrawQueueEntry {
     Vertex v[4];
-    AssetID tex_id;
+    Texture texture;
 };  
 
 struct DevUILayout {

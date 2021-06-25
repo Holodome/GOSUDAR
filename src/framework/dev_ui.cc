@@ -30,7 +30,7 @@ static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = Colors::white
     entry.v[3].p = Vec3(rect.bottom_right());
     entry.v[3].uv = uv_rect.bottom_right();
     entry.v[3].c = color;
-    entry.tex_id = tex_id;
+    entry.texture = layout->dev_ui->assets->get_tex(tex_id);
     
     assert(layout->draw_queue_entry_count < layout->max_draw_queue_entry_count);
     layout->draw_queue[layout->draw_queue_entry_count++] = entry;
@@ -224,7 +224,10 @@ void dev_ui_end_section(DevUILayout *layout) {
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
     for (size_t i = 0; i < layout->draw_queue_entry_count; ++i) {
         DevUIDrawQueueEntry *entry = layout->draw_queue + i;
-        imm_draw_v(render_group, entry->v, entry->tex_id);
+        push_quad(render_group, entry->v[0].p, entry->v[1].p, entry->v[2].p, entry->v[3].p, 
+            entry->v[0].c, entry->v[1].c, entry->v[2].c, entry->v[3].c, 
+            entry->v[0].uv, entry->v[1].uv, entry->v[2].uv, entry->v[3].uv,
+            entry->texture);
     }
     temp_memory_end(layout->temp_mem);
     layout->dev_ui->active_id = layout->active_id;

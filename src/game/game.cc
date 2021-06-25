@@ -9,7 +9,7 @@ void game_init(Game *game) {
     f32 init_start = game->os.get_time();
     size_t renderer_arena_size = MEGABYTES(256);
     arena_init(&game->renderer.arena, os_alloc(renderer_arena_size), renderer_arena_size);
-    game->renderer.init();
+    renderer_init(&game->renderer);
     
     size_t assets_arena_size = MEGABYTES(256);
     arena_init(&game->assets.arena, os_alloc(assets_arena_size), assets_arena_size);
@@ -27,6 +27,7 @@ void game_init(Game *game) {
     
     size_t dev_ui_arena_size = MEGABYTES(8);
     arena_init(&game->dev_ui.arena, os_alloc(dev_ui_arena_size), dev_ui_arena_size);
+    game->dev_ui.assets = &game->assets;
     dev_ui_init(&game->dev_ui, &game->assets);
     logprintln("Game", "Init took %llums", (u64)((init_end - init_start) * 1000));
 }
@@ -38,7 +39,7 @@ void game_cleanup(Game *game) {
     // Mem::free(game->dev_ui.arena.data);
     game->assets.cleanup();
     os_free(game->assets.arena.data);
-    game->renderer.cleanup();
+    renderer_cleanup(&game->renderer);
     os_free(game->renderer.arena.data);
     game->os.cleanup();
 }
@@ -55,15 +56,10 @@ void game_update_and_render(Game *game) {
         game->is_running = false;
     }
     
-    game->renderer.begin_frame();
-    game->renderer.set_draw_region(game->input.winsize);
-    game->renderer.clear(Vec4(0.2));
-
-    update_and_render(&game->game_state, &game->input, &game->renderer, &game->assets);
-
-    RenderGroup interface_render_group = render_group_begin(&game->renderer, &game->assets,
-        Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0));
-    interface_render_group.has_depth = false;
+    RendererCommands *commands = renderer_begin_frame(&game->renderer, game->input.winsize, Vec4(0.2));
+    update_and_render(&game->game_state, &game->input, commands, &game->assets);
+    RenderGroup interface_render_group = render_group_begin(commands, &game->assets,
+        setup_2d(Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0)));
     
     game->dev_ui.mouse_d = game->input.mdelta;
     game->dev_ui.mouse_p = game->input.mpos;
@@ -84,5 +80,6 @@ void game_update_and_render(Game *game) {
         
     }
     dev_ui_end(&dev_ui, &interface_render_group);
+    renderer_end_frame(&game->renderer);
     game->os.update_window();
 }

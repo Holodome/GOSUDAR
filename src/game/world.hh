@@ -242,7 +242,7 @@ struct GameState {
 };
 
 void game_state_init(GameState *game_state);
-void update_and_render(GameState *game_state, Input *input, Renderer *renderer, Assets *assets);
+void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets);
 
 #define WORLD_HH 1
 #endif

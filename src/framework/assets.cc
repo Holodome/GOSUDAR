@@ -96,6 +96,11 @@ AssetInfo *Assets::get_info(AssetID id) {
 }
 
 Texture Assets::get_tex(AssetID id) {
+    // @CLEANUP
+    if (id == (u32)-1) {
+        id = Asset_White;
+    }
+    
     AssetInfo *info = this->get_info(id);
     assert(info->kind == AssetKind::Image);
     if (info->state == AssetState::Loaded) {
@@ -113,7 +118,7 @@ Texture Assets::get_tex(AssetID id) {
         Vec2i tex_size = Vec2i(w, h);
         Mem::free(buffer);
         
-        Texture tex = renderer->create_texture(data, tex_size);
+        Texture tex = renderer_create_texture(this->renderer, data, tex_size);
         size_t idx = this->texture_count++;
         this->textures[idx] = tex;
         Mem::free(data);
@@ -166,7 +171,7 @@ FontData *Assets::get_font(AssetID id) {
         
         size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
-        this->textures[this->texture_count] = renderer->create_texture(atlas_data, Vec2i(atlas_width, atlas_height));
+        this->textures[this->texture_count] = renderer_create_texture(this->renderer, atlas_data, Vec2i(atlas_width, atlas_height));
         AssetInfo *tex_info = this->get_info(Asset_FontAtlas);
         tex_info->state = AssetState::Loaded;
         tex_info->array_entry_idx = this->texture_count;

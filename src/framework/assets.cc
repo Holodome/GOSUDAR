@@ -69,6 +69,10 @@ void Assets::init() {
     this->asset_infos[Asset_Building].kind = AssetKind::Image;
     this->asset_infos[Asset_Building].state = AssetState::Unloaded;
     
+    this->asset_infos[Asset_Building1].filename = "building1.png";
+    this->asset_infos[Asset_Building1].kind = AssetKind::Image;
+    this->asset_infos[Asset_Building1].state = AssetState::Unloaded;
+    
     this->asset_infos[Asset_Font].filename = "c:/windows/fonts/consola.ttf";
     this->asset_infos[Asset_Font].kind = AssetKind::Font;
     this->asset_infos[Asset_Font].state = AssetState::Unloaded;

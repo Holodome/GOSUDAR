@@ -57,6 +57,12 @@ WorldPosition world_position_from_tile_position(Vec2i tile_position) {
     return result;
 }
 
+WorldPosition world_position_floor_to_cell(WorldPosition pos) {
+    pos.offset.x = floorf(pos.offset.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+    pos.offset.y = floorf(pos.offset.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+    return pos;
+}
+
 Vec2 DEBUG_world_pos_to_p(WorldPosition pos) {
     WorldPosition base_pos = {};
     return distance_between_pos(pos, base_pos);    
@@ -78,18 +84,6 @@ inline EntityID entity_id_from_storage_index(u32 index) {
     EntityID result;
     result.value = index;
     return result;    
-}
-
-void add_flags(SimEntity *entity, u32 flags) {
-    entity->flags |= flags;
-}
-
-void remove_flags(SimEntity *entity, u32 flags) {
-    entity->flags &= ~flags;
-}
-
-bool is_set(SimEntity *entity, u32 flag) {
-    return (bool)(entity->flags & flag);
 }
 
 EntityID add_world_entity(World *world, WorldPosition pos) {
@@ -232,13 +226,13 @@ void end_sim(SimRegion *sim) {
         SimEntity *entity = sim->entities + entity_idx;
         // Place entity in world 
         WorldPosition new_position = pos_add(sim->origin, entity->p);
-        if (is_same(entity->id, null_id()) && !is_set(entity, EntityFlags_IsDeleted)) {
+        if (is_same(entity->id, null_id()) && !(entity->flags & ENTITY_FLAG_IS_DELETED)) {
             entity->id = add_world_entity(sim->game_state->world, new_position);
             Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
             world_ent->sim = *entity;
         } else {
             Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
-            if (is_set(entity, EntityFlags_IsDeleted)) {
+            if (entity->flags & ENTITY_FLAG_IS_DELETED) {
                 Chunk *old_chunk = get_world_chunk(sim->game_state->world, world_ent->world_pos.chunk);
                 remove_entity_from_chunk(sim->game_state->world, old_chunk, entity->id);
             } else {
@@ -302,7 +296,7 @@ SimEntity *create_entity(SimRegion *sim) {
 }
 
 static void set_entity_to_next_not_deleted(EntityIterator *iter) {
-    while ((iter->idx < iter->sim->entity_count) && is_set(iter->sim->entities + iter->idx, EntityFlags_IsDeleted)) {
+    while ((iter->idx < iter->sim->entity_count) && (iter->sim->entities[iter->idx].flags & ENTITY_FLAG_IS_DELETED)) {
         ++iter->idx;
     }
     
@@ -329,23 +323,35 @@ void advance(EntityIterator *iter) {
 static EntityID add_player(World *world) {
     EntityID entity_id = add_world_entity(world, {});
     Entity *entity = get_world_entity(world, entity_id);
-    entity->sim.kind = EntityKind_Player;
+    entity->sim.kind = ENTITY_KIND_PLAYER;
     return entity_id;
 }
 
 static EntityID add_tree(World *world, WorldPosition pos) {
-    // Vec2 tree_p = world_pos_to_p(pos);
-    // Vec2i tile_p = Vec2i(tree_p / CELL_SIZE);
-    pos.offset.x = floorf(pos.offset.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
-    pos.offset.y = floorf(pos.offset.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+    pos = world_position_floor_to_cell(pos);
     
     EntityID entity_id = add_world_entity(world, pos);
     Entity *entity = get_world_entity(world, entity_id);
-    entity->sim.kind = EntityKind_WorldObject;
-    entity->sim.world_object = (WorldObjectKind)(rand() % 3 + 1);
-    entity->sim.world_object_flags = WorldObjectFlags_IsTree;
+    entity->sim.kind = ENTITY_KIND_WORLD_OBJECT;
+    entity->sim.world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
+    entity->sim.world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
+    entity->sim.resource_kind = RESOURCE_KIND_WOOD;
     entity->sim.resource_interactions_left = 1;
-    // entity->sim.min_cell = tile_p;
+    entity->sim.resource_gain = 2;
+    return entity_id;
+}
+
+static EntityID add_gold_vein(World *world, WorldPosition pos) {
+    pos = world_position_floor_to_cell(pos);
+    
+    EntityID entity_id = add_world_entity(world, pos);
+    Entity *entity = get_world_entity(world, entity_id);
+    entity->sim.kind = ENTITY_KIND_WORLD_OBJECT;
+    entity->sim.world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
+    entity->sim.world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
+    entity->sim.resource_kind = RESOURCE_KIND_GOLD;
+    entity->sim.resource_interactions_left = 5;
+    entity->sim.resource_gain = 10;
     return entity_id;
 }
 
@@ -382,6 +388,15 @@ void game_state_init(GameState *game_state) {
         tree_p.offset.x = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
         tree_p.offset.y = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
         add_tree(game_state->world, tree_p);
+    }
+    
+    for (size_t i = 0; i < 50; ++i) {
+        WorldPosition p;
+        p.chunk.x = rand() % 10;
+        p.chunk.y = rand() % 10;
+        p.offset.x = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
+        p.offset.y = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
+        add_gold_vein(game_state->world, p);
     }
 }
 
@@ -499,7 +514,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
         SimEntity *entity = iter.ptr;
         
         switch (entity->kind) {
-            case EntityKind_Player: {
+            case ENTITY_KIND_PLAYER: {
                 if (!game_state->is_player_interacting) {
                     entity->p += player_delta;
                     // Find closest interactable
@@ -509,7 +524,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
                         tree_iter.ptr;
                         advance(&tree_iter)) {
                         SimEntity *test_entity = tree_iter.ptr;
-                        if (test_entity->kind == EntityKind_WorldObject) {
+                        if (test_entity->kind == ENTITY_KIND_WORLD_OBJECT) {
                             f32 d_sq = Math::length_sq(test_entity->p - entity->p);
                             if (d_sq < interact_distance_sq && d_sq < closest_so_far) {
                                 closest_so_far = d_sq;
@@ -528,13 +543,21 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
             if (game_state->is_player_interacting) {
                 game_state->interaction_current_time += input->dt;
                 if (game_state->interaction_current_time >= game_state->interaction_time) {
-                    game_state->interactable = null_id();
                     game_state->is_player_interacting = false;
-                    if (ent->world_object_flags & WorldObjectFlags_IsTree) {
+                    if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
                         ent->resource_interactions_left -= 1;
-                        game_state->wood_count += 1;
+                        switch (ent->resource_kind) {
+                            case RESOURCE_KIND_WOOD: {
+                                game_state->wood_count += ent->resource_gain;
+                            } break;
+                            case RESOURCE_KIND_GOLD: {
+                                game_state->gold_count += ent->resource_gain;
+                            } break;
+                            INVALID_DEFAULT_CASE;
+                        }
                         if (ent->resource_interactions_left == 0) {
-                            add_flags(ent, EntityFlags_IsDeleted);
+                            ent->flags |= ENTITY_FLAG_IS_DELETED;
+                            game_state->interactable = null_id();
                         }
                     } else {
                         assert(false);
@@ -543,7 +566,7 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
             } else {
                 f32 interaction_time;
                 assert(ent->resource_interactions_left > 0);
-                if (ent->world_object_flags & WorldObjectFlags_IsTree) {
+                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
                     interaction_time = 1.0f;
                 } else {
                     assert(false);
@@ -642,27 +665,35 @@ void update_and_render(GameState *game_state, Input *input, Renderer *renderer, 
         AssetID texture_id;
         Vec2 size;
         switch(entity->kind) {
-            case EntityKind_Player: {
+            case ENTITY_KIND_PLAYER: {
                 texture_id = Asset_Dude;
                 size = Vec2(0.5f);
             } break;
-            case EntityKind_WorldObject: {
-                switch(entity->world_object) {
-                    case WorldObjectKind_TreeForest: {
+            case ENTITY_KIND_WORLD_OBJECT: {
+                switch(entity->world_object_kind) {
+                    case WORLD_OBJECT_KIND_TREE_FOREST: {
                         texture_id = Asset_TreeForest;
                     } break;
-                    case WorldObjectKind_TreeJungle: {
+                    case WORLD_OBJECT_KIND_TREE_JUNGLE: {
                         texture_id = Asset_TreeJungle;
                     } break;
-                    case WorldObjectKind_TreeDesert: {
+                    case WORLD_OBJECT_KIND_TREE_DESERT: {
                         texture_id = Asset_TreeDesert;
                     } break;
-                    case WorldObjectKind_GoldDeposit: {
+                    case WORLD_OBJECT_KIND_GOLD_DEPOSIT: {
                         texture_id = Asset_GoldVein;
                     } break;
+                    case WORLD_OBJECT_KIND_BUILDING1: {
+                        texture_id = Asset_Building;
+                    } break;
+                    case WORLD_OBJECT_KIND_BUILDING2: {
+                        texture_id = Asset_Building1;
+                    } break;
+                    INVALID_DEFAULT_CASE;
                 }
                 size = Vec2(0.5f);
             } break;
+            INVALID_DEFAULT_CASE;
         }
         
         Vec3 billboard[4];

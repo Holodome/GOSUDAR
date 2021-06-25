@@ -17,6 +17,7 @@ enum AssetCategory {
     Asset_Grass,
     Asset_WoodIcon,
     Asset_Building,
+    Asset_Building1,
     Asset_Count
 };  
 

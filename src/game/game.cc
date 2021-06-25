@@ -28,9 +28,6 @@ void game_init(Game *game) {
     size_t dev_ui_arena_size = MEGABYTES(8);
     arena_init(&game->dev_ui.arena, os_alloc(dev_ui_arena_size), dev_ui_arena_size);
     dev_ui_init(&game->dev_ui, &game->assets);
-    // Effectively it is not whole init time, but time of game initialization-related routines,
-    // cause there is little point in recording time spend on os-related stuff. It should be profiled separately
-    // and is (probably) inconsistent due to tf os does 
     logprintln("Game", "Init took %llums", (u64)((init_end - init_start) * 1000));
 }
 
@@ -48,11 +45,12 @@ void game_cleanup(Game *game) {
 
 void game_update_and_render(Game *game) {
     game->os.update_input(&game->input);
-    game->input.update();
 #define MIN_DT 0.001f
 #define MAX_DT 0.1f
     game->input.dt = Math::clamp(game->input.dt, MIN_DT, MAX_DT);
-    
+    if (game->input.is_key_pressed(Key::Escape)) {
+        game->is_running = false;
+    }    
     if (game->input.is_quit_requested) {
         game->is_running = false;
     }
@@ -71,12 +69,20 @@ void game_update_and_render(Game *game) {
     game->dev_ui.mouse_p = game->input.mpos;
     game->dev_ui.is_mouse_pressed = game->input.is_key_held(Key::MouseLeft);
     DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
-    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
-        game->renderer.statistics.draw_call_count, game->game_state.world->entity_count);
+    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu; S: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
+        game->renderer.statistics.draw_call_count, game->game_state.world->entity_count,
+        game->game_state.DEBUG_last_frame_sim_region_entity_count);
     Entity *player = get_world_entity(game->game_state.world, game->game_state.camera_followed_entity_id);
-    dev_ui_labelf(&dev_ui, "P: (%.3f %.3f); Chunk: (%d %d)", player->world_pos.offset.x, player->world_pos.offset.y,
+    Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
+    dev_ui_labelf(&dev_ui, "P: (%.2f %.2f); O: (%.3f %.3f); Chunk: (%d %d)", 
+        player_pos.x, player_pos.y,
+        player->world_pos.offset.x, player->world_pos.offset.y,
         player->world_pos.chunk.x, player->world_pos.chunk.y);
     dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game->game_state.wood_count, game->game_state.gold_count);    
+    if (game->game_state.is_player_interacting) {
+        dev_ui_labelf(&dev_ui, "I: %u%%", (i32)(game->game_state.interaction_current_time / game->game_state.interaction_time * 100));    
+        
+    }
     dev_ui_end(&dev_ui, &interface_render_group);
     game->os.update_window();
 }

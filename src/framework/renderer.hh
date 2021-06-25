@@ -73,6 +73,25 @@ RenderGroup render_group_begin(Renderer *renderer, Assets *assets, Mat4x4 mvp);
 void render_group_set_texture(RenderGroup *group, AssetID texture_id);
 void render_group_end(RenderGroup *group);
 
+enum RendererCommand {
+    RendererCommand_Clear,
+    RendererCommand_Quads
+};
+
+struct RendererCommands {
+    size_t max_command_buffer_size;
+    u8 *push_buffer_at;
+    u8 *push_buffer_data_at;
+    
+    size_t max_vertex_count;
+    size_t vertex_count;
+    Vertex *vertices;
+    
+    size_t max_index_count;
+    size_t index_count;
+    u32 *indices;
+};
+
 struct Renderer {
     MemoryArena arena;
     

@@ -2,7 +2,7 @@
 
 #include "lib/lib.hh"
 
-#include "game/camera.hh"
+#define WORLD_EPSILON 0.001f
 
 #define TILE_SIZE 1.0f
 #define TILES_IN_CHUNK 4
@@ -20,7 +20,7 @@ struct WorldPosition {
 inline WorldPosition pos_add(WorldPosition base_pos, Vec2 offset);
 inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);
 inline bool is_same_chunk(WorldPosition a, WorldPosition b);
-inline Vec2 world_pos_to_p(WorldPosition pos);
+inline Vec2 DEBUG_world_pos_to_p(WorldPosition pos);
 inline WorldPosition world_position_from_tile_position(Vec2i tile_position);
 
 enum EntityKind {
@@ -45,6 +45,7 @@ struct EntityID {
 
 inline EntityID null_id();
 inline bool is_same(EntityID a, EntityID b);
+inline bool is_not_null(EntityID a);
 inline EntityID entity_id_from_storage_index(u32 index);
 
 enum WorldObjectKind {
@@ -58,7 +59,7 @@ enum WorldObjectKind {
 };
 
 struct SimEntity {
-    EntityID entity_id;
+    EntityID id;
     EntityKind kind;
     u32 flags; // EntityFlags
     // For sim
@@ -67,7 +68,8 @@ struct SimEntity {
     // WorldObject
     WorldObjectKind world_object;
     u32 world_object_flags;
-    Vec2i min_cell;
+    // Vec2i min_cell;
+    u32 resource_interactions_left;
 };  
 
 inline void add_flags(SimEntity *entity, u32 flags);
@@ -142,16 +144,13 @@ CT_ASSERT(IS_POW2(SIM_REGION_ENTITY_COUNT));
 // Also it provides space partitioning
 // This is going to be very computationally heavy piece of data, so we better do copies here instead of using pointers to world
 struct SimRegion {
-    MemoryArena *frame_arena;
-    // World *world;
+    // @TODO think if we need this back-pointer
     struct GameState *game_state;
     // So in case player positions are some huge float numbers,
     // map entities from world position to sim position and back after sim end
     WorldPosition origin;
     Vec2i min_chunk;
     Vec2i max_chunk;
-    // Local space camera
-    SimCamera cam;
     // @CLEAN this is here only because we couldn't do zsort ourselves!
     Vec3 cam_p;
     Mat4x4 cam_mvp; 
@@ -200,7 +199,7 @@ struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
-    SimCamera camera;
+    SimCamera cam;
     EntityID camera_followed_entity_id;
     // Generated world size
     Vec2i min_chunk;
@@ -209,10 +208,15 @@ struct GameState {
     World *world;
     u32 wood_count;
     u32 gold_count;
+    
     bool is_player_interacting;
     EntityID interactable;
+    f32 interaction_time;
+    f32 interaction_current_time;
     
     BuildingKind selected_builing_kind;
+    
+    size_t DEBUG_last_frame_sim_region_entity_count;
 };
 
 void game_state_init(GameState *game_state);

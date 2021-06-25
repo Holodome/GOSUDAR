@@ -56,18 +56,16 @@ struct KeyState {
 };
 
 struct Input {
-    Vec2 winsize = Vec2(0);
-    Vec2 mpos = Vec2(0);
-    Vec2 mdelta = Vec2(0);
-    f32 mwheel = 0;  
-    KeyState keys[(u32)Key::Count] = {};
-    f32 time = 0, dt = 0;
-    bool is_quit_requested = false;
+    Vec2 winsize;
+    Vec2 mpos;
+    Vec2 mdelta;
+    f32 mwheel; 
+    KeyState keys[(u32)Key::Count];
+    f32 time;
+    f32 dt;
+    bool is_quit_requested;
     
-    f32 lmc_click_time = 0;
-    bool lmc_doubleclick = false;
-    f32 keys_down_time[(u32)Key::Count] = {};
-    u32 utf32 = 0;
+    u32 utf32;
     
     bool is_key_pressed(Key key) {
         KeyState *k = keys + (uintptr_t)key;
@@ -77,50 +75,6 @@ struct Input {
     bool is_key_held(Key key) {
         KeyState *k = keys + (uintptr_t)key;
         return k->is_down;
-    }
-    
-    bool is_key_held_te(Key key, f32 repeat_rate, f32 repeat_delay) {
-        u32 ku = (u32)key;
-        bool result = false;
-        f32 t = keys_down_time[ku];
-        if (t == 0) {
-            result = true;
-        } else {
-            if (t > repeat_delay) {
-                f32 press_mod = fmodf(t - repeat_delay, repeat_rate);
-                f32 abs_mod = fmodf(t - repeat_delay - dt, repeat_rate);
-                if ((press_mod > repeat_rate * 0.5f) != (abs_mod > repeat_rate * 0.5f)) {
-                    result = true;
-                }
-            }
-        }
-        
-        return result;
-    }
-    
-    // Called after platform specific update
-    void update() {
-        for (u32 i = 0; i < (u32)Key::Count; ++i) {
-            if (is_key_held((Key)i)) {
-                if (keys_down_time[i] < 0) {
-                    keys_down_time[i] = 0;
-                } else {
-                    keys_down_time[i] += dt;
-                }
-            } else {
-                keys_down_time[i] = -1;
-            }
-        }    
-        
-        lmc_doubleclick = false;
-        if (is_key_pressed(Key::MouseLeft)) {
-            if (time - lmc_click_time < 0.30f) {
-                lmc_doubleclick = true;
-                lmc_click_time = 0;
-            } else {
-                lmc_click_time = time;
-            }
-        }
     }
 };
 

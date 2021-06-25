@@ -5,6 +5,7 @@ int main(int argc, char **argv) {
     logprintln("App", "start");
     {
         Game game;
+        memset(&game, 0, sizeof(game));
         game_init(&game);
         while (game.is_running) {
             game_update_and_render(&game);

@@ -936,5 +936,9 @@ namespace Colors {
     const static Vec4 pink = Vec4(1.0f, 0.0f, 1.0f, 1.0f);
 }
 
+inline Vec3 xz(Vec2 xz, f32 y = 0.0f) {
+    return Vec3(xz.x, y, xz.y);
+}
+
 #define MATH_HH 1
 #endif

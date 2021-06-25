@@ -9,14 +9,6 @@
 
 #include "game/world.hh"
 
-enum DevMode {
-    DevMode_None           = 0x0,
-    DevMode_DevUI          = 0x1,
-    DevMode_DevUIFocused   = 0x2,
-    DevMode_FreeCamera     = 0x4,
-    DevMode_StopSimulation = 0x8
-};  
-
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
 // Game state is the logic of the game

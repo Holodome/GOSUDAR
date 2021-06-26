@@ -91,6 +91,8 @@ EntityID add_world_entity(World *world, WorldPosition pos) {
 }
 
 Entity *get_world_entity(World *world, EntityID id) {
+    // @TODO clean, make 0 id invalid
+    assert(id.value);
     assert(id.value < world->entity_count);
     return world->entities + id.value;    
 }

@@ -25,16 +25,17 @@ struct GameState {
     u32 wood_count;
     u32 gold_count;
     
-    u32 interaction_kind;
-    bool is_player_interacting;
     EntityID interactable;
+    u32 interaction_kind;
     f32 interaction_time;
     f32 interaction_current_time;
-    
-    bool allow_camera_controls;
-    
     u8 selected_building;
+    
     bool is_in_building_mode;
+    bool allow_camera_controls;
+    // Per-frame data
+    Vec2 mouse_projection;
+    SimEntity *camera_followed_entity;
     
     size_t DEBUG_last_frame_sim_region_entity_count;
 };

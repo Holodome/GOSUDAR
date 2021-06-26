@@ -47,6 +47,7 @@ void game_state_init(GameState *game_state) {
     game_state->wood_count = 0;
     game_state->gold_count = 0;
     game_state->interactable = null_id();
+    game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
     game_state->allow_camera_controls = false;
     // Initialize world struct
     game_state->world = alloc_struct(&game_state->arena, World);
@@ -143,6 +144,121 @@ static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i 
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
 
+static void update_interactions(GameState *game_state, SimRegion *sim, Input *input) {
+    if (!game_state->interaction_kind) {
+        game_state->interactable = null_id();
+        f32 closest_so_far = INFINITY;
+        for (EntityIterator tree_iter = iterate_all_entities(sim);
+            is_valid(&tree_iter);
+            advance(&tree_iter)) {
+            SimEntity *test_entity = tree_iter.ptr;
+            if (test_entity->kind == ENTITY_KIND_WORLD_OBJECT) {
+                f32 d_sq = Math::length_sq(test_entity->p - game_state->camera_followed_entity->p);
+#define INTERACT_DISTANCE 0.25f
+#define INTERACT_DISTANCE_SQ (INTERACT_DISTANCE * INTERACT_DISTANCE)
+                if (d_sq < INTERACT_DISTANCE_SQ && d_sq < closest_so_far) {
+                    closest_so_far = d_sq;
+                    game_state->interactable = test_entity->id;
+                }
+            }
+        }
+    }
+    
+    if (is_not_null(game_state->interactable)) {
+        SimEntity *ent = get_entity_by_id(sim, game_state->interactable);
+        // printf("%hhu %u\n", ent->world_object_flags, ent->id.value);
+
+        assert(ent->kind == ENTITY_KIND_WORLD_OBJECT);
+        if (game_state->interaction_kind) {
+            bool continue_interaction = false;
+            switch (game_state->interaction_kind) {
+                case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
+                    continue_interaction = input->is_key_held(Key::MouseLeft);
+                } break;
+                case PLAYER_INTERACTION_KIND_BUILD: {
+                    continue_interaction = input->is_key_held(Key::MouseRight);
+                } break;
+                INVALID_DEFAULT_CASE;
+            }
+            
+            if (continue_interaction) {
+                game_state->interaction_current_time += input->dt;
+                if (game_state->interaction_current_time >= game_state->interaction_time) {
+                    // finalize interaction
+                    switch (game_state->interaction_kind) {
+                        case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
+                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE);
+                            assert(ent->resource_interactions_left);
+                            ent->resource_interactions_left -= 1;
+                            switch (ent->resource_kind) {
+                                case RESOURCE_KIND_WOOD: {
+                                    game_state->wood_count += ent->resource_gain;
+                                } break;
+                                case RESOURCE_KIND_GOLD: {
+                                    game_state->gold_count += ent->resource_gain;
+                                } break;
+                                INVALID_DEFAULT_CASE;
+                            }
+                            if (ent->resource_interactions_left == 0) {
+                                ent->flags |= ENTITY_FLAG_IS_DELETED;
+                                game_state->interactable = null_id();
+                            }
+                        } break;
+                        case PLAYER_INTERACTION_KIND_BUILD: {
+                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING);
+#define BUILD_SPEED 0.1
+                            ent->build_progress += BUILD_SPEED;
+                            ent->build_progress = Math::min(ent->build_progress, 1.0f);
+                            if (ent->build_progress == 1.0f) {
+                                
+                            }
+                        } break;
+                        INVALID_DEFAULT_CASE;
+                    }
+                    game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
+                } 
+            } else {
+                
+                game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
+            }
+        } else {
+            u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
+            if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+                if (input->is_key_held(Key::MouseLeft)) {
+                    interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
+                } 
+            } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                if (input->is_key_held(Key::MouseRight)) {
+                    interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
+                }
+            }
+            
+            if (interaction_kind) {
+                f32 interaction_time;
+                bool cancel_interaction = false;
+                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+                    assert(ent->resource_interactions_left > 0);
+                    // switch on type...
+                    interaction_time = 1.0f;
+                } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                    if (ent->build_progress < 1.0f) {
+                        interaction_time = 1.0f;
+                    } else {
+                        cancel_interaction = true;
+                    }
+                } else {
+                    assert(false);
+                }
+                if (!cancel_interaction) {
+                    game_state->interaction_time = interaction_time;
+                    game_state->interaction_current_time = 0;
+                    game_state->interaction_kind = interaction_kind;
+                }
+            }
+        }
+    } 
+}
+
 void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets) {
     arena_clear(&game_state->frame_arena);
     // Since camera follows some entity and is never too far from it, we can assume that camera position is
@@ -193,41 +309,13 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         game_state->cam.pitch = Math::clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         game_state->cam.distance_from_player -= input->mwheel;
     }
-  
-    f32 interact_distance = 0.25f;
-    f32 interact_distance_sq = interact_distance * interact_distance;
-    for (EntityIterator iter = iterate_all_entities(sim);
-         is_valid(&iter);
-         advance(&iter)) {
-        SimEntity *entity = iter.ptr;
-        
-        switch (entity->kind) {
-            case ENTITY_KIND_PLAYER: {
-                // @TODO this can be outside of entity update?
-                if (!game_state->is_player_interacting) {
-                    entity->p += player_delta;
-                    // Find closest interactable
-                    game_state->interactable = null_id();
-                    f32 closest_so_far = INFINITY;
-                    for (EntityIterator tree_iter = iterate_all_entities(sim);
-                        is_valid(&tree_iter);
-                        advance(&tree_iter)) {
-                        SimEntity *test_entity = tree_iter.ptr;
-                        if (test_entity->kind == ENTITY_KIND_WORLD_OBJECT) {
-                            f32 d_sq = Math::length_sq(test_entity->p - entity->p);
-                            if (d_sq < interact_distance_sq && d_sq < closest_so_far) {
-                                closest_so_far = d_sq;
-                                game_state->interactable = test_entity->id;
-                            }
-                        }
-                    }
-                }   
-            } break;
-        }
-    }
-   
+    
     // Update camera movement
     SimEntity *camera_followed_entity = get_entity_by_id(sim, game_state->camera_followed_entity_id);
+    game_state->camera_followed_entity = camera_followed_entity;
+    if (!game_state->interaction_kind) {
+        camera_followed_entity->p += player_delta;
+    }
     Vec3 center_pos = xz(camera_followed_entity->p);
     f32 horiz_distance = game_state->cam.distance_from_player * Math::cos(game_state->cam.pitch);
     f32 vert_distance = game_state->cam.distance_from_player * Math::sin(game_state->cam.pitch);
@@ -251,6 +339,9 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     bool intersect = ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+    game_state->mouse_projection = mouse_point;
+    
+    update_interactions(game_state, sim, input);
     
     if (game_state->is_in_building_mode) {
         if (input->is_key_pressed(Key::MouseRight)) {
@@ -263,99 +354,6 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
             // @TODO set interactable
         }
     }
-    
-    if (is_not_null(game_state->interactable)) {
-        SimEntity *ent = get_entity_by_id(sim, game_state->interactable);
-        assert(ent->kind == ENTITY_KIND_WORLD_OBJECT);
-        if (game_state->is_player_interacting) {
-            bool continue_interaction = false;
-            switch (game_state->interaction_kind) {
-                case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
-                    continue_interaction = input->is_key_held(Key::MouseLeft);
-                } break;
-                case PLAYER_INTERACTION_KIND_BUILD: {
-                    continue_interaction = input->is_key_held(Key::MouseRight);
-                } break;
-                INVALID_DEFAULT_CASE;
-            }
-            
-            if (continue_interaction) {
-                game_state->interaction_current_time += input->dt;
-                if (game_state->interaction_current_time >= game_state->interaction_time) {
-                    game_state->is_player_interacting = false;
-                    // finalize interaction
-                    switch (game_state->interaction_kind) {
-                        case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
-                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE);
-                            assert(ent->resource_interactions_left);
-                            ent->resource_interactions_left -= 1;
-                            switch (ent->resource_kind) {
-                                case RESOURCE_KIND_WOOD: {
-                                    game_state->wood_count += ent->resource_gain;
-                                } break;
-                                case RESOURCE_KIND_GOLD: {
-                                    game_state->gold_count += ent->resource_gain;
-                                } break;
-                                INVALID_DEFAULT_CASE;
-                            }
-                            if (ent->resource_interactions_left == 0) {
-                                ent->flags |= ENTITY_FLAG_IS_DELETED;
-                                game_state->interactable = null_id();
-                            }
-                        } break;
-                        case PLAYER_INTERACTION_KIND_BUILD: {
-                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING);
-#define BUILD_SPEED 0.1
-                            ent->build_progress += BUILD_SPEED;
-                            ent->build_progress = Math::min(ent->build_progress, 1.0f);
-                            if (ent->build_progress == 1.0f) {
-                                
-                            }
-                        } break;
-                        INVALID_DEFAULT_CASE;
-                    }
-                } 
-            } else {
-                game_state->is_player_interacting = false;
-            }
-        } else {
-            u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
-            if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
-                if (input->is_key_held(Key::MouseLeft)) {
-                    interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
-                } 
-            } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
-                if (input->is_key_held(Key::MouseRight)) {
-                    interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
-                }
-            }
-            
-            if (interaction_kind) {
-                f32 interaction_time;
-                bool cancel_interaction = false;
-                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
-                    assert(ent->resource_interactions_left > 0);
-                    // switch on type...
-                    interaction_time = 1.0f;
-                } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
-                    if (ent->build_progress < 1.0f) {
-                        interaction_time = 1.0f;
-                    } else {
-                        cancel_interaction = true;
-                    }
-                } else {
-                    assert(false);
-                }
-                if (!cancel_interaction) {
-                    game_state->interaction_time = interaction_time;
-                    game_state->interaction_current_time = 0;
-                    game_state->is_player_interacting = true;
-                    game_state->interaction_kind = interaction_kind;
-                    printf("begin new interaction\n");
-                }
-            }
-        }
-    } 
     
     RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
     // Draw ground

@@ -104,7 +104,6 @@ struct SimEntity {
     u8 resource_gain;
     // For building
     f32 build_progress; // [0-1]
-    f32 hit_points;
 };  
 
 CT_ASSERT(ENUM_FITS_IN_VARIABLE(ENTITY_FLAG_SENTINEL, STRUCT_FIELD(SimEntity, flags)));

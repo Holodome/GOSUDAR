@@ -77,11 +77,11 @@ void game_update_and_render(Game *game) {
     dev_ui_labelf(&dev_ui, "Building mode: %s", game->game_state.is_in_building_mode ? "true" : "false");
     if (!is_same(game->game_state.interactable, null_id())) {
         SimEntity *interactable = &get_world_entity(game->game_state.world, game->game_state.interactable)->sim;
-        if (interactable->world_object_flags &= WORLD_OBJECT_FLAG_IS_BUILDING) {
+        if (interactable->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
             dev_ui_labelf(&dev_ui, "Building build progress: %.2f", interactable->build_progress);
         }
     }
-    if (game->game_state.is_player_interacting) {
+    if (game->game_state.interaction_kind) {
         dev_ui_labelf(&dev_ui, "I: %u%%", (i32)(game->game_state.interaction_current_time / game->game_state.interaction_time * 100));    
     }
     dev_ui_end(&dev_ui, &interface_render_group);

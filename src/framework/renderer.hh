@@ -15,6 +15,9 @@ extern _type _name;
 typedef u32 AssetID;
 #define INVALID_ASSET_ID ((AssetID)-1)
 
+#define RENDERER_INDEX_TYPE u16
+#define RENDERER_MAX_INDEX VARIABLE_MAX_VALUE(RENDERER_INDEX_TYPE)
+
 struct Vertex {
     Vec3 p;
     Vec2 uv;
@@ -25,16 +28,6 @@ struct Vertex {
 
 struct Shader {
     GLuint id;
-    
-    static Shader invalid() {
-        return { GL_INVALID_ID };
-    }
-    bool operator==(Shader other) {
-        return this->id == other.id;
-    }
-    bool operator!=(Shader other) {
-        return this->id != other.id;
-    }
 };
 
 struct Texture {
@@ -96,7 +89,7 @@ struct RendererCommands {
     
     size_t max_index_count;
     size_t index_count;
-    u32 *indices;
+    RENDERER_INDEX_TYPE *indices;
     
     RenderQuads *last_quads;
 };

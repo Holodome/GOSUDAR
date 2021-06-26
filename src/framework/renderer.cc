@@ -12,9 +12,14 @@ static _type _name;
 static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
     RenderQuads *quads = 0;
     if (commands->last_quads && memcmp(&commands->last_quads->setup, &setup, sizeof(setup)) == 0) {
-        quads = commands->last_quads;
-        ++quads->quad_count;
-    } else {
+        RENDERER_INDEX_TYPE base_index = commands->vertex_count - commands->last_quads->vertex_array_offset;
+        if (base_index + 6 < RENDERER_MAX_INDEX) {
+            quads = commands->last_quads;
+            ++quads->quad_count;
+        }
+    } 
+    
+    if (!quads) {
         assert(commands->quads_count < commands->max_quads_count);
         quads = commands->quads + commands->quads_count++;
         quads->index_array_offset = commands->index_count;
@@ -64,8 +69,8 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
     vertex_buffer[3].tex = texture_index;
 
     // Index buffer
-    u32 *index_buffer = render_group->commands->indices + render_group->commands->index_count;
-    u32  base_index   = render_group->commands->vertex_count - quads->vertex_array_offset;
+    RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
+    RENDERER_INDEX_TYPE  base_index   = render_group->commands->vertex_count - quads->vertex_array_offset;
     index_buffer[0] = base_index + 0;
     index_buffer[1] = base_index + 2;
     index_buffer[2] = base_index + 3;
@@ -232,7 +237,7 @@ void main()
     renderer->commands.vertices = alloc_arr(&renderer->arena, max_vertex_count, Vertex);
     size_t max_index_count = max_vertex_count / 2 * 3;
     renderer->commands.max_index_count = max_index_count;
-    renderer->commands.indices = alloc_arr(&renderer->arena, max_index_count, u32);
+    renderer->commands.indices = alloc_arr(&renderer->arena, max_index_count, RENDERER_INDEX_TYPE);
    
     glGenVertexArrays(1, &renderer->vertex_array);
     glBindVertexArray(renderer->vertex_array);
@@ -243,7 +248,7 @@ void main()
 
     glGenBuffers(1, &renderer->index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(u32), 0, GL_STREAM_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
     glEnableVertexAttribArray(0);
@@ -314,7 +319,7 @@ void renderer_end_frame(Renderer *renderer) {
     glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
     glBufferSubData(GL_ARRAY_BUFFER, 0, renderer->commands.vertex_count * sizeof(Vertex), renderer->commands.vertices);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, renderer->commands.index_count * sizeof(u32), renderer->commands.indices);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, renderer->commands.index_count * sizeof(RENDERER_INDEX_TYPE), renderer->commands.indices);
 
     glClearColor(renderer->clear_color.r, renderer->clear_color.g,
                  renderer->clear_color.b, renderer->clear_color.a);
@@ -333,8 +338,9 @@ void renderer_end_frame(Renderer *renderer) {
         glUniform1i(glGetUniformLocation(renderer->standard_shader.id, "tex"), 0); 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_UNSIGNED_INT,
-            (GLvoid *)(sizeof(u32) * quads->index_array_offset),
+        GLenum gl_type = (sizeof(RENDERER_INDEX_TYPE) == 4 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT);
+        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, gl_type,
+            (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
             quads->vertex_array_offset);
             
         ++renderer->current_statistics.draw_call_count;

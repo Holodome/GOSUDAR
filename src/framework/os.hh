@@ -49,9 +49,9 @@ struct KeyState {
     bool is_down = false;
     int transition_count = 0;  
 
-    void update(bool is_down) {
-        if (this->is_down != is_down) {
-            this->is_down = is_down;
+    void update(bool new_down) {
+        if (this->is_down != new_down) {
+            this->is_down = new_down;
             ++transition_count;
         }
     }

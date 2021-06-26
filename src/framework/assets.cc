@@ -112,9 +112,9 @@ Texture Assets::get_tex(AssetID id) {
         size_t file_size = OS::get_file_size(file);
         void *buffer = Mem::alloc(file_size);
         OS::read_file(file, 0, file_size, buffer);
-        
+        assert((int)file_size == file_size);
         int w, h;
-        void *data = stbi_load_from_memory((const stbi_uc *)buffer, file_size, &w, &h, 0, 4);
+        void *data = stbi_load_from_memory((const stbi_uc *)buffer, (int)file_size, &w, &h, 0, 4);
         Vec2i tex_size = Vec2i(w, h);
         Mem::free(buffer);
         
@@ -171,6 +171,7 @@ FontData *Assets::get_font(AssetID id) {
         
         size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
+        result = font;
         this->textures[this->texture_count] = renderer_create_texture(this->renderer, atlas_data, Vec2i(atlas_width, atlas_height));
         AssetInfo *tex_info = this->get_info(Asset_FontAtlas);
         tex_info->state = AssetState::Loaded;
@@ -201,7 +202,7 @@ FontData *Assets::get_font(AssetID id) {
         info->array_entry_idx = array_idx;
         logprintln("Fonts", "Loaded font '%s'", info->filename);
     }
-    return &this->fonts[info->array_entry_idx];
+    return result;
 }
 
 Vec2 Assets::get_text_size(AssetID id, const char *text, size_t count, f32 scale) {
@@ -214,9 +215,9 @@ Vec2 Assets::get_text_size(AssetID id, const char *text, size_t count, f32 scale
     
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
-        char s = text[i];
-        if (s >= font->first_codepoint && s < (font->first_codepoint + font->glyphs.len)) {
-            FontGlyph *glyph = &font->glyphs[s - font->first_codepoint];
+        u8 codepoint = text[i];
+        if (codepoint >= font->first_codepoint && codepoint < (font->first_codepoint + font->glyphs.len)) {
+            FontGlyph *glyph = &font->glyphs[codepoint - font->first_codepoint];
             // FontGlyph *glyph = &glyphs[first_codepoint];
             result.x += glyph->x_advance * scale;
         }

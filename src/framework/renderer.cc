@@ -3,7 +3,7 @@
 #include "game/game.hh"
 
 #define GLPROC(_name, _type) \
-static _type _name;
+_type _name;
 #include "framework/gl_procs.inc"
 #undef GLPROC
 
@@ -70,30 +70,31 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
         uv10 = uv10 * uv_scale;
         uv11 = uv11 * uv_scale;
 
+        u16 texture_index = (u16)texture.index;
         // Vertex buffer
         assert(render_group->commands->vertex_count + 4 <= render_group->commands->max_vertex_count);
         Vertex *vertex_buffer = render_group->commands->vertices + render_group->commands->vertex_count;
         vertex_buffer[0].p = v00;
         vertex_buffer[0].uv  = uv00;
         vertex_buffer[0].c = c00;
-        vertex_buffer[0].tex = texture.index;
+        vertex_buffer[0].tex = texture_index;
         vertex_buffer[1].p = v01;
         vertex_buffer[1].uv  = uv01;
         vertex_buffer[1].c = c01;
-        vertex_buffer[1].tex = texture.index;
+        vertex_buffer[1].tex = texture_index;
         vertex_buffer[2].p = v10;
         vertex_buffer[2].uv  = uv10;
         vertex_buffer[2].c = c10;
-        vertex_buffer[2].tex = texture.index;
+        vertex_buffer[2].tex = texture_index;
         vertex_buffer[3].p = v11;
         vertex_buffer[3].uv  = uv11;
         vertex_buffer[3].c = c11;
-        vertex_buffer[3].tex = texture.index;
+        vertex_buffer[3].tex = texture_index;
 
         // Index buffer
         assert(render_group->commands->index_count + 6 <= render_group->commands->max_index_count);
         RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
-        RENDERER_INDEX_TYPE  base_index   = render_group->commands->vertex_count - quads->vertex_array_offset;
+        RENDERER_INDEX_TYPE  base_index   = (RENDERER_INDEX_TYPE)(render_group->commands->vertex_count - quads->vertex_array_offset);
         index_buffer[0] = base_index + 0;
         index_buffer[1] = base_index + 2;
         index_buffer[2] = base_index + 3;
@@ -142,8 +143,7 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
 	offset.y += line_height;
     
 	for (const char *scan = text; *scan; ++scan) {
-		char symbol = *scan;
-
+		u8 symbol = *scan;
 		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 
@@ -201,6 +201,7 @@ RenderGroup render_group_begin(RendererCommands *commands, Assets *assets, Rende
 }
 
 void render_group_end(RenderGroup *group) {
+    (void)group;
     // group->renderer->has_render_group = false;
 }
 
@@ -353,7 +354,7 @@ void main()
                    GL_RGBA8,
                    RENDERER_TEXTURE_DIM,
                    RENDERER_TEXTURE_DIM,
-                   renderer->max_texture_count);
+                   (GLsizei)renderer->max_texture_count);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -367,7 +368,7 @@ void main()
 }
 
 void renderer_cleanup(Renderer *renderer) {
-    
+    (void)(renderer);    
 }
 
 RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Vec4 clear_color) {
@@ -394,8 +395,8 @@ void renderer_end_frame(Renderer *renderer) {
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, renderer->display_size.x, renderer->display_size.y);
-    glScissor(0, 0, renderer->display_size.x, renderer->display_size.y);
+    glViewport(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
+    glScissor(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
     // Upload data from vertex array to OpenGL buffer
     glBindVertexArray(renderer->vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
@@ -420,9 +421,9 @@ void renderer_end_frame(Renderer *renderer) {
         glUniform1i(renderer->tex_location, 0); 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE,
+        glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
             (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
-            quads->vertex_array_offset);
+            (GLint)quads->vertex_array_offset);
             
         ++renderer->current_statistics.draw_call_count;
     }
@@ -431,9 +432,10 @@ void renderer_end_frame(Renderer *renderer) {
 Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size) {
     assert(size.x <= RENDERER_TEXTURE_DIM && size.y <= RENDERER_TEXTURE_DIM);
     Texture tex;
-    tex.index = renderer->texture_count++;
-    tex.width  = size.x;
-    tex.height = size.y;
+    tex.index = (u32)renderer->texture_count++;
+    tex.width  = (u16)size.x;
+    tex.height = (u16)size.y;
+    assert(tex.width == size.x && tex.height == size.y);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0,
                     tex.index, size.x, size.y, 1,

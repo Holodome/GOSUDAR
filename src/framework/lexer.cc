@@ -21,8 +21,8 @@ f64 Token::get_real() const {
     return this->real;    
 }
 
-bool Token::is_kind(TokenKind kind) const {
-    return this->kind == kind;
+bool Token::is_kind(TokenKind other) const {
+    return this->kind == other;
 }
 
 bool Token::is_kind(int ascii) const {

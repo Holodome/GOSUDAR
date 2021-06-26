@@ -22,10 +22,6 @@ static bool is_chunk_coord_initialized(Vec2i coord) {
     return coord.x != CHUNK_COORD_UNINITIALIZED;
 }
 
-static Vec2i chunk_coord_uninitialized() {
-    return Vec2i(CHUNK_COORD_UNINITIALIZED, 0);
-}
-
 // Add offset to base_pos and return new position
 inline WorldPosition pos_add(WorldPosition base_pos, Vec2 offset);
 inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);

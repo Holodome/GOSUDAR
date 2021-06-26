@@ -114,7 +114,7 @@ namespace Math {
         Vec2G(T x, T y) : x(x), y(y) {}
         explicit Vec2G(T s) : x(s), y(s) {}
         template <typename S>
-        explicit Vec2G(Vec2G<S> v) : x(v.x), y(v.y) {}
+        explicit Vec2G(Vec2G<S> v) : x((T)v.x), y((T)v.y) {}
         
         Vec2G<T> operator-() const {
             return Vec2G<T>(-x, -y);
@@ -725,14 +725,14 @@ namespace Math {
             return Rect::minmax(r.top_left() + d, r.bottom_right() + d);
         }
         
-        bool collide(Vec2 p) {
-            return x < p.x && y < p.y && p.x < x + w && p.y < y + h;
+        bool collide(Vec2 other) {
+            return x < other.x && y < other.y && other.x < x + w && other.y < y + h;
         }
         
         bool collide(Rect rect) {
             bool result = true;
             if ((x + w < rect.x || x > rect.x + rect.w) ||
-                (y + h < rect.y | y > rect.y + rect.h)) {
+                (y + h < rect.y || y > rect.y + rect.h)) {
                 result = false;
             }
 

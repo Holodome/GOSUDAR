@@ -221,7 +221,7 @@ void OS::update_input(Input *input) {
                 input->mwheel += (f32)wheel_delta / WHEEL_DELTA;
             } break;
             case WM_CHAR: {
-                u32 input_char = msg.wParam;
+                u32 input_char = (u32)msg.wParam;
                 // Limit to ASCII for now
                 if (0x20 <= input_char && input_char <= 0x7F) {
                     input->utf32 = input_char;
@@ -235,7 +235,7 @@ void OS::update_input(Input *input) {
                 i32  scancode = (HIWORD(msg.lParam) & (KF_EXTENDED | 0xFF));
 
                 if (!scancode) {
-                    scancode = MapVirtualKeyW(msg.wParam, MAPVK_VK_TO_VSC);
+                    scancode = MapVirtualKeyW((UINT)msg.wParam, MAPVK_VK_TO_VSC);
                 }
 
                 Key key = Key::None;
@@ -344,14 +344,14 @@ void OS::update_input(Input *input) {
     POINT mp;
     GetCursorPos(&mp);
     ScreenToClient(internal->hwnd, &mp);
-    Vec2 mouse = Vec2(mp.x, mp.y);
+    Vec2 mouse = Vec2((f32)mp.x, (f32)mp.y);
     
     input->mdelta = mouse - input->mpos;
     input->mpos = mouse;
     
     RECT wr;
     GetClientRect(internal->hwnd, &wr);
-    input->winsize = Vec2(wr.right - wr.left, wr.bottom - wr.top);
+    input->winsize = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
@@ -424,6 +424,7 @@ RealWorldTime OS::get_real_world_time() {
 
 void OS::mkdir(const char *name) {
     HRESULT result = CreateDirectoryA(name, 0);
+    UNREFERENCED_VARIABLE(result);
     // assert(result);
     // @TODO errors
 }

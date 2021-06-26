@@ -44,7 +44,7 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 	Vec3 offset = Vec3(p, 0);
 	offset.y += line_height;
 	for (const char *scan = text; *scan; ++scan) {
-		char symbol = *scan;
+		u8 symbol = *scan;
 		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x);
@@ -71,9 +71,9 @@ static Vec2 get_text_size(DevUILayout *layout, const char *text) {
     size_t count = strlen(text);
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
-        char s = text[i];
-        if (s >= font->first_codepoint && s < (font->first_codepoint + font->glyphs.len)) {
-            FontGlyph *glyph = &font->glyphs[s - font->first_codepoint];
+        u8 codepoint = text[i];
+        if (codepoint >= font->first_codepoint && codepoint < (font->first_codepoint + font->glyphs.len)) {
+            FontGlyph *glyph = &font->glyphs[codepoint - font->first_codepoint];
             // FontGlyph *glyph = &glyphs[first_codepoint];
             result.x += glyph->x_advance;
         }

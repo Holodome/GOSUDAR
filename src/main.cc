@@ -1,6 +1,6 @@
 #include "game/game.hh"
 
-int main(int argc, char **argv) {
+int main() {
     logger_init();
     logprintln("App", "start");
     {

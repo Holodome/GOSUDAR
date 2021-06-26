@@ -79,7 +79,8 @@ inline EntityID entity_id_from_storage_index(u32 index) {
 EntityID add_world_entity(World *world, WorldPosition pos) {
     assert(world->entity_count < world->max_entity_count);
     EntityID id;
-    id.value = world->entity_count++; 
+    assert(world->entity_count < UINT32_MAX);
+    id.value = (u32)world->entity_count++; 
     Entity *entity = world->entities + id.value;
     memset(entity, 0, sizeof(*entity));
     entity->world_pos = pos;
@@ -133,11 +134,11 @@ bool remove_entity_from_chunk(World *world, Chunk *chunk, EntityID id) {
                 entity_block->entity_storage_indices[entity_idx] = first_block->entity_storage_indices[--first_block->entity_count];  
                 if (first_block->entity_count == 0) {
                     if (first_block->next) {
-                        EntityBlock *entity_block = first_block->next;
-                        *first_block = *entity_block;
+                        EntityBlock *free_block = first_block->next;
+                        *first_block = *free_block;
                         
                         entity_block->next = world->first_free;
-                        world->first_free = entity_block;
+                        world->first_free = free_block;
                     }
                 } 
                 

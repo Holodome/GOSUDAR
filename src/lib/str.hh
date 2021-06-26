@@ -19,18 +19,18 @@ struct Str {
     }
     Str(const char *text) {
         init();
-        u32 len = strlen(text);
-        ensure_alloced(len + 1);
-        memcpy(data, text, len);
-        this->data[len] = 0;
-        this->len = len;
+        size_t tex_len = strlen(text);
+        ensure_alloced(tex_len + 1);
+        memcpy(data, text, tex_len);
+        this->data[tex_len] = 0;
+        this->len = (u32)tex_len;
     } 
     Str(const char *text, size_t len) {
         init();
         ensure_alloced(len + 1);
         memcpy(data, text, len);
         this->data[len] = 0;
-        this->len = len;
+        this->len = (u32)len;
     }
     ~Str() {
         if (data != base_buffer) {
@@ -47,21 +47,21 @@ struct Str {
     }
     
     // Make sure string has enough storage for amount chars
-    void ensure_alloced(u32 amount, bool copy_old = true) {
+    void ensure_alloced(size_t amount, bool copy_old = true) {
         if (amount > capacity) {
             reallocate(amount, copy_old);
         }
     }
     
     // Change string data storage, either allocate new buffer or use base_buffer
-    void reallocate(u32 amount, bool copy_old = true) {
+    void reallocate(size_t amount, bool copy_old = true) {
         assert(amount);
         
-        u32 new_capacity = amount;
+        size_t new_capacity = amount;
         char *new_data;
         if (new_capacity > STR_BASE_ALLOC) {
             new_data = (char *)Mem::alloc(amount);
-            capacity = new_capacity;
+            capacity = (u32)new_capacity;
         } else {
             new_data = base_buffer;
             capacity = STR_BASE_ALLOC;
@@ -100,7 +100,7 @@ struct Str {
         ensure_alloced(l + 1, false);
         memcpy(data, other.data, l);
         data[l] = 0;
-        len = l;
+        len = (u32)l;
     }
     
     void operator=(const char *text) {
@@ -108,7 +108,7 @@ struct Str {
         ensure_alloced(l + 1, false);
         memcpy(data, text, l);
         data[l] = 0;
-        len = l;
+        len = (u32)l;
     }
     
     const char *c_str() const {

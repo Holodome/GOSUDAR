@@ -84,8 +84,8 @@ void game_state_init(GameState *game_state) {
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
-    f32 x = tile_pos.x;
-    f32 y = tile_pos.y;
+    f32 x = (f32)tile_pos.x;
+    f32 y = (f32)tile_pos.y;
     out[0] = Vec3(x, 0, y) * TILE_SIZE;
     out[1] = Vec3(x, 0, y + 1) * TILE_SIZE;
     out[2] = Vec3(x + 1, 0, y) * TILE_SIZE;
@@ -234,7 +234,7 @@ static void update_interactions(GameState *game_state, SimRegion *sim, Input *in
             }
             
             if (interaction_kind) {
-                f32 interaction_time;
+                f32 interaction_time = 0.0f;
                 bool cancel_interaction = false;
                 if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
                     assert(ent->resource_interactions_left > 0);
@@ -249,6 +249,7 @@ static void update_interactions(GameState *game_state, SimRegion *sim, Input *in
                 } else {
                     assert(false);
                 }
+                
                 if (!cancel_interaction) {
                     game_state->interaction_time = interaction_time;
                     game_state->interaction_current_time = 0;
@@ -336,7 +337,7 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     Vec3 ray_dir = uv_to_world(projection, view, Vec2((2.0f * input->mpos.x) / input->winsize.x - 1.0f,
 													  1.0f - (2.0f * input->mpos.y) / input->winsize.y));
     f32 t = 0;
-    bool intersect = ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
+    ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
     game_state->mouse_projection = mouse_point;
@@ -363,8 +364,8 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
                 chunk_y < game_state->min_chunk.y || chunk_y > game_state->max_chunk.y) {
                 continue;       
             }
-            for (size_t tile_x = 0; tile_x < TILES_IN_CHUNK; ++tile_x) {
-                for (size_t tile_y = 0; tile_y < TILES_IN_CHUNK; ++tile_y) {
+            for (i32 tile_x = 0; tile_x < TILES_IN_CHUNK; ++tile_x) {
+                for (i32 tile_y = 0; tile_y < TILES_IN_CHUNK; ++tile_y) {
                     Vec2i tile_pos = (Vec2i(chunk_x, chunk_y) - sim->min_chunk) * TILES_IN_CHUNK + Vec2i(tile_x, tile_y);
                     Vec3 tile_v[4];
                     get_ground_tile_positions(tile_pos, tile_v);
@@ -374,8 +375,8 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         }
     }
     // Draw grid near mouse cursor
-    Vec2i mouse_cell_coord = Vec2i(floorf(mouse_point.x / CELL_SIZE), floorf(mouse_point.y / CELL_SIZE));
-    Vec2 mouse_cell_pos = Vec2(mouse_cell_coord) * CELL_SIZE;
+    Vec2 mouse_cell_coord = Vec2(floorf(mouse_point.x / CELL_SIZE), floorf(mouse_point.y / CELL_SIZE));
+    Vec2 mouse_cell_pos = mouse_cell_coord * CELL_SIZE;
 #define MOUSE_CELL_RAD 5
     for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
         for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
@@ -403,20 +404,19 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
     TempMemory zsort = temp_memory_begin(&game_state->frame_arena);
     size_t drawable_entity_storage_index_count = 0;
-    u32 *drawable_entity_storage_indexs = alloc_arr(&game_state->frame_arena, max_drawable_count, u32);
+    size_t *drawable_entity_storage_indexs = alloc_arr(&game_state->frame_arena, max_drawable_count, size_t);
     for (EntityIterator iter = iterate_all_entities(sim);
          is_valid(&iter);
          advance(&iter)) {
-        SimEntity *entity = iter.ptr;
         drawable_entity_storage_indexs[drawable_entity_storage_index_count++] = iter.idx;
     }
     
     // Sort by distance to camera
-    qsort_s(drawable_entity_storage_indexs, drawable_entity_storage_index_count, sizeof(u32), z_camera_sort, sim);
+    qsort_s(drawable_entity_storage_indexs, drawable_entity_storage_index_count, sizeof(*drawable_entity_storage_indexs), z_camera_sort, sim);
     for (size_t drawable_idx = 0; drawable_idx < drawable_entity_storage_index_count; ++drawable_idx) {
         SimEntity *entity = &sim->entities[drawable_entity_storage_indexs[drawable_idx]];
-        AssetID texture_id;
-        Vec2 size;
+        AssetID texture_id = INVALID_ASSET_ID;
+        Vec2 size = Vec2(0, 0);
         switch(entity->kind) {
             case ENTITY_KIND_PLAYER: {
                 texture_id = Asset_Dude;

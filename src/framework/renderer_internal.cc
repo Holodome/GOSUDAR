@@ -3,6 +3,8 @@
 static void APIENTRY
 opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                       const GLchar* message, const void *_) {
+    (void)_;
+    (void)length;
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
 
     char *source_str;

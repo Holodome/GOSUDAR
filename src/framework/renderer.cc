@@ -9,24 +9,51 @@ static _type _name;
 
 #include "framework/renderer_internal.cc"
 
+RendererSetup setup_3d(Mat4x4 mvp) {
+    RendererSetup result;
+    result.mvp = mvp;
+    result.has_depth = true;
+    return result;
+}
+
+RendererSetup setup_2d(Mat4x4 mvp) {
+    RendererSetup result;
+    result.mvp = mvp;
+    result.has_depth = false;
+    return result;
+}
+
+// Returns quads that render group should use with given setup.
+// This quads are guaranteed to fit at least single quad in it
+// We may add additional checks for buffer overflow if some renderer call draws multiple quads while using single get_quads call
 static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
     RenderQuads *quads = 0;
-    if (commands->last_quads && memcmp(&commands->last_quads->setup, &setup, sizeof(setup)) == 0) {
-        RENDERER_INDEX_TYPE base_index = commands->vertex_count - commands->last_quads->vertex_array_offset;
-        if (base_index + 6 < RENDERER_MAX_INDEX) {
-            quads = commands->last_quads;
-            ++quads->quad_count;
+    if (commands->vertex_count + 4 > commands->max_vertex_count || commands->index_count + 6 > commands->max_index_count) {
+        logprintln("Renderer", "Commands buffer overflow. I is %llu/%llu, V is %llu/%llu", 
+            commands->index_count, commands->max_index_count, commands->vertex_count, commands->max_vertex_count);
+    } else {
+        if (commands->last_quads && memcmp(&commands->last_quads->setup, &setup, sizeof(setup)) == 0) {
+            // Check that index type can fit more indices without overflowing
+            size_t base_index = commands->vertex_count - commands->last_quads->vertex_array_offset;
+            if (base_index + 6 <= RENDERER_MAX_INDEX) {
+                quads = commands->last_quads;
+                ++quads->quad_count;
+            }
+        } 
+        
+        if (!quads) {
+            if (commands->quads_count + 1 > commands->max_quads_count) {
+                logprintln("Renderer", "Commands buffer overflow. Quads is %llu/%llu", 
+                    commands->quads_count, commands->max_quads_count);
+            } else {
+                quads = commands->quads + commands->quads_count++;
+                quads->index_array_offset = commands->index_count;
+                quads->vertex_array_offset = commands->vertex_count;
+                quads->quad_count = 1;
+                quads->setup = setup;
+                commands->last_quads = quads;
+            }
         }
-    } 
-    
-    if (!quads) {
-        assert(commands->quads_count < commands->max_quads_count);
-        quads = commands->quads + commands->quads_count++;
-        quads->index_array_offset = commands->index_count;
-        quads->vertex_array_offset = commands->index_count;
-        quads->quad_count = 1;
-        quads->setup = setup;
-        commands->last_quads = quads;
     }
     return quads;
 }
@@ -36,51 +63,48 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
                Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,
                Texture texture) {
     RenderQuads *quads = get_quads(render_group->commands, render_group->setup);
-    u32 texture_index = texture.index;
-    
-    Vec2 array_texture_size   = Vec2(RENDERER_TEXTURE_DIM);
-    Vec2 current_texture_size = Vec2(texture.width, texture.height);
-    Vec2 uv_scale = current_texture_size / array_texture_size;
-    uv00 = uv00 * uv_scale;
-    uv01 = uv01 * uv_scale;
-    uv10 = uv10 * uv_scale;
-    uv11 = uv11 * uv_scale;
+    if (quads) {
+        Vec2 uv_scale = Vec2(texture.width, texture.height) * RENDERER_RECIPROCAL_TEXTURE_SIZE;
+        uv00 = uv00 * uv_scale;
+        uv01 = uv01 * uv_scale;
+        uv10 = uv10 * uv_scale;
+        uv11 = uv11 * uv_scale;
 
-    // Vertex buffer
-    Vertex *vertex_buffer = render_group->commands->vertices + render_group->commands->vertex_count;
-    vertex_buffer[0].p = v00;
-    vertex_buffer[0].uv  = uv00;
-    vertex_buffer[0].c = c00;
-    vertex_buffer[0].tex = texture_index;
+        // Vertex buffer
+        assert(render_group->commands->vertex_count + 4 <= render_group->commands->max_vertex_count);
+        Vertex *vertex_buffer = render_group->commands->vertices + render_group->commands->vertex_count;
+        vertex_buffer[0].p = v00;
+        vertex_buffer[0].uv  = uv00;
+        vertex_buffer[0].c = c00;
+        vertex_buffer[0].tex = texture.index;
+        vertex_buffer[1].p = v01;
+        vertex_buffer[1].uv  = uv01;
+        vertex_buffer[1].c = c01;
+        vertex_buffer[1].tex = texture.index;
+        vertex_buffer[2].p = v10;
+        vertex_buffer[2].uv  = uv10;
+        vertex_buffer[2].c = c10;
+        vertex_buffer[2].tex = texture.index;
+        vertex_buffer[3].p = v11;
+        vertex_buffer[3].uv  = uv11;
+        vertex_buffer[3].c = c11;
+        vertex_buffer[3].tex = texture.index;
 
-    vertex_buffer[1].p = v01;
-    vertex_buffer[1].uv  = uv01;
-    vertex_buffer[1].c = c01;
-    vertex_buffer[1].tex = texture_index;
+        // Index buffer
+        assert(render_group->commands->index_count + 6 <= render_group->commands->max_index_count);
+        RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
+        RENDERER_INDEX_TYPE  base_index   = render_group->commands->vertex_count - quads->vertex_array_offset;
+        index_buffer[0] = base_index + 0;
+        index_buffer[1] = base_index + 2;
+        index_buffer[2] = base_index + 3;
+        index_buffer[3] = base_index + 0;
+        index_buffer[4] = base_index + 1;
+        index_buffer[5] = base_index + 3;
 
-    vertex_buffer[2].p = v10;
-    vertex_buffer[2].uv  = uv10;
-    vertex_buffer[2].c = c10;
-    vertex_buffer[2].tex = texture_index;
-
-    vertex_buffer[3].p = v11;
-    vertex_buffer[3].uv  = uv11;
-    vertex_buffer[3].c = c11;
-    vertex_buffer[3].tex = texture_index;
-
-    // Index buffer
-    RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
-    RENDERER_INDEX_TYPE  base_index   = render_group->commands->vertex_count - quads->vertex_array_offset;
-    index_buffer[0] = base_index + 0;
-    index_buffer[1] = base_index + 2;
-    index_buffer[2] = base_index + 3;
-    index_buffer[3] = base_index + 0;
-    index_buffer[4] = base_index + 1;
-    index_buffer[5] = base_index + 3;
-
-    // Update buffer sizes after we are finished.
-    render_group->commands->vertex_count += 4;
-    render_group->commands->index_count  += 6;
+        // Update buffer sizes after we are finished.
+        render_group->commands->vertex_count += 4;
+        render_group->commands->index_count  += 6;
+    }
 }
 
 void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
@@ -170,20 +194,61 @@ void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color, f32 thi
 
 RenderGroup render_group_begin(RendererCommands *commands, Assets *assets, RendererSetup setup) {
     RenderGroup result = {};
-    // assert(!renderer->has_render_group);
-    // renderer->has_render_group = true;
-    
     result.commands = commands;
     result.assets = assets;
-    
     result.setup = setup;
-    // result.imvp = Mat4x4::inverse(mvp);    
     return result;
 }
 
 void render_group_end(RenderGroup *group) {
-    // assert(group->renderer->has_render_group);
     // group->renderer->has_render_group = false;
+}
+
+static GLuint create_shader(const Str &source) {
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source.data };
+    const char *const fragment_source[] = { "#version 330\n", "", source.data };
+    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
+    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
+    glCompileShader(vertex_shader);
+    glCompileShader(fragment_shader);
+    
+    GLint vertex_compiled, fragment_compiled;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
+    
+    bool shader_failed = false;
+    if (!(vertex_compiled && fragment_compiled)) {
+        char shader_log[4096];
+        if (!vertex_compiled) {
+            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+        if (!fragment_compiled) {
+            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+    }
+    
+    GLuint id = glCreateProgram();
+    glAttachShader(id, vertex_shader);
+    glAttachShader(id, fragment_shader);
+    glLinkProgram(id);
+    
+    GLint link_success;
+    glGetProgramiv(id, GL_LINK_STATUS, &link_success);
+    if (!link_success) {
+        char program_log[4096];
+        glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
+        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
+        shader_failed = true;
+    }    
+    
+    assert(!shader_failed);
+    return id;
 }
 
 
@@ -215,6 +280,17 @@ void main()
     frag_texture_index = texture_index;        
 }      
 #else 
+
+float linear1_to_srgb(float l) {
+    l = clamp(l, 0, 1);
+    float s = l * 12.92f;
+    if (l > 0.0031308f)
+    {
+        s = 1.055f * pow(l, 1.0 / 2.4) - 0.055f;
+    }
+    return s;
+}
+
 in vec4 rect_color;        
 in vec2 frag_uv;       
 flat in int frag_texture_index;        
@@ -224,10 +300,16 @@ void main()
 {      
     vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
     vec4 texture_sample = texture(tex, array_uv);      
+    if (texture_sample.a == 0) {
+        discard;
+    } 
+    
     out_color = texture_sample * rect_color;       
 }      
 #endif)FOO";
     renderer->standard_shader = create_shader(standard_shader_code);
+    renderer->mvp_location = glGetUniformLocation(renderer->standard_shader, "mvp");
+    renderer->tex_location = glGetUniformLocation(renderer->standard_shader, "tex");
    
     size_t max_quads_count = 1024;
     renderer->commands.max_quads_count = max_quads_count;
@@ -304,10 +386,10 @@ RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Ve
 void renderer_end_frame(Renderer *renderer) {
     // glEnable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
-    // glDepthMask(GL_TRUE);
+    glDepthMask(GL_TRUE);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    // glDepthFunc(GL_LEQUAL);
-    // glCullFace(GL_BACK);
+    glDepthFunc(GL_LEQUAL);
+    glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_BLEND);
@@ -325,7 +407,7 @@ void renderer_end_frame(Renderer *renderer) {
                  renderer->clear_color.b, renderer->clear_color.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glUseProgram(renderer->standard_shader.id);
+    glUseProgram(renderer->standard_shader);
     for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
         RenderQuads *quads = renderer->commands.quads + i;
         
@@ -334,12 +416,11 @@ void renderer_end_frame(Renderer *renderer) {
         } else {
             glDisable(GL_DEPTH_TEST);
         }
-        glUniformMatrix4fv(glGetUniformLocation(renderer->standard_shader.id, "mvp"), 1, false, quads->setup.mvp.value_ptr());
-        glUniform1i(glGetUniformLocation(renderer->standard_shader.id, "tex"), 0); 
+        glUniformMatrix4fv(renderer->mvp_location, 1, false, quads->setup.mvp.value_ptr());
+        glUniform1i(renderer->tex_location, 0); 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-        GLenum gl_type = (sizeof(RENDERER_INDEX_TYPE) == 4 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT);
-        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, gl_type,
+        glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE,
             (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
             quads->vertex_array_offset);
             

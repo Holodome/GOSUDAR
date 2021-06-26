@@ -13,10 +13,9 @@ void game_init(Game *game) {
     
     size_t assets_arena_size = MEGABYTES(256);
     arena_init(&game->assets.arena, os_alloc(assets_arena_size), assets_arena_size);
-    // @CLEAN
+    // @TODO
     game->assets.renderer = &game->renderer;
     game->assets.init();
-    game->renderer.white_texture = game->assets.get_tex(Asset_White);
     
     size_t frame_arena_size = MEGABYTES(256);
     arena_init(&game->game_state.frame_arena, os_alloc(frame_arena_size), frame_arena_size);

@@ -1,58 +1,5 @@
 #include "framework/renderer.hh"
 
-static Shader create_shader(const Str &source) {
-    Shader result;
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source.data };
-    const char *const fragment_source[] = { "#version 330\n", "", source.data };
-    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
-    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
-    glCompileShader(vertex_shader);
-    glCompileShader(fragment_shader);
-    
-    GLint vertex_compiled, fragment_compiled;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
-    
-    bool shader_failed = false;
-    if (!(vertex_compiled && fragment_compiled)) {
-        char shader_log[4096];
-        if (!vertex_compiled) {
-            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
-            shader_failed = true;
-        }
-        if (!fragment_compiled) {
-            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
-            shader_failed = true;
-        }
-    }
-    
-    GLuint id = glCreateProgram();
-    glAttachShader(id, vertex_shader);
-    glAttachShader(id, fragment_shader);
-    glLinkProgram(id);
-    
-    GLint link_success;
-    glGetProgramiv(id, GL_LINK_STATUS, &link_success);
-    if (!link_success) {
-        char program_log[4096];
-        glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
-        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
-        shader_failed = true;
-    }    
-    
-    assert(!shader_failed);
-    result.id = id;
-    return result;
-}
-
-static void bind_shader(Shader *shader) {
-    glUseProgram(shader->id);
-}
-
 static void APIENTRY
 opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                       const GLchar* message, const void *_) {

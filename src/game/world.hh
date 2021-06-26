@@ -16,6 +16,16 @@ struct WorldPosition {
     Vec2 offset; // Offset in chunk, world coordinate units in [0; CHUNK_SIZE]
 };  
 
+// @TODO clean
+#define CHUNK_COORD_UNINITIALIZED 0x7FFFFFFF
+static bool is_chunk_coord_initialized(Vec2i coord) {
+    return coord.x != CHUNK_COORD_UNINITIALIZED;
+}
+
+static Vec2i chunk_coord_uninitialized() {
+    return Vec2i(CHUNK_COORD_UNINITIALIZED, 0);
+}
+
 // Add offset to base_pos and return new position
 inline WorldPosition pos_add(WorldPosition base_pos, Vec2 offset);
 inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);
@@ -73,6 +83,13 @@ enum {
     RESOURCE_KIND_SENTINEL,
 };
 
+// @TODO if we want to be fancy, we can use depth kind system
+// So there will be several kind levels, primary being pawn, world object
+// And pawn can be human or animal
+// And human can be hostile or friendly or whatever
+// This way we can save space on repeating kind fields
+// But really this is just a couple of bytes, so should we care?
+
 struct SimEntity {
     // General data
     Vec2 p;
@@ -126,7 +143,6 @@ CT_ASSERT(IS_POW2(WORLD_CHUNK_HASH_SIZE));
 // It can be though as entity list, that additionally has spatial partition and uses ids for access
 struct World {
     MemoryArena *world_arena;
-    MemoryArena *frame_arena;
     // Linked list free entry
     EntityBlock *first_free;
     // Chunks hash table. Implemented with external collision resolving (other chunks are allocated separately)
@@ -171,7 +187,7 @@ struct SimRegion {
     WorldPosition origin;
     Vec2i min_chunk;
     Vec2i max_chunk;
-    // @CLEAN this is here only because we couldn't do zsort ourselves!
+    // @TODO this is here only because we couldn't do zsort ourselves!
     Vec3 cam_p;
     Mat4x4 cam_mvp; 
     
@@ -203,46 +219,8 @@ struct EntityIterator {
 };
 
 EntityIterator iterate_all_entities(SimRegion *sim);
+bool is_valid(EntityIterator *iter);
 void advance(EntityIterator *iter);
-
-enum {
-    PLAYER_INTERACTION_KIND_NONE,
-    // Make this separate from destroy not to overcomplicate things trying to use less names
-    PLAYER_INTERACTION_KIND_MINE_RESOURCE,
-    PLAYER_INTERACTION_KIND_DESTROY,
-    PLAYER_INTERACTION_KIND_BUILD,
-    PLAYER_INTERACTION_KIND_SENTINEL  
-};
-
-// All game-related data is stored here. Like player resources, debug thigs etc.
-struct GameState {
-    MemoryArena arena;
-    MemoryArena frame_arena;
-    
-    SimCamera cam;
-    EntityID camera_followed_entity_id;
-    // Generated world size
-    Vec2i min_chunk;
-    Vec2i max_chunk;
-    
-    World *world;
-    u32 wood_count;
-    u32 gold_count;
-    
-    u32 interaction_kind;
-    bool is_player_interacting;
-    EntityID interactable;
-    f32 interaction_time;
-    f32 interaction_current_time;
-    
-    u8 selected_building;
-    bool is_planning_building;
-    
-    size_t DEBUG_last_frame_sim_region_entity_count;
-};
-
-void game_state_init(GameState *game_state);
-void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets);
 
 #define WORLD_HH 1
 #endif

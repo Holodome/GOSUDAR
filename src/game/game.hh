@@ -7,7 +7,7 @@
 #include "framework/assets.hh"
 #include "framework/dev_ui.hh"
 
-#include "game/world.hh"
+#include "game/game_state.hh"
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state

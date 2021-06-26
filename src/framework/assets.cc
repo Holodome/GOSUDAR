@@ -81,7 +81,7 @@ void Assets::init() {
     this->asset_infos[Asset_FontAtlas].kind = AssetKind::Image;
     this->asset_infos[Asset_FontAtlas].state = AssetState::Unloaded;
     
-    // @CLEAN
+    // @TODO
     this->get_tex(Asset_White);
     logprintln("Assets", "Init end");
 }

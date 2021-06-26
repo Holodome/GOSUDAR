@@ -6,7 +6,6 @@ enum {
     PLAYER_INTERACTION_KIND_NONE,
     // Make this separate from destroy not to overcomplicate things trying to use less names
     PLAYER_INTERACTION_KIND_MINE_RESOURCE,
-    PLAYER_INTERACTION_KIND_DESTROY,
     PLAYER_INTERACTION_KIND_BUILD,
     PLAYER_INTERACTION_KIND_SENTINEL  
 };
@@ -32,8 +31,10 @@ struct GameState {
     f32 interaction_time;
     f32 interaction_current_time;
     
+    bool allow_camera_controls;
+    
     u8 selected_building;
-    bool is_planning_building;
+    bool is_in_building_mode;
     
     size_t DEBUG_last_frame_sim_region_entity_count;
 };

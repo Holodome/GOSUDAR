@@ -11,6 +11,8 @@ enum struct Key {
     A,
     S,
     D,
+    Z,
+    B,
     Shift,
     Ctrl,
     Space,

@@ -10,7 +10,7 @@ static EntityID add_player(World *world) {
 }
 
 static EntityID add_tree(World *world, WorldPosition pos) {
-    pos = world_position_floor_to_cell(pos);
+    pos.offset = floor_to_cell(pos.offset);
     
     EntityID entity_id = add_world_entity(world, pos);
     Entity *entity = get_world_entity(world, entity_id);
@@ -24,7 +24,7 @@ static EntityID add_tree(World *world, WorldPosition pos) {
 }
 
 static EntityID add_gold_vein(World *world, WorldPosition pos) {
-    pos = world_position_floor_to_cell(pos);
+    pos.offset = floor_to_cell(pos.offset);
     
     EntityID entity_id = add_world_entity(world, pos);
     Entity *entity = get_world_entity(world, entity_id);
@@ -47,6 +47,7 @@ void game_state_init(GameState *game_state) {
     game_state->wood_count = 0;
     game_state->gold_count = 0;
     game_state->interactable = null_id();
+    game_state->allow_camera_controls = false;
     // Initialize world struct
     game_state->world = alloc_struct(&game_state->arena, World);
     game_state->world->world_arena = &game_state->arena;
@@ -150,7 +151,6 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     Vec2i min_chunk_coord, max_chunk_coord;
     get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
     SimRegion *sim = begin_sim(game_state, min_chunk_coord, max_chunk_coord);
-    // @TODO This is kinda stupstorage_index to do update here - what if we want to do sim twice
     // Calculate player movement
     Vec2 player_delta = Vec2(0);
     f32 move_coef = 4.0f * input->dt;
@@ -172,8 +172,15 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     player_delta.x += x_speed * Math::cos(game_state->cam.yaw);
     player_delta.y += x_speed * Math::sin(game_state->cam.yaw);     
     
+    if (input->is_key_pressed(Key::Z)) {
+        game_state->allow_camera_controls = !game_state->allow_camera_controls;
+    }
+    if (input->is_key_pressed(Key::B)) {
+        game_state->is_in_building_mode = !game_state->is_in_building_mode;
+    }
+    
     // Update camera input
-    if (input->is_key_held(Key::MouseRight)) {
+    if (game_state->allow_camera_controls) {
         f32 x_view_coef = 1.0f * input->dt;
         f32 y_view_coef = 0.6f * input->dt;
         f32 x_angle_change = input->mdelta.x * x_view_coef;
@@ -196,6 +203,7 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         
         switch (entity->kind) {
             case ENTITY_KIND_PLAYER: {
+                // @TODO this can be outside of entity update?
                 if (!game_state->is_player_interacting) {
                     entity->p += player_delta;
                     // Find closest interactable
@@ -218,48 +226,6 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         }
     }
    
-    if (is_not_null(game_state->interactable)) {
-        SimEntity *ent = get_entity_by_id(sim, game_state->interactable);
-        if (input->is_key_held(Key::MouseLeft)) {
-            if (game_state->is_player_interacting) {
-                game_state->interaction_current_time += input->dt;
-                if (game_state->interaction_current_time >= game_state->interaction_time) {
-                    game_state->is_player_interacting = false;
-                    if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
-                        ent->resource_interactions_left -= 1;
-                        switch (ent->resource_kind) {
-                            case RESOURCE_KIND_WOOD: {
-                                game_state->wood_count += ent->resource_gain;
-                            } break;
-                            case RESOURCE_KIND_GOLD: {
-                                game_state->gold_count += ent->resource_gain;
-                            } break;
-                            INVALID_DEFAULT_CASE;
-                        }
-                        if (ent->resource_interactions_left == 0) {
-                            ent->flags |= ENTITY_FLAG_IS_DELETED;
-                            game_state->interactable = null_id();
-                        }
-                    } else {
-                        assert(false);
-                    }
-                }
-            } else {
-                f32 interaction_time;
-                assert(ent->resource_interactions_left > 0);
-                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
-                    interaction_time = 1.0f;
-                } else {
-                    assert(false);
-                }
-                game_state->interaction_time = interaction_time;
-                game_state->interaction_current_time = 0;
-                game_state->is_player_interacting = true;
-            }
-        } else {
-            game_state->is_player_interacting = false;
-        }
-    } 
     // Update camera movement
     SimEntity *camera_followed_entity = get_entity_by_id(sim, game_state->camera_followed_entity_id);
     Vec3 center_pos = xz(camera_followed_entity->p);
@@ -285,6 +251,111 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     bool intersect = ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+    
+    if (game_state->is_in_building_mode) {
+        if (input->is_key_pressed(Key::MouseRight)) {
+            SimEntity *building = create_entity(sim);
+            building->p = floor_to_cell(mouse_point);
+            building->kind = ENTITY_KIND_WORLD_OBJECT;
+            building->world_object_flags = WORLD_OBJECT_FLAG_IS_BUILDING;
+            building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1;
+            game_state->is_in_building_mode = false;
+            // @TODO set interactable
+        }
+    }
+    
+    if (is_not_null(game_state->interactable)) {
+        SimEntity *ent = get_entity_by_id(sim, game_state->interactable);
+        assert(ent->kind == ENTITY_KIND_WORLD_OBJECT);
+        if (game_state->is_player_interacting) {
+            bool continue_interaction = false;
+            switch (game_state->interaction_kind) {
+                case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
+                    continue_interaction = input->is_key_held(Key::MouseLeft);
+                } break;
+                case PLAYER_INTERACTION_KIND_BUILD: {
+                    continue_interaction = input->is_key_held(Key::MouseRight);
+                } break;
+                INVALID_DEFAULT_CASE;
+            }
+            
+            if (continue_interaction) {
+                game_state->interaction_current_time += input->dt;
+                if (game_state->interaction_current_time >= game_state->interaction_time) {
+                    game_state->is_player_interacting = false;
+                    // finalize interaction
+                    switch (game_state->interaction_kind) {
+                        case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
+                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE);
+                            assert(ent->resource_interactions_left);
+                            ent->resource_interactions_left -= 1;
+                            switch (ent->resource_kind) {
+                                case RESOURCE_KIND_WOOD: {
+                                    game_state->wood_count += ent->resource_gain;
+                                } break;
+                                case RESOURCE_KIND_GOLD: {
+                                    game_state->gold_count += ent->resource_gain;
+                                } break;
+                                INVALID_DEFAULT_CASE;
+                            }
+                            if (ent->resource_interactions_left == 0) {
+                                ent->flags |= ENTITY_FLAG_IS_DELETED;
+                                game_state->interactable = null_id();
+                            }
+                        } break;
+                        case PLAYER_INTERACTION_KIND_BUILD: {
+                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING);
+#define BUILD_SPEED 0.1
+                            ent->build_progress += BUILD_SPEED;
+                            ent->build_progress = Math::min(ent->build_progress, 1.0f);
+                            if (ent->build_progress == 1.0f) {
+                                
+                            }
+                        } break;
+                        INVALID_DEFAULT_CASE;
+                    }
+                } 
+            } else {
+                game_state->is_player_interacting = false;
+            }
+        } else {
+            u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
+            if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+                if (input->is_key_held(Key::MouseLeft)) {
+                    interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
+                } 
+            } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                if (input->is_key_held(Key::MouseRight)) {
+                    interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
+                }
+            }
+            
+            if (interaction_kind) {
+                f32 interaction_time;
+                bool cancel_interaction = false;
+                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+                    assert(ent->resource_interactions_left > 0);
+                    // switch on type...
+                    interaction_time = 1.0f;
+                } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                    if (ent->build_progress < 1.0f) {
+                        interaction_time = 1.0f;
+                    } else {
+                        cancel_interaction = true;
+                    }
+                } else {
+                    assert(false);
+                }
+                if (!cancel_interaction) {
+                    game_state->interaction_time = interaction_time;
+                    game_state->interaction_current_time = 0;
+                    game_state->is_player_interacting = true;
+                    game_state->interaction_kind = interaction_kind;
+                    printf("begin new interaction\n");
+                }
+            }
+        }
+    } 
     
     RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
     // Draw ground
@@ -368,7 +439,11 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
                         texture_id = Asset_GoldVein;
                     } break;
                     case WORLD_OBJECT_KIND_BUILDING1: {
-                        texture_id = Asset_Building;
+                        if (entity->build_progress == 1.0f) {
+                            texture_id = Asset_Building;
+                        } else {
+                            texture_id = Asset_Building1;
+                        }
                     } break;
                     case WORLD_OBJECT_KIND_BUILDING2: {
                         texture_id = Asset_Building1;

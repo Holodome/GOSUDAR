@@ -32,7 +32,7 @@ inline Vec2 distance_between_pos(WorldPosition a, WorldPosition b);
 inline bool is_same_chunk(WorldPosition a, WorldPosition b);
 inline Vec2 DEBUG_world_pos_to_p(WorldPosition pos);
 inline WorldPosition world_position_from_tile_position(Vec2i tile_position);
-inline WorldPosition world_position_floor_to_cell(WorldPosition pos);
+inline Vec2 floor_to_cell(Vec2 pos);
 
 struct EntityID {
     u32 value;    
@@ -61,7 +61,7 @@ enum {
 // World object flags
 enum {
     WORLD_OBJECT_FLAG_IS_RESOURCE = 0x1,
-    WORLD_OJBECT_FLAG_IS_BUILDING = 0x2,
+    WORLD_OBJECT_FLAG_IS_BUILDING = 0x2,
     WORLD_OJBECT_FLAG_SENTINEL
 };
 // World object kind
@@ -103,7 +103,7 @@ struct SimEntity {
     u8 resource_interactions_left;
     u8 resource_gain;
     // For building
-    f32 build_progress; // in work units
+    f32 build_progress; // [0-1]
     f32 hit_points;
 };  
 

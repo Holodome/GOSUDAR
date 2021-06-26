@@ -47,9 +47,9 @@ WorldPosition world_position_from_tile_position(Vec2i tile_position) {
     return result;
 }
 
-WorldPosition world_position_floor_to_cell(WorldPosition pos) {
-    pos.offset.x = floorf(pos.offset.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
-    pos.offset.y = floorf(pos.offset.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+Vec2 floor_to_cell(Vec2 pos) {
+    pos.x = floorf(pos.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+    pos.y = floorf(pos.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
     return pos;
 }
 
@@ -281,6 +281,7 @@ SimEntity *add_entity(SimRegion *sim, EntityID entity_id) {
 SimEntity *create_entity(SimRegion *sim) {
     assert(sim->entity_count < sim->max_entity_count);
     SimEntity *entity = sim->entities + sim->entity_count++;
+    memset(entity, 0, sizeof(*entity));
     entity->id = null_id();
     return entity;
 }

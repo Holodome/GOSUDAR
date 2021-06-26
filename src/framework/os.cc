@@ -252,6 +252,12 @@ void OS::update_input(Input *input) {
                     case 0x020: {
                         key = Key::D;
                     } break;
+                    case 0x02C: {
+                        key = Key::Z;
+                    } break;
+                    case 0x030: {
+                        key = Key::B;
+                    } break;
                     case 0x02A: {
                         key = Key::Shift;
                     } break;

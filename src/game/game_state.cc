@@ -289,6 +289,7 @@ static void update_interface(GameState *game_state, Input *input) {
 }
 
 static void update_world_simulation(GameState *game_state, FrameData *frame, Input *input) {
+    TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
 
     SimEntity *camera_followed_entity = get_entity_by_id(sim, game_state->camera_followed_entity_id);
@@ -357,9 +358,11 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
 }
 
 static void render_world(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
+    TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
     RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
     // Draw ground
+    BEGIN_BLOCK("Render_ground");
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
         for (i32 chunk_y = sim->min_chunk.y; chunk_y <= sim->max_chunk.y; ++chunk_y) {
             if (chunk_x < game_state->min_chunk.x || chunk_x > game_state->max_chunk.x || 
@@ -402,9 +405,11 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         v[3] = xz(entity_p + Vec2(half_size.x, half_size.y),   10 * WORLD_EPSILON);
         push_quad(&world_render_group, v, Asset_SelectCircle);
     }
-    size_t max_drawable_count = sim->entity_count;
+    END_BLOCK();
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
+    BEGIN_BLOCK("ZSORT");
     TempMemory zsort = temp_memory_begin(&game_state->frame_arena);
+    size_t max_drawable_count = sim->entity_count;
     size_t drawable_entity_storage_index_count = 0;
     size_t *drawable_entity_storage_indexs = alloc_arr(&game_state->frame_arena, max_drawable_count, size_t);
     for (EntityIterator iter = iterate_all_entities(sim);
@@ -415,6 +420,8 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     
     // Sort by distance to camera
     qsort_s(drawable_entity_storage_indexs, drawable_entity_storage_index_count, sizeof(*drawable_entity_storage_indexs), z_camera_sort, sim);
+    END_BLOCK();
+    BEGIN_BLOCK("Render billboards");
     for (size_t drawable_idx = 0; drawable_idx < drawable_entity_storage_index_count; ++drawable_idx) {
         SimEntity *entity = &sim->entities[drawable_entity_storage_indexs[drawable_idx]];
         AssetID texture_id = INVALID_ASSET_ID;
@@ -460,6 +467,7 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), size.x, size.y, billboard);
         push_quad(&world_render_group, billboard, texture_id);
     }
+    END_BLOCK();
     render_group_end(&world_render_group); 
 }
 

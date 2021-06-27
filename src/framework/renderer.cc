@@ -62,6 +62,7 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
                Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
                Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,
                Texture texture) {
+    TIMED_FUNCTION();
     RenderQuads *quads = get_quads(render_group->commands, render_group->setup);
     if (quads) {
         Vec2 uv_scale = Vec2(texture.width, texture.height) * RENDERER_RECIPROCAL_TEXTURE_SIZE;

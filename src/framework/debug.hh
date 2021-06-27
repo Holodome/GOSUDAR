@@ -1,6 +1,7 @@
 #if !defined(DEBUG_HH)
 
 #include "lib/general.hh"
+#include "lib/math.hh"
 #include "lib/memory_arena.hh"
 
 #include <intrin.h>
@@ -10,6 +11,8 @@
 #define DEBUG_MAX_EVENT_COUNT (65536 * 16)
 #define DEBUG_MAX_RECORD_COUNT 65536
 #define DEBUG_MAX_REGIONS_PER_FRAME 65536
+#define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
+CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 
 enum {
     DEBUG_EVENT_NONE,
@@ -21,8 +24,8 @@ enum {
 struct DebugEvent {
     u8 type;          // DebugEventType
     u64 clock;        // rdstc
-    char *debug_name; // see DEBUG_NAME
-    char *name;       // user-defined block name
+    const char *debug_name; // see DEBUG_NAME
+    const char *name;       // user-defined block name
 };
 
 struct DebugTable {
@@ -82,20 +85,35 @@ struct DebugTimedBlock {
 struct DebugFrameRegion {
     f32 time_min;
     f32 time_max;
-    char *debug_name; // see DEBUG_NAME
-    char *name;       // user-defined block name
+    const char *debug_name; // see DEBUG_NAME
+    const char *name;       // user-defined block name
+};
+
+struct DebugRecord {
+    const char *debug_name; // hash key
+    const char *name;
+    u32 times_called;
+    u64 total_clocks;
+};  
+
+struct DebugRecordHash {
+    const char *debug_name;
+    DebugRecord *ptr;
 };
 
 struct DebugFrame {
     u64 begin_clock;
     u64 end_clock;
-
-    DebugFrameRegion *regions;
-    size_t            region_count;
+    
+    u32 records_count;
+    DebugRecord records[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
+    DebugRecordHash records_hash[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
+    
+    // size_t           region_count;
+    // DebugFrameRegion regions[DEBUG_MAX_REGIONS_PER_FRAME];
 };
 
-struct DebugOpenBlock
-{
+struct DebugOpenBlock {
     u32 frame_index;
     DebugEvent *opening_event;
     DebugOpenBlock *parent;
@@ -103,20 +121,15 @@ struct DebugOpenBlock
     DebugOpenBlock *next_free;
 };
 
+
 struct DebugState {
-    MemoryArena debug_arena;
-    
     MemoryArena collate_arena;
-    TempMemory collate_temp;
 
     DebugTable debug_table;
-
-    u32         frame_count;
-    DebugFrame *frames;
-    DebugFrame *collation_frame;
+    
+    u32 frame_index;
+    DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
     DebugOpenBlock *current_open_block;
-
-    char *debug_name_to_record;
         
     DebugOpenBlock *first_free_block;
     u32 collation_array_index;

@@ -178,6 +178,7 @@ void move_entity(World *world, EntityID id, WorldPosition to, WorldPosition from
 }
 
 SimRegion *begin_sim(struct GameState *game_state, Vec2i min_chunk, Vec2i max_chunk) {
+    TIMED_FUNCTION();
     SimRegion *sim = alloc_struct(&game_state->frame_arena, SimRegion);
     sim->game_state = game_state;
     sim->max_entity_count = 4096;
@@ -215,6 +216,7 @@ SimRegion *begin_sim(struct GameState *game_state, Vec2i min_chunk, Vec2i max_ch
 }
 
 void end_sim(SimRegion *sim) {
+    TIMED_FUNCTION();
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = sim->entities + entity_idx;
         // Place entity in world 

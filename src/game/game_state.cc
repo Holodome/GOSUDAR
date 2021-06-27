@@ -2,29 +2,23 @@
 
 #include "game/ray_casting.hh"
 
-static EntityID add_player(World *world) {
-    EntityID entity_id = add_world_entity(world, {});
-    Entity *entity = get_world_entity(world, entity_id);
-    entity->sim.kind = ENTITY_KIND_PLAYER;
-    return entity_id;
-}
-
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);
     Vec2 b_floor = floor_to_cell(b);
     return a_floor == b_floor;
 }
 
-static bool is_cell_occupied(World *world, WorldPosition test_cell) {
+
+static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
+    TIMED_FUNCTION();
     bool occupied = false;
     
-    Chunk *test_chunk = get_world_chunk(world, test_cell.chunk);
-    for (ChunkIterator iter = iterate_chunk_entities(test_chunk);
+    for (EntityIterator iter = iterate_all_entities(sim);
          is_valid(&iter);
          advance(&iter)) {
-        Entity *entity = get_world_entity(world, *iter.id);
-        if (entity->sim.kind & ENTITY_KIND_WORLD_OBJECT) {
-            if (is_in_same_cell(test_cell.offset, entity->world_pos.offset)) {
+        SimEntity *entity = iter.ptr;
+        if (entity->kind & ENTITY_KIND_WORLD_OBJECT) {
+            if (is_in_same_cell(entity->p, p)) {
                 occupied = true;
                 break;
             }
@@ -33,49 +27,54 @@ static bool is_cell_occupied(World *world, WorldPosition test_cell) {
     return occupied;
 }
 
-static EntityID add_tree(World *world, WorldPosition pos) {
-    pos.offset = floor_to_cell(pos.offset);
-    
-    EntityID entity_id = add_world_entity(world, pos);
-    Entity *entity = get_world_entity(world, entity_id);
-    entity->sim.kind = ENTITY_KIND_WORLD_OBJECT;
-    entity->sim.world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
-    entity->sim.world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
-    entity->sim.resource_kind = RESOURCE_KIND_WOOD;
-    entity->sim.resource_interactions_left = 1;
-    entity->sim.resource_gain = 2;
-    return entity_id;
+static EntityID add_player(SimRegion *sim) {
+    SimEntity *entity = create_entity(sim);
+    entity->p = {};
+    entity->kind = ENTITY_KIND_PLAYER;
+    return entity->id;
 }
 
-static EntityID add_gold_vein(World *world, WorldPosition pos) {
-    pos.offset = floor_to_cell(pos.offset);
+static EntityID add_tree(SimRegion *sim, Vec2 pos) {
+    pos = floor_to_cell(pos);
     
-    EntityID entity_id = add_world_entity(world, pos);
-    Entity *entity = get_world_entity(world, entity_id);
-    entity->sim.kind = ENTITY_KIND_WORLD_OBJECT;
-    entity->sim.world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
-    entity->sim.world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
-    entity->sim.resource_kind = RESOURCE_KIND_GOLD;
-    entity->sim.resource_interactions_left = 5;
-    entity->sim.resource_gain = 10;
-    return entity_id;
+    SimEntity *entity = create_entity(sim);
+    entity->p = pos;
+    entity->kind = ENTITY_KIND_WORLD_OBJECT;
+    entity->world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
+    entity->world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
+    entity->resource_kind = RESOURCE_KIND_WOOD;
+    entity->resource_interactions_left = 1;
+    entity->resource_gain = 2;
+    return entity->id;
 }
 
-static void world_gen(GameState *game_state, World *world) {
+static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
+    pos = floor_to_cell(pos);
+    
+    SimEntity *entity = create_entity(sim);
+    entity->p = pos;
+    entity->kind = ENTITY_KIND_WORLD_OBJECT;
+    entity->world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
+    entity->world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
+    entity->resource_kind = RESOURCE_KIND_GOLD;
+    entity->resource_interactions_left = 5;
+    entity->resource_gain = 10;
+    return entity->id;
+}
+
+static void world_gen(GameState *game_state) {
     Entropy entropy;
-    entropy.state = 123;
-    
+    entropy.state = 1233437824;
+    SimRegion *gen_sim = begin_sim(game_state, Vec2i(0), Vec2i(0));
     // Initialize game_state 
-    game_state->camera_followed_entity_id = add_player(game_state->world);
+    game_state->camera_followed_entity_id = add_player(gen_sim);
     for (size_t i = 0; i < 1000; ++i) {
         do {
-            WorldPosition tree_p;
-            tree_p.chunk.x = random_int(&entropy, 10);
-            tree_p.chunk.y = random_int(&entropy, 10);
-            tree_p.offset.x = random(&entropy) * CHUNK_SIZE;
-            tree_p.offset.y = random(&entropy) * CHUNK_SIZE;
-            if (!is_cell_occupied(world, tree_p)) {
-                add_tree(game_state->world, tree_p);
+            Vec2 p;
+            p.x = random(&entropy) * CHUNK_SIZE * 10;
+            p.y = random(&entropy) * CHUNK_SIZE * 10;
+            if (!is_cell_occupied(gen_sim, p)) {
+                add_tree(gen_sim, p);
                 break;
             }
         } while (true);
@@ -83,17 +82,16 @@ static void world_gen(GameState *game_state, World *world) {
     
     for (size_t i = 0; i < 50; ++i) {
         do {
-            WorldPosition p;
-            p.chunk.x = random_int(&entropy, 10);
-            p.chunk.y = random_int(&entropy, 10);
-            p.offset.x = random(&entropy) * CHUNK_SIZE;
-            p.offset.y = random(&entropy) * CHUNK_SIZE;
-            if (!is_cell_occupied(world, p)) {
-                add_gold_vein(game_state->world, p);
+            Vec2 p;
+            p.x = random(&entropy) * CHUNK_SIZE * 10;
+            p.y = random(&entropy) * CHUNK_SIZE * 10;
+            if (!is_cell_occupied(gen_sim, p)) {
+                add_gold_vein(gen_sim, p);
                 break;
             }
         } while (0);
     }
+    end_sim(gen_sim);
 }
 
 void game_state_init(GameState *game_state) {
@@ -121,8 +119,11 @@ void game_state_init(GameState *game_state) {
     for (size_t i = 0; i < ARRAY_SIZE(game_state->world->chunk_hash); ++i) {
         game_state->world->chunk_hash[i].coord = Vec2i(CHUNK_COORD_UNINITIALIZED, 0);
     }
+    for (size_t i = 0; i < game_state->world->max_entity_count; ++i) {
+        game_state->world->entities[i].world_pos.chunk.x = CHUNK_COORD_UNINITIALIZED;
+    }
     
-    world_gen(game_state, game_state->world);
+    world_gen(game_state);
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -328,23 +329,6 @@ static void update_interface(GameState *game_state, Input *input) {
         game_state->cam.pitch = Math::clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         game_state->cam.distance_from_player -= input->mwheel;
     }
-}
-
-static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
-    bool occupied = false;
-    
-    for (EntityIterator iter = iterate_all_entities(sim);
-         is_valid(&iter);
-         advance(&iter)) {
-        SimEntity *entity = iter.ptr;
-        if (entity->kind & ENTITY_KIND_WORLD_OBJECT) {
-            if (is_in_same_cell(entity->p, p)) {
-                occupied = true;
-                break;
-            }
-        }        
-    }
-    return occupied;
 }
 
 static void update_world_simulation(GameState *game_state, FrameData *frame, Input *input) {

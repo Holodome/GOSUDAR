@@ -158,7 +158,7 @@ struct World {
     Entity *entities;
 };  
 
-EntityID add_world_entity(World *world, WorldPosition pos);
+// EntityID add_world_entity(World *world, WorldPosition pos);
 Entity *get_world_entity(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);
 bool remove_entity_from_chunk(World *world, Chunk *chunk, EntityID id);

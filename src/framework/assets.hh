@@ -85,5 +85,32 @@ struct Assets {
     Vec2 get_text_size(AssetID id, const char *text, size_t count = 0, f32 scale = 1.0f);
 };
 
+/*
+
+// Tags is per-asset kind settings
+#define ASSET_TAG_COUNT 10
+struct AssetTags {
+    f32 tags[ASSET_TAG_COUNT];
+};
+
+enum AssetKind {
+    AssetKind_Tree, // Tags: biome(kind), subkind(bush/tree), health, height, 
+    AssetKind_Building, // Tags: kind, build progress, health
+    AssetKind_Player, // Tags: facing direction, health 
+    AssetKind_Font, // Tags: codepoint
+};
+// For example, when program wants to get some assetfor tree,
+// it does not need to specify all parameters itself and select asset from list
+// Instead it specifies tags and lets assets system choose best match 
+// This way we can have enums for asset kinds with small number of kinds,
+// but each of them can have unlimited number of individual assets
+
+// If we keep ASSET_TAG_COUNT small, we can use bitmask for choosing asset tags needed
+// Tags-mask can be computed with knowing kind
+Asset *get_asset_internal(AssetKind kind, u32 tags_mask, AssetTags weights);
+Asset *get_asset(AssetKind kind, AssetTags weights);
+
+*/
+
 #define ASSETS_HH 1
 #endif

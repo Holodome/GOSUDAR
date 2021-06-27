@@ -100,20 +100,20 @@ void advance(ChunkIterator *iter) {
     }
 }
 
-EntityID add_world_entity(World *world, WorldPosition pos) {
-    assert(world->entity_count < world->max_entity_count);
-    EntityID id;
-    assert(world->entity_count < UINT32_MAX);
-    id.value = (u32)world->entity_count++; 
-    Entity *entity = world->entities + id.value;
-    memset(entity, 0, sizeof(*entity));
-    entity->world_pos = pos;
-    entity->sim.id = id;
+// EntityID add_world_entity(World *world, WorldPosition pos) {
+//     assert(world->entity_count < world->max_entity_count);
+//     EntityID id;
+//     assert(world->entity_count < UINT32_MAX);
+//     id.value = (u32)world->entity_count++; 
+//     Entity *entity = world->entities + id.value;
+//     memset(entity, 0, sizeof(*entity));
+//     entity->world_pos = pos;
+//     entity->sim.id = id;
     
-    Chunk *chunk = get_world_chunk(world, pos.chunk);
-    add_entity_to_chunk(world, chunk, id);
-    return id;    
-}
+//     Chunk *chunk = get_world_chunk(world, pos.chunk);
+//     add_entity_to_chunk(world, chunk, id);
+//     return id;    
+// }
 
 Entity *get_world_entity(World *world, EntityID id) {
     // @TODO clean, make 0 id invalid
@@ -216,10 +216,6 @@ SimRegion *begin_sim(struct GameState *game_state, Vec2i min_chunk, Vec2i max_ch
     
     for (i32 chunk_y = min_chunk.y; chunk_y <= max_chunk.y; ++chunk_y) {
         for (i32 chunk_x = min_chunk.x; chunk_x <= max_chunk.x; ++chunk_x) {
-            // if (chunk_x < game_state->min_chunk.x || chunk_x > game_state->max_chunk.x || 
-            //     chunk_y < game_state->min_chunk.y || chunk_y > game_state->max_chunk.y) {
-            //     continue;       
-            // }
             Vec2i chunk_coord = Vec2i(chunk_x, chunk_y);
             // Maybe if chunk has zero entities we delete it, this way we can dont worry about chunk regions 
             // in sim region. Let the update code handle where entity can go.
@@ -243,20 +239,20 @@ void end_sim(SimRegion *sim) {
         SimEntity *entity = sim->entities + entity_idx;
         // Place entity in world 
         WorldPosition new_position = pos_add(sim->origin, entity->p);
-        if (is_same(entity->id, null_id()) && !(entity->flags & ENTITY_FLAG_IS_DELETED)) {
-            entity->id = add_world_entity(sim->game_state->world, new_position);
-            Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
-            world_ent->sim = *entity;
+        // if (is_same(entity->id, null_id()) && !(entity->flags & ENTITY_FLAG_IS_DELETED)) {
+        //     // entity->id = add_world_entity(sim->game_state->world, new_position);
+        //     Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
+        //     world_ent->sim = *entity;
+        // } else {
+        Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
+        if (entity->flags & ENTITY_FLAG_IS_DELETED) {
+            Chunk *old_chunk = get_world_chunk(sim->game_state->world, world_ent->world_pos.chunk);
+            remove_entity_from_chunk(sim->game_state->world, old_chunk, entity->id);
         } else {
-            Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
-            if (entity->flags & ENTITY_FLAG_IS_DELETED) {
-                Chunk *old_chunk = get_world_chunk(sim->game_state->world, world_ent->world_pos.chunk);
-                remove_entity_from_chunk(sim->game_state->world, old_chunk, entity->id);
-            } else {
-                world_ent->sim = *entity;
-				move_entity(sim->game_state->world, entity->id, new_position, world_ent->world_pos);
-            }
+            world_ent->sim = *entity;
+            move_entity(sim->game_state->world, entity->id, new_position, world_ent->world_pos);
         }
+        // }
     }
 }
 
@@ -310,7 +306,12 @@ SimEntity *create_entity(SimRegion *sim) {
     assert(sim->entity_count < sim->max_entity_count);
     SimEntity *entity = sim->entities + sim->entity_count++;
     memset(entity, 0, sizeof(*entity));
-    entity->id = null_id();
+    // @TODO make this more explicit
+    entity->id.value = sim->game_state->world->entity_count++;
+    SimEntityHash *hash = get_hash_from_storage_index(sim, entity->id);
+    hash->id = entity->id;
+    hash->ptr = entity;
+
     return entity;
 }
 

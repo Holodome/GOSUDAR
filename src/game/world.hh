@@ -130,6 +130,16 @@ struct Chunk {
     Chunk *next_in_hash;
 };
 
+struct ChunkIterator {
+    EntityBlock *block;
+    u32 entity_index;
+    EntityID *id;
+};  
+
+ChunkIterator iterate_chunk_entities(Chunk *chunk);
+bool is_valid(ChunkIterator *iter);
+void advance(ChunkIterator *iter);
+
 #define WORLD_CHUNK_HASH_SIZE 4096
 CT_ASSERT(IS_POW2(WORLD_CHUNK_HASH_SIZE));
 // @TODO make world inners inaccessable, use api calls for all

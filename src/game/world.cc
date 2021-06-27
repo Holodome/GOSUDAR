@@ -48,8 +48,8 @@ WorldPosition world_position_from_tile_position(Vec2i tile_position) {
 }
 
 Vec2 floor_to_cell(Vec2 pos) {
-    pos.x = floorf(pos.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
-    pos.y = floorf(pos.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE * 0.5f;
+    pos.x = floorf(pos.x / CELL_SIZE) * CELL_SIZE;
+    pos.y = floorf(pos.y / CELL_SIZE) * CELL_SIZE;
     return pos;
 }
 
@@ -74,6 +74,30 @@ inline EntityID entity_id_from_storage_index(u32 index) {
     EntityID result;
     result.value = index;
     return result;    
+}
+
+ChunkIterator iterate_chunk_entities(Chunk *chunk) {
+    ChunkIterator iter;
+    iter.block = &chunk->entity_block;
+    iter.entity_index = 0;
+    iter.id = iter.block->entity_count ? iter.block->entity_storage_indices : 0;
+    return iter;
+}
+
+bool is_valid(ChunkIterator *iter) {
+    return iter->id != 0;    
+}
+
+void advance(ChunkIterator *iter) {
+    if (iter->entity_index + 1 < iter->block->entity_count) {
+        iter->id = iter->block->entity_storage_indices + ++iter->entity_index;
+    } else if (iter->block->next) {
+        iter->entity_index = 0;
+        iter->block = iter->block->next;
+        iter->id = iter->block->entity_count ? iter->block->entity_storage_indices : 0;
+    } else {
+        iter->id = 0;
+    }
 }
 
 EntityID add_world_entity(World *world, WorldPosition pos) {
@@ -201,14 +225,12 @@ SimRegion *begin_sim(struct GameState *game_state, Vec2i min_chunk, Vec2i max_ch
             // in sim region. Let the update code handle where entity can go.
             // So this way we could make portals or whatever in far away chunks
             Chunk *chunk = get_world_chunk(game_state->world, chunk_coord);
-            for (EntityBlock *block = &chunk->entity_block;
-                 block;
-                 block = block->next) {
-                for (size_t entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
-                    EntityID entity_id = block->entity_storage_indices[entity_idx];
-                    add_entity(sim, entity_id);
-                }        
-            }
+            for (ChunkIterator iter = iterate_chunk_entities(chunk);
+                 is_valid(&iter);
+                 advance(&iter)) {
+                EntityID entity_id = *iter.id;
+                add_entity(sim, entity_id);
+            }        
         }
     }
     
@@ -283,6 +305,7 @@ SimEntity *add_entity(SimRegion *sim, EntityID entity_id) {
     return entity;
 }
 
+// @NOTE fix that we can't get this entity by id until next frame
 SimEntity *create_entity(SimRegion *sim) {
     assert(sim->entity_count < sim->max_entity_count);
     SimEntity *entity = sim->entities + sim->entity_count++;

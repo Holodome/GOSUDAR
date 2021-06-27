@@ -4,30 +4,13 @@
 
 DebugTable *debug_table;
 
-// static DebugFrameRegion *debug_add_region(DebugFrame *collation_frame) {
-//     assert(collation_frame->region_count < DEBUG_MAX_REGIONS_PER_FRAME);
-//     DebugFrameRegion *result = collation_frame->regions + collation_frame->region_count++;
-    
-//     return result;
-// }
-
 static const char *debug_name_from(DebugOpenBlock *block) {
     const char *record = block ? block->opening_event->debug_name : 0;
     return record;
 }
 
-static void debug_restart_collation(DebugState *debug_state, u32 invalid_event_array_index) {
-    // temp_memory_end(debug_state->collate_temp);
-    // debug_state->collate_temp = temp_memory_begin(&debug_state->collate_arena);
-    
-    debug_state->first_free_block = 0;
-    debug_state->current_open_block = 0;
-    
-    debug_state->collation_array_index = invalid_event_array_index + 1;
-    // debug_state->collation_frame = 0;
-}
-
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
+    u64 collation_start_clock = __rdtsc();
     for (;; ++debug_state->collation_array_index) {
         if (debug_state->collation_array_index == DEBUG_MAX_EVENT_ARRAY_COUNT) {
             debug_state->collation_array_index = 0;
@@ -83,17 +66,16 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                             for (size_t offset = 0; offset < DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME; ++offset) {
                                 u32 hash_index = ((hash_value + offset) & hash_mask);
                                 DebugRecordHash *test = collation_frame->records_hash + hash_index;
-                                if (test->debug_name == 0) {
-                                    test->debug_name = opening_event->debug_name;
+                                if (test->debug_name_hash == 0) {
+                                    test->debug_name_hash = hash_value;
                                     assert(collation_frame->records_count < DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME);
-                                    test->ptr = collation_frame->records + collation_frame->records_count++;
-                                    record = test->ptr;
+                                    test->index = collation_frame->records_count++;
+                                    record = collation_frame->records + test->index;
                                     record->debug_name = opening_event->debug_name;
                                     record->name = opening_event->name;
 									break;
-                                } else if (test->debug_name == opening_event->debug_name) {
-                                    assert(test->ptr);
-                                    record = test->ptr;
+                                } else if (test->debug_name_hash == hash_value) {
+                                    record = collation_frame->records + test->index;
 									break;
                                 }
                             }
@@ -112,12 +94,9 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
             
         }
     }
+    u64 collation_end_clock = __rdtsc();
+    debug_state->frames[debug_state->frame_index].collation_clocks = collation_end_clock - collation_start_clock;
 }
-
-// static void debug_refresh_collation(DebugState *debug_state) {
-//     debug_restart_collation(debug_state, debug_table->current_event_array_index);
-//     debug_collate_events(debug_state,    debug_table->current_event_array_index);
-// }
 
 void debug_frame_end(DebugState *debug_state) {
     ++debug_table->current_event_array_index;
@@ -130,10 +109,14 @@ void debug_frame_end(DebugState *debug_state) {
     u32 event_array_index = event_array_index_event_index >> 32;
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
-    debug_collate_events(debug_state, debug_table->current_event_array_index);
+    
+    if (!debug_state->is_paused) {
+        debug_collate_events(debug_state, debug_table->current_event_array_index);
+    }
 }
 
 DebugState *debug_init() {
+    printf("Debug state size: %llu (%llu mb)\n", sizeof(DebugState), sizeof(DebugState) >> 20);
     DebugState *debug_state = (DebugState *)os_alloc(sizeof(DebugState));
     
     debug_table = &debug_state->debug_table;
@@ -141,7 +124,8 @@ DebugState *debug_init() {
     size_t debug_collate_arena_size = MEGABYTES(256);
     arena_init(&debug_state->collate_arena, os_alloc(debug_collate_arena_size), debug_collate_arena_size);
     
-    debug_restart_collation(debug_state, debug_table->current_event_array_index);
-    
+    debug_state->first_free_block = 0;
+    debug_state->current_open_block = 0;
+    debug_state->collation_array_index = 0;    
     return debug_state;
 }

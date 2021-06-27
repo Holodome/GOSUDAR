@@ -61,7 +61,6 @@ void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNM
         arena->peak_size = arena->data_size;
     }
     
-    assert(result);
     return result;
 }
 

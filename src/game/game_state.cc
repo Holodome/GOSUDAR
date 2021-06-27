@@ -9,6 +9,30 @@ static EntityID add_player(World *world) {
     return entity_id;
 }
 
+static bool is_in_same_cell(Vec2 a, Vec2 b) {
+    Vec2 a_floor = floor_to_cell(a);
+    Vec2 b_floor = floor_to_cell(b);
+    return a_floor == b_floor;
+}
+
+static bool is_cell_occupied(World *world, WorldPosition test_cell) {
+    bool occupied = false;
+    
+    Chunk *test_chunk = get_world_chunk(world, test_cell.chunk);
+    for (ChunkIterator iter = iterate_chunk_entities(test_chunk);
+         is_valid(&iter);
+         advance(&iter)) {
+        Entity *entity = get_world_entity(world, *iter.id);
+        if (entity->sim.kind & ENTITY_KIND_WORLD_OBJECT) {
+            if (is_in_same_cell(test_cell.offset, entity->world_pos.offset)) {
+                occupied = true;
+                break;
+            }
+        }        
+    }
+    return occupied;
+}
+
 static EntityID add_tree(World *world, WorldPosition pos) {
     pos.offset = floor_to_cell(pos.offset);
     
@@ -37,6 +61,41 @@ static EntityID add_gold_vein(World *world, WorldPosition pos) {
     return entity_id;
 }
 
+static void world_gen(GameState *game_state, World *world) {
+    Entropy entropy;
+    entropy.state = 123;
+    
+    // Initialize game_state 
+    game_state->camera_followed_entity_id = add_player(game_state->world);
+    for (size_t i = 0; i < 1000; ++i) {
+        do {
+            WorldPosition tree_p;
+            tree_p.chunk.x = random_int(&entropy, 10);
+            tree_p.chunk.y = random_int(&entropy, 10);
+            tree_p.offset.x = random(&entropy) * CHUNK_SIZE;
+            tree_p.offset.y = random(&entropy) * CHUNK_SIZE;
+            if (!is_cell_occupied(world, tree_p)) {
+                add_tree(game_state->world, tree_p);
+                break;
+            }
+        } while (true);
+    }
+    
+    for (size_t i = 0; i < 50; ++i) {
+        do {
+            WorldPosition p;
+            p.chunk.x = random_int(&entropy, 10);
+            p.chunk.y = random_int(&entropy, 10);
+            p.offset.x = random(&entropy) * CHUNK_SIZE;
+            p.offset.y = random(&entropy) * CHUNK_SIZE;
+            if (!is_cell_occupied(world, p)) {
+                add_gold_vein(game_state->world, p);
+                break;
+            }
+        } while (0);
+    }
+}
+
 void game_state_init(GameState *game_state) {
     // Initialize game_state params
     game_state->min_chunk = Vec2i(0);
@@ -62,25 +121,8 @@ void game_state_init(GameState *game_state) {
     for (size_t i = 0; i < ARRAY_SIZE(game_state->world->chunk_hash); ++i) {
         game_state->world->chunk_hash[i].coord = Vec2i(CHUNK_COORD_UNINITIALIZED, 0);
     }
-    // Initialize game_state 
-    game_state->camera_followed_entity_id = add_player(game_state->world);
-    for (size_t i = 0; i < 1000; ++i) {
-        WorldPosition tree_p;
-        tree_p.chunk.x = rand() % 10;
-        tree_p.chunk.y = rand() % 10;
-        tree_p.offset.x = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
-        tree_p.offset.y = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
-        add_tree(game_state->world, tree_p);
-    }
     
-    for (size_t i = 0; i < 50; ++i) {
-        WorldPosition p;
-        p.chunk.x = rand() % 10;
-        p.chunk.y = rand() % 10;
-        p.offset.x = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
-        p.offset.y = ((rand() / (f32)RAND_MAX)) * CHUNK_SIZE;
-        add_gold_vein(game_state->world, p);
-    }
+    world_gen(game_state, game_state->world);
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -92,10 +134,10 @@ static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
     out[3] = Vec3(x + 1, 0, y + 1) * TILE_SIZE;
 }
 
-static void get_billboard_positions(Vec3 mstorage_index_bottom, Vec3 right, Vec3 up, f32 wstorage_indexth, f32 height, Vec3 out[4]) {
-    Vec3 top_left = mstorage_index_bottom - right * wstorage_indexth * 0.5f + up * height;
+static void get_billboard_positions(Vec3 mstorage_index_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
+    Vec3 top_left = mstorage_index_bottom - right * width * 0.5f + up * height;
     Vec3 bottom_left = top_left - up * height;
-    Vec3 top_right = top_left + right * wstorage_indexth;
+    Vec3 top_right = top_left + right * width;
     Vec3 bottom_right = top_right - up * height;
     out[0] = top_left;
     out[1] = bottom_left;
@@ -139,7 +181,7 @@ static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
 }
 
 static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i *max) {
-#define REGION_CHUNK_RADIUS 3
+#define REGION_CHUNK_RADIUS 2
     *min = Vec2i(camera_coord.chunk.x - REGION_CHUNK_RADIUS, camera_coord.chunk.y - REGION_CHUNK_RADIUS);
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
@@ -288,6 +330,23 @@ static void update_interface(GameState *game_state, Input *input) {
     }
 }
 
+static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
+    bool occupied = false;
+    
+    for (EntityIterator iter = iterate_all_entities(sim);
+         is_valid(&iter);
+         advance(&iter)) {
+        SimEntity *entity = iter.ptr;
+        if (entity->kind & ENTITY_KIND_WORLD_OBJECT) {
+            if (is_in_same_cell(entity->p, p)) {
+                occupied = true;
+                break;
+            }
+        }        
+    }
+    return occupied;
+}
+
 static void update_world_simulation(GameState *game_state, FrameData *frame, Input *input) {
     TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
@@ -346,13 +405,15 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
     
     if (game_state->is_in_building_mode) {
         if (input->is_key_pressed(Key::MouseRight)) {
-            SimEntity *building = create_entity(sim);
-            building->p = floor_to_cell(mouse_point);
-            building->kind = ENTITY_KIND_WORLD_OBJECT;
-            building->world_object_flags = WORLD_OBJECT_FLAG_IS_BUILDING;
-            building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1;
-            game_state->is_in_building_mode = false;
-            // @TODO set interactable
+            Vec2 p = floor_to_cell(mouse_point);
+            if (!is_cell_occupied(sim, p)) {
+                SimEntity *building = create_entity(sim);
+                building->p = p;
+                building->kind = ENTITY_KIND_WORLD_OBJECT;
+                building->world_object_flags = WORLD_OBJECT_FLAG_IS_BUILDING;
+                building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1;
+                game_state->is_in_building_mode = false;
+            }
         }
     }
 }
@@ -380,16 +441,25 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         }
     }
     // Draw grid near mouse cursor
-    Vec2 mouse_cell_coord = Vec2(floorf(frame->mouse_projection.x / CELL_SIZE), floorf(frame->mouse_projection.y / CELL_SIZE));
-    Vec2 mouse_cell_pos = mouse_cell_coord * CELL_SIZE;
+    Vec2 mouse_cell_pos = floor_to_cell(frame->mouse_projection);
 #define MOUSE_CELL_RAD 5
     for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
         for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
-            Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-            Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-            Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-            Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-            push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, 0.01f);
+            Vec2 cell_middle = Vec2(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE * 0.5f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE * 0.5f);
+            bool is_occupied = is_cell_occupied(sim, cell_middle);
+            if (!is_occupied) {
+                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, 0.01f);
+            } else {
+                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::red, 0.01f);
+            }
         }
     }
     // Highlight selected entity    

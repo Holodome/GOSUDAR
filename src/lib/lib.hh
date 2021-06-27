@@ -7,6 +7,7 @@
 #include "lib/hashing.hh"
 #include "lib/str.hh"
 #include "lib/array.hh"
+#include "rng.hh"
 #include "lib/misc.hh"
 #include "lib/hash_table.hh"
 #include "lib/memory_arena.hh"

@@ -940,5 +940,9 @@ inline Vec3 xz(Vec2 xz, f32 y = 0.0f) {
     return Vec3(xz.x, y, xz.y);
 }
 
+inline Vec2 floor(Vec2 v) {
+    return Vec2(floorf(v.x), floorf(v.y));
+}
+
 #define MATH_HH 1
 #endif

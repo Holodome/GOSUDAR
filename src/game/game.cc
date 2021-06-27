@@ -32,6 +32,13 @@ void game_init(Game *game) {
     logprintln("Game", "Init took %llums", (u64)((init_end - init_start) * 1000));
 }
 
+static int records_sort(void *ctx, const void *a, const void *b) {
+    DebugFrame *frame = (DebugFrame *)ctx;
+    u32 index_a = *(u32 *)a;
+    u32 index_b = *(u32 *)b;
+    return frame->records[index_a].total_clocks < frame->records[index_b].total_clocks ? 1 : -1;
+}
+
 void game_cleanup(Game *game) {
     logprintln("Game", "Cleanup");
     os_free(game->game_state.frame_arena.data);
@@ -49,54 +56,78 @@ void game_update_and_render(Game *game) {
 #define MIN_DT 0.001f
 #define MAX_DT 0.1f
     game->input.dt = Math::clamp(game->input.dt, MIN_DT, MAX_DT);
-    if (game->input.is_key_pressed(Key::Escape)) {
+    
+    // Non-game related keybinds
+    if (game->input.is_key_pressed(Key::Escape) || game->input.is_quit_requested) {
         game->is_running = false;
     }    
-    if (game->input.is_quit_requested) {
-        game->is_running = false;
+    if (game->input.is_key_pressed(Key::F1)) {
+        game->dev_mode = DEV_MODE_NONE;
     }
+    if (game->input.is_key_pressed(Key::F2)) {
+        game->dev_mode = DEV_MODE_INFO;
+    }
+    if (game->input.is_key_pressed(Key::F3)) {
+        game->dev_mode = DEV_MODE_PROFILER;
+    }
+    if (game->input.is_key_pressed(Key::F4)) {
+        game->debug_state->is_paused = !game->debug_state->is_paused;
+    }
+    
     
     RendererCommands *commands = renderer_begin_frame(&game->renderer, game->input.winsize, Vec4(0.2));
     update_and_render(&game->game_state, &game->input, commands, &game->assets);
     RenderGroup interface_render_group = render_group_begin(commands, &game->assets,
         setup_2d(Mat4x4::ortographic_2d(0, game->input.winsize.x, game->input.winsize.y, 0)));
     
+    BEGIN_BLOCK("DevUI");
     game->dev_ui.mouse_d = game->input.mdelta;
     game->dev_ui.mouse_p = game->input.mpos;
     game->dev_ui.is_mouse_pressed = game->input.is_key_held(Key::MouseLeft);
     DevUILayout dev_ui = dev_ui_begin(&game->dev_ui);
-    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu; S: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
-        game->renderer.statistics.draw_call_count, game->game_state.world->entity_count,
-        game->game_state.DEBUG_last_frame_sim_region_entity_count);
-    Entity *player = get_world_entity(game->game_state.world, game->game_state.camera_followed_entity_id);
-    Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
-    dev_ui_labelf(&dev_ui, "P: (%.2f %.2f); O: (%.3f %.3f); Chunk: (%d %d)", 
-        player_pos.x, player_pos.y,
-        player->world_pos.offset.x, player->world_pos.offset.y,
-        player->world_pos.chunk.x, player->world_pos.chunk.y);
-    dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game->game_state.wood_count, game->game_state.gold_count);    
-    dev_ui_labelf(&dev_ui, "Building mode: %s", game->game_state.is_in_building_mode ? "true" : "false");
-    if (!is_same(game->game_state.interactable, null_id())) {
-        SimEntity *interactable = &get_world_entity(game->game_state.world, game->game_state.interactable)->sim;
-        if (interactable->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
-            dev_ui_labelf(&dev_ui, "Building build progress: %.2f", interactable->build_progress);
+    if (game->dev_mode == DEV_MODE_INFO) {
+        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu; S: %llu", 1.0f / game->input.dt, (u32)(game->input.dt * 1000), 
+            game->renderer.statistics.draw_call_count, game->game_state.world->entity_count,
+            game->game_state.DEBUG_last_frame_sim_region_entity_count);
+        Entity *player = get_world_entity(game->game_state.world, game->game_state.camera_followed_entity_id);
+        Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
+        dev_ui_labelf(&dev_ui, "P: (%.2f %.2f); O: (%.3f %.3f); Chunk: (%d %d)", 
+            player_pos.x, player_pos.y,
+            player->world_pos.offset.x, player->world_pos.offset.y,
+            player->world_pos.chunk.x, player->world_pos.chunk.y);
+        dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game->game_state.wood_count, game->game_state.gold_count);    
+        dev_ui_labelf(&dev_ui, "Building mode: %s", game->game_state.is_in_building_mode ? "true" : "false");
+        if (!is_same(game->game_state.interactable, null_id())) {
+            SimEntity *interactable = &get_world_entity(game->game_state.world, game->game_state.interactable)->sim;
+            if (interactable->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                dev_ui_labelf(&dev_ui, "Building build progress: %.2f", interactable->build_progress);
+            }
         }
+        if (game->game_state.interaction_kind) {
+            dev_ui_labelf(&dev_ui, "I: %u%%", (u32)(game->game_state.interaction_current_time / game->game_state.interaction_time * 100));    
+        }
+    } else if (game->dev_mode == DEV_MODE_PROFILER) {
+        DebugFrame *frame = game->debug_state->frames + (game->debug_state->frame_index ? game->debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
+        // DebugFrame *frame = game->debug_state->frames;
+        f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
+        u64 record_count = frame->records_count;
+        TempMemory records_sort_temp = temp_memory_begin(&game->debug_state->collate_arena);
+        u32 *records_sorted = alloc_arr(&game->debug_state->collate_arena, record_count, u32);
+        for (size_t i = 0; i < record_count; ++i) {
+            records_sorted[i] = i;
+        }
+        
+        qsort_s(records_sorted, record_count, sizeof(*records_sorted), records_sort, frame);
+        dev_ui_labelf(&dev_ui, "Collation: %.2f%%", (f32)frame->collation_clocks / frame_time * 100);    
+        for (size_t i = 0; i < frame->records_count; ++i) {
+            DebugRecord *record = frame->records + records_sorted[i];
+            dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
+                record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
+        }
+        temp_memory_end(records_sort_temp);
     }
-    if (game->game_state.interaction_kind) {
-        dev_ui_labelf(&dev_ui, "I: %u%%", (i32)(game->game_state.interaction_current_time / game->game_state.interaction_time * 100));    
-    }
-    
-    // DebugFrame *frame = game->debug_state->frames + (game->debug_state->frame_index ? game->debug_state->frame_index - 1: 31);
-    DebugFrame *frame = game->debug_state->frames;
-    f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
-    dev_ui_labelf(&dev_ui, "DM: %llu", game->debug_state->collate_arena.data_size);    
-    for (size_t i = 0; i < frame->records_count; ++i) {
-        DebugRecord *record = frame->records + i;
-        dev_ui_labelf(&dev_ui, "%llu %s %llu %u %llu %.2f%%\n", i, record->name, record->total_clocks, 
-            record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
-    }
-    
     dev_ui_end(&dev_ui, &interface_render_group);
+    END_BLOCK();
     renderer_end_frame(&game->renderer);
     game->os.update_window();
     debug_frame_end(game->debug_state);

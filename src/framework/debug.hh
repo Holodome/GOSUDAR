@@ -7,10 +7,8 @@
 #include <intrin.h>
 
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
-#define DEBUG_MAX_FRAME_COUNT 32
-#define DEBUG_MAX_EVENT_COUNT (65536 * 16)
-#define DEBUG_MAX_RECORD_COUNT 65536
-#define DEBUG_MAX_REGIONS_PER_FRAME 65536
+#define DEBUG_MAX_FRAME_COUNT 4
+#define DEBUG_MAX_EVENT_COUNT 65536
 #define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
 CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 
@@ -90,27 +88,25 @@ struct DebugFrameRegion {
 };
 
 struct DebugRecord {
-    const char *debug_name; // hash key
+    const char *debug_name;
     const char *name;
     u32 times_called;
     u64 total_clocks;
 };  
 
 struct DebugRecordHash {
-    const char *debug_name;
-    DebugRecord *ptr;
+    u32 debug_name_hash;
+    u32 index;
 };
 
 struct DebugFrame {
+    u64 collation_clocks;
     u64 begin_clock;
     u64 end_clock;
     
     u32 records_count;
     DebugRecord records[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
     DebugRecordHash records_hash[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
-    
-    // size_t           region_count;
-    // DebugFrameRegion regions[DEBUG_MAX_REGIONS_PER_FRAME];
 };
 
 struct DebugOpenBlock {
@@ -120,7 +116,6 @@ struct DebugOpenBlock {
 
     DebugOpenBlock *next_free;
 };
-
 
 struct DebugState {
     MemoryArena collate_arena;
@@ -136,7 +131,7 @@ struct DebugState {
     bool is_paused;
 };
 
-DebugState * debug_init();
+DebugState *debug_init();
 void debug_frame_end(DebugState *debug_state);
 
 #define DEBUG_HH 1

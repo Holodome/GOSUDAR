@@ -9,6 +9,13 @@
 
 #include "game/game_state.hh"
 
+enum {
+    DEV_MODE_NONE,  
+    DEV_MODE_INFO,  
+    DEV_MODE_PROFILER,  
+    DEV_MODE_SENTINEL,  
+};
+
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
 // Game state is the logic of the game
@@ -20,6 +27,7 @@ struct Game {
     Assets assets;
     DevUI dev_ui;
     DebugState *debug_state;
+    u32 dev_mode;
     
     bool is_running;
     

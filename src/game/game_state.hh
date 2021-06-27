@@ -10,6 +10,12 @@ enum {
     PLAYER_INTERACTION_KIND_SENTINEL  
 };
 
+struct FrameData {
+    Vec2 mouse_projection;
+    SimEntity *camera_followed_entity;
+    SimRegion *sim;
+};  
+
 // All game-related data is stored here. Like player resources, debug thigs etc.
 struct GameState {
     MemoryArena arena;
@@ -34,8 +40,6 @@ struct GameState {
     bool is_in_building_mode;
     bool allow_camera_controls;
     // Per-frame data
-    Vec2 mouse_projection;
-    SimEntity *camera_followed_entity;
     
     size_t DEBUG_last_frame_sim_region_entity_count;
 };

@@ -366,6 +366,7 @@ void OS::update_input(Input *input) {
 }
 
 void OS::update_window() {
+    TIMED_FUNCTION();
     internal->wglSwapLayerBuffers(internal->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
 }
 

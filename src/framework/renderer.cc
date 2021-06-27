@@ -385,6 +385,7 @@ RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Ve
 }
 
 void renderer_end_frame(Renderer *renderer) {
+    TIMED_FUNCTION();
     // glEnable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
     glDepthMask(GL_TRUE);

@@ -2,6 +2,7 @@
 
 void game_init(Game *game) {
     logprintln("Game", "Init start");
+    game->debug_state = debug_init();
     game->is_running = true;   
     
     game->os.init();
@@ -13,7 +14,7 @@ void game_init(Game *game) {
     
     size_t assets_arena_size = MEGABYTES(256);
     arena_init(&game->assets.arena, os_alloc(assets_arena_size), assets_arena_size);
-    // @TODO
+    // @TODO clean
     game->assets.renderer = &game->renderer;
     game->assets.init();
     
@@ -44,6 +45,7 @@ void game_cleanup(Game *game) {
 }
 
 void game_update_and_render(Game *game) {
+    FRAME_MARKER();
     game->os.update_input(&game->input);
 #define MIN_DT 0.001f
 #define MAX_DT 0.1f
@@ -85,6 +87,14 @@ void game_update_and_render(Game *game) {
         dev_ui_labelf(&dev_ui, "I: %u%%", (i32)(game->game_state.interaction_current_time / game->game_state.interaction_time * 100));    
     }
     dev_ui_end(&dev_ui, &interface_render_group);
+    DebugFrame *frame = game->debug_state->frames;
+    f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
+    for (size_t i = 0; i < frame->region_count; ++i) {
+        DebugFrameRegion *region = frame->regions + i;
+        printf("%llu %s %.0f(%u%%)\n", i, region->debug_name, region->time_max - region->time_min, (u32)((region->time_max - region->time_min) / frame_time * 100));
+    }
+    
     renderer_end_frame(&game->renderer);
     game->os.update_window();
+    debug_frame_end(game->debug_state);
 }

@@ -144,16 +144,20 @@ static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i 
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
 
-static void update_interactions(GameState *game_state, SimRegion *sim, Input *input) {
+static void update_interactions(GameState *game_state, FrameData *frame, Input *input) {
+    if (game_state->is_in_building_mode) {
+        return;
+    }
+    
     if (!game_state->interaction_kind) {
         game_state->interactable = null_id();
         f32 closest_so_far = INFINITY;
-        for (EntityIterator tree_iter = iterate_all_entities(sim);
+        for (EntityIterator tree_iter = iterate_all_entities(frame->sim);
             is_valid(&tree_iter);
             advance(&tree_iter)) {
             SimEntity *test_entity = tree_iter.ptr;
             if (test_entity->kind == ENTITY_KIND_WORLD_OBJECT) {
-                f32 d_sq = Math::length_sq(test_entity->p - game_state->camera_followed_entity->p);
+                f32 d_sq = Math::length_sq(test_entity->p - frame->camera_followed_entity->p);
 #define INTERACT_DISTANCE 0.25f
 #define INTERACT_DISTANCE_SQ (INTERACT_DISTANCE * INTERACT_DISTANCE)
                 if (d_sq < INTERACT_DISTANCE_SQ && d_sq < closest_so_far) {
@@ -165,7 +169,7 @@ static void update_interactions(GameState *game_state, SimRegion *sim, Input *in
     }
     
     if (is_not_null(game_state->interactable)) {
-        SimEntity *ent = get_entity_by_id(sim, game_state->interactable);
+        SimEntity *ent = get_entity_by_id(frame->sim, game_state->interactable);
         // printf("%hhu %u\n", ent->world_object_flags, ent->id.value);
 
         assert(ent->kind == ENTITY_KIND_WORLD_OBJECT);
@@ -260,35 +264,7 @@ static void update_interactions(GameState *game_state, SimRegion *sim, Input *in
     } 
 }
 
-void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets) {
-    arena_clear(&game_state->frame_arena);
-    // Since camera follows some entity and is never too far from it, we can assume that camera position is
-    // the position of followed entity
-    WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
-    Vec2i min_chunk_coord, max_chunk_coord;
-    get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
-    SimRegion *sim = begin_sim(game_state, min_chunk_coord, max_chunk_coord);
-    // Calculate player movement
-    Vec2 player_delta = Vec2(0);
-    f32 move_coef = 4.0f * input->dt;
-    f32 z_speed = 0;
-    if (input->is_key_held(Key::W)) {
-        z_speed = move_coef;
-    } else if (input->is_key_held(Key::S)) {
-        z_speed = -move_coef;
-    }
-    player_delta.x += z_speed *  Math::sin(game_state->cam.yaw);
-    player_delta.y += z_speed * -Math::cos(game_state->cam.yaw);
-    
-    f32 x_speed = 0;
-    if (input->is_key_held(Key::D)) {
-        x_speed = move_coef;
-    } else if (input->is_key_held(Key::A)) {
-        x_speed = -move_coef;
-    }
-    player_delta.x += x_speed * Math::cos(game_state->cam.yaw);
-    player_delta.y += x_speed * Math::sin(game_state->cam.yaw);     
-    
+static void update_interface(GameState *game_state, Input *input) {
     if (input->is_key_pressed(Key::Z)) {
         game_state->allow_camera_controls = !game_state->allow_camera_controls;
     }
@@ -310,11 +286,34 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         game_state->cam.pitch = Math::clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         game_state->cam.distance_from_player -= input->mwheel;
     }
-    
-    // Update camera movement
+}
+
+static void update_world_simulation(GameState *game_state, FrameData *frame, Input *input) {
+    SimRegion *sim = frame->sim;
+
     SimEntity *camera_followed_entity = get_entity_by_id(sim, game_state->camera_followed_entity_id);
-    game_state->camera_followed_entity = camera_followed_entity;
+    frame->camera_followed_entity = camera_followed_entity;
     if (!game_state->interaction_kind) {
+        // Calculate player movement
+        Vec2 player_delta = Vec2(0);
+        f32 move_coef = 4.0f * input->dt;
+        f32 z_speed = 0;
+        if (input->is_key_held(Key::W)) {
+            z_speed = move_coef;
+        } else if (input->is_key_held(Key::S)) {
+            z_speed = -move_coef;
+        }
+        player_delta.x += z_speed *  Math::sin(game_state->cam.yaw);
+        player_delta.y += z_speed * -Math::cos(game_state->cam.yaw);
+        
+        f32 x_speed = 0;
+        if (input->is_key_held(Key::D)) {
+            x_speed = move_coef;
+        } else if (input->is_key_held(Key::A)) {
+            x_speed = -move_coef;
+        }
+        player_delta.x += x_speed * Math::cos(game_state->cam.yaw);
+        player_delta.y += x_speed * Math::sin(game_state->cam.yaw);     
         camera_followed_entity->p += player_delta;
     }
     Vec3 center_pos = xz(camera_followed_entity->p);
@@ -340,9 +339,9 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
-    game_state->mouse_projection = mouse_point;
+    frame->mouse_projection = mouse_point;
     
-    update_interactions(game_state, sim, input);
+    update_interactions(game_state, frame, input);
     
     if (game_state->is_in_building_mode) {
         if (input->is_key_pressed(Key::MouseRight)) {
@@ -355,7 +354,10 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
             // @TODO set interactable
         }
     }
-    
+}
+
+static void render_world(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
+    SimRegion *sim = frame->sim;
     RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
     // Draw ground
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
@@ -375,7 +377,7 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         }
     }
     // Draw grid near mouse cursor
-    Vec2 mouse_cell_coord = Vec2(floorf(mouse_point.x / CELL_SIZE), floorf(mouse_point.y / CELL_SIZE));
+    Vec2 mouse_cell_coord = Vec2(floorf(frame->mouse_projection.x / CELL_SIZE), floorf(frame->mouse_projection.y / CELL_SIZE));
     Vec2 mouse_cell_pos = mouse_cell_coord * CELL_SIZE;
 #define MOUSE_CELL_RAD 5
     for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
@@ -459,6 +461,23 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
         push_quad(&world_render_group, billboard, texture_id);
     }
     render_group_end(&world_render_group); 
+}
+
+void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets) {
+    TIMED_FUNCTION();
+    FrameData frame = {};
+    arena_clear(&game_state->frame_arena);
+    // Since camera follows some entity and is never too far from it, we can assume that camera position is
+    // the position of followed entity
+    WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
+    Vec2i min_chunk_coord, max_chunk_coord;
+    get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
+    frame.sim = begin_sim(game_state, min_chunk_coord, max_chunk_coord);
+    SimRegion *sim = frame.sim;
+    
+    update_interface(game_state, input);
+    update_world_simulation(game_state, &frame, input);
+    render_world(game_state, &frame, commands, assets);
     game_state->DEBUG_last_frame_sim_region_entity_count = sim->entity_count;
     end_sim(sim);
 }

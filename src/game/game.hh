@@ -19,6 +19,7 @@ struct Game {
     Input input;
     Assets assets;
     DevUI dev_ui;
+    DebugState *debug_state;
     
     bool is_running;
     

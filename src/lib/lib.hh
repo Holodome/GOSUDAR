@@ -10,6 +10,7 @@
 #include "lib/misc.hh"
 #include "lib/hash_table.hh"
 #include "lib/memory_arena.hh"
+#include "framework/debug.hh"
 #include "framework/logger.hh"
 
 #define LIB_HH 1

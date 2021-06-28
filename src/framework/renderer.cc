@@ -121,6 +121,12 @@ void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id) {
         Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
+void push_quad(RenderGroup *render_group, Vec3 v[4], Vec4 c, AssetID texture_id) {
+    Texture tex = render_group->assets->get_tex(texture_id);
+    push_quad(render_group, v[0], v[1], v[2], v[3], c, c, c, c,
+        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
+}
+
 void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, AssetID texture_id) {
     Vec3 v[4]; 
     rect.store_points(v);

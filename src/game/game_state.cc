@@ -8,7 +8,6 @@ static bool is_in_same_cell(Vec2 a, Vec2 b) {
     return a_floor == b_floor;
 }
 
-
 static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
     TIMED_FUNCTION();
     bool occupied = false;
@@ -189,6 +188,8 @@ static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i 
 
 static void update_interactions(GameState *game_state, FrameData *frame, Input *input) {
     if (game_state->is_in_building_mode) {
+        game_state->interactable = null_id();
+        game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
         return;
     }
     
@@ -522,6 +523,18 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         push_quad(&world_render_group, billboard, texture_id);
     }
     END_BLOCK();
+    
+    if (game_state->is_in_building_mode) {
+        Vec3 billboard[4];
+        Vec2 cell_pos = floor_to_cell(frame->mouse_projection);
+        if (!is_cell_occupied(sim, cell_pos)) {
+            Vec3 pos = xz(cell_pos);
+            AssetID texture_id = Asset_Building;
+            get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), 0.5f, 0.5f, billboard);
+            push_quad(&world_render_group, billboard, Vec4(1, 1, 1, 0.5f), texture_id);
+        }
+    }
+    
     render_group_end(&world_render_group); 
 }
 

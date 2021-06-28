@@ -2,7 +2,10 @@
 
 void game_init(Game *game) {
     logprintln("Game", "Init start");
-    game->debug_state = debug_init();
+    game->debug_state = (DebugState *)os_alloc(sizeof(DebugState));
+    size_t debug_collate_arena_size = MEGABYTES(256);
+    arena_init(&game->debug_state->collate_arena, os_alloc(debug_collate_arena_size), debug_collate_arena_size);
+    debug_init(game->debug_state);
     game->is_running = true;   
     
     game->os.init();
@@ -20,7 +23,7 @@ void game_init(Game *game) {
     
     size_t frame_arena_size = MEGABYTES(256);
     arena_init(&game->game_state.frame_arena, os_alloc(frame_arena_size), frame_arena_size);
-    size_t world_arena_size = MEGABYTES(256);
+    size_t world_arena_size = MEGABYTES(512);
     arena_init(&game->game_state.arena, os_alloc(world_arena_size), world_arena_size);
     game_state_init(&game->game_state);
     f32 init_end = game->os.get_time();
@@ -72,8 +75,10 @@ void game_update_and_render(Game *game) {
     }
     if (game->input.is_key_pressed(Key::F4)) {
         game->debug_state->is_paused = !game->debug_state->is_paused;
+    } 
+    if (game->input.is_key_pressed(Key::F5)) {
+        game->dev_mode = DEV_MODE_MEMORY;
     }
-    
     
     RendererCommands *commands = renderer_begin_frame(&game->renderer, game->input.winsize, Vec4(0.2));
     update_and_render(&game->game_state, &game->input, commands, &game->assets);
@@ -95,6 +100,7 @@ void game_update_and_render(Game *game) {
             player_pos.x, player_pos.y,
             player->world_pos.offset.x, player->world_pos.offset.y,
             player->world_pos.chunk.x, player->world_pos.chunk.y);
+        dev_ui_labelf(&dev_ui, "Chunks allocated: %llu", game->game_state.world->DEBUG_external_chunks_allocated);
         dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game->game_state.wood_count, game->game_state.gold_count);    
         dev_ui_labelf(&dev_ui, "Building mode: %s", game->game_state.is_in_building_mode ? "true" : "false");
         if (!is_same(game->game_state.interactable, null_id())) {
@@ -125,7 +131,19 @@ void game_update_and_render(Game *game) {
                 record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
         }
         temp_memory_end(records_sort_temp);
+    } else if (game->dev_mode == DEV_MODE_MEMORY) {
+        dev_ui_labelf(&dev_ui, "Debug Arena: %llu/%llu (%.2f%%)", game->debug_state->collate_arena.data_size, game->debug_state->collate_arena.data_capacity,
+            game->debug_state->collate_arena.data_size * 100.0f / game->debug_state->collate_arena.data_capacity);
+        dev_ui_labelf(&dev_ui, "Renderer Arena: %llu/%llu (%.2f%%)", game->renderer.arena.data_size, game->renderer.arena.data_capacity,
+            game->renderer.arena.data_size * 100.0f / game->renderer.arena.data_capacity);
+        dev_ui_labelf(&dev_ui, "Assets Arena: %llu/%llu (%.2f%%)", game->assets.arena.data_size, game->assets.arena.data_capacity,
+            game->assets.arena.data_size * 100.0f /  game->assets.arena.data_capacity);
+        dev_ui_labelf(&dev_ui, "Frame Arena: %llu/%llu (%.2f%%)", game->game_state.frame_arena.data_size, game->game_state.frame_arena.data_capacity,
+            game->game_state.frame_arena.data_size * 100.0f / game->game_state.frame_arena.data_capacity);
+        dev_ui_labelf(&dev_ui, "Game Arena: %llu/%llu (%.2f%%)", game->game_state.arena.data_size, game->game_state.arena.data_capacity,
+            game->game_state.arena.data_size * 100.0f / game->game_state.arena.data_capacity);
     }
+    
     dev_ui_end(&dev_ui, &interface_render_group);
     END_BLOCK();
     renderer_end_frame(&game->renderer);

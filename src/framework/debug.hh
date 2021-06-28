@@ -117,6 +117,11 @@ struct DebugOpenBlock {
     DebugOpenBlock *next_free;
 };
 
+struct DebugMemoryArena {
+    const char *name;
+    
+};
+
 struct DebugState {
     MemoryArena collate_arena;
 
@@ -131,7 +136,7 @@ struct DebugState {
     bool is_paused;
 };
 
-DebugState *debug_init();
+void debug_init(DebugState *debug_state);
 void debug_frame_end(DebugState *debug_state);
 
 #define DEBUG_HH 1

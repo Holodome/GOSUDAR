@@ -13,6 +13,7 @@ enum {
     DEV_MODE_NONE,  
     DEV_MODE_INFO,  
     DEV_MODE_PROFILER,  
+    DEV_MODE_MEMORY,  
     DEV_MODE_SENTINEL,  
 };
 

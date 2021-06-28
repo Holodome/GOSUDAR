@@ -115,17 +115,10 @@ void debug_frame_end(DebugState *debug_state) {
     }
 }
 
-DebugState *debug_init() {
-    printf("Debug state size: %llu (%llu mb)\n", sizeof(DebugState), sizeof(DebugState) >> 20);
-    DebugState *debug_state = (DebugState *)os_alloc(sizeof(DebugState));
-    
+void debug_init(DebugState *debug_state) {
     debug_table = &debug_state->debug_table;
-    
-    size_t debug_collate_arena_size = MEGABYTES(256);
-    arena_init(&debug_state->collate_arena, os_alloc(debug_collate_arena_size), debug_collate_arena_size);
     
     debug_state->first_free_block = 0;
     debug_state->current_open_block = 0;
     debug_state->collation_array_index = 0;    
-    return debug_state;
 }

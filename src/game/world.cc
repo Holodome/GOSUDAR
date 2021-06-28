@@ -123,6 +123,10 @@ Entity *get_world_entity(World *world, EntityID id) {
 }
 
 Chunk *get_world_chunk(World *world, Vec2i coord) {
+    if (!is_chunk_coord_initialized(coord)) {
+        return 0;
+    }
+    
     u32 hash_value = coord.x * 123123 + coord.y * 1891289 + 121290;    
     u32 hash_slot = hash_value & (ARRAY_SIZE(world->chunk_hash) - 1);
     
@@ -132,15 +136,16 @@ Chunk *get_world_chunk(World *world, Vec2i coord) {
             break;
         } 
         
-        if (is_chunk_coord_initialized(chunk->coord) && !chunk->next_in_hash) {
+		if (!is_chunk_coord_initialized(chunk->coord)) {
+            chunk->coord = coord;
+            break;
+        }
+        if (!chunk->next_in_hash) {
+            ++world->DEBUG_external_chunks_allocated;
             chunk->next_in_hash = (Chunk *)arena_alloc(world->world_arena, sizeof(Chunk));
         }
         if (chunk->next_in_hash) {
             chunk = chunk->next_in_hash;
-        }
-        if (!is_chunk_coord_initialized(chunk->coord)) {
-            chunk->coord = coord;
-            break;
         }
     }
     return chunk;    
@@ -193,7 +198,9 @@ void add_entity_to_chunk(World *world, Chunk *chunk, EntityID id) {
 void move_entity(World *world, EntityID id, WorldPosition to, WorldPosition from) {
     if (to.chunk != from.chunk) {
         Chunk *old_chunk = get_world_chunk(world, from.chunk);
-        remove_entity_from_chunk(world, old_chunk, id);
+        if (old_chunk) {
+            remove_entity_from_chunk(world, old_chunk, id);
+        }
         Chunk *new_chunk = get_world_chunk(world, to.chunk);
         add_entity_to_chunk(world, new_chunk, id);
     }

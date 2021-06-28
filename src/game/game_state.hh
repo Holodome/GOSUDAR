@@ -35,11 +35,10 @@ struct GameState {
     u32 interaction_kind;
     f32 interaction_time;
     f32 interaction_current_time;
-    u8 selected_building;
     
     bool is_in_building_mode;
+    u8 selected_building;
     bool allow_camera_controls;
-    // Per-frame data
     
     size_t DEBUG_last_frame_sim_region_entity_count;
 };

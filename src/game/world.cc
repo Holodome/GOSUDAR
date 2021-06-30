@@ -123,11 +123,16 @@ Entity *get_world_entity(World *world, EntityID id) {
 }
 
 Chunk *get_world_chunk(World *world, Vec2i coord) {
+    TIMED_FUNCTION();
     if (!is_chunk_coord_initialized(coord)) {
         return 0;
     }
-    
     u32 hash_value = coord.x * 123123 + coord.y * 1891289 + 121290;    
+#if 1 
+    xorshift32(&hash_value);
+#endif 
+    
+#if 0
     u32 hash_slot = hash_value & (ARRAY_SIZE(world->chunk_hash) - 1);
     
     Chunk *chunk = world->chunk_hash + hash_slot;
@@ -149,6 +154,24 @@ Chunk *get_world_chunk(World *world, Vec2i coord) {
         }
     }
     return chunk;    
+#else 
+    Chunk *chunk = 0;
+    u32 hash_mask = ARRAY_SIZE(world->chunk_hash) - 1;
+    u32 hash_slot = hash_value & hash_mask;
+    for (size_t offset = 0; offset < ARRAY_SIZE(world->chunk_hash); ++offset) {
+        u32 hash_index = ((hash_value + offset) & hash_mask);
+        Chunk *test = world->chunk_hash + hash_index;
+        if (!is_chunk_coord_initialized(test->coord)) {
+            test->coord = coord;
+            chunk = test;
+            break;
+        } else if (test->coord == coord) {
+            chunk = test;
+            break;
+        }
+    }
+    return chunk;
+#endif 
 }
 
 bool remove_entity_from_chunk(World *world, Chunk *chunk, EntityID id) {

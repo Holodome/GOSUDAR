@@ -5,17 +5,8 @@
 #include "framework/os.hh"
 #include "framework/renderer.hh"
 #include "framework/assets.hh"
-#include "framework/dev_ui.hh"
 
 #include "game/game_state.hh"
-
-enum {
-    DEV_MODE_NONE,  
-    DEV_MODE_INFO,  
-    DEV_MODE_PROFILER,  
-    DEV_MODE_MEMORY,  
-    DEV_MODE_SENTINEL,  
-};
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
@@ -26,9 +17,7 @@ struct Game {
     Renderer renderer;
     Input input;
     Assets assets;
-    DevUI dev_ui;
     DebugState *debug_state;
-    u32 dev_mode;
     
     bool is_running;
     

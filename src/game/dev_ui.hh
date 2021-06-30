@@ -47,6 +47,7 @@ struct DevUILayout {
     DevUIID active_id;
     
     Vec2 p;
+    Vec2 last_line_p;
 };  
 
 void dev_ui_init(DevUI *dev_ui, Assets *assets);
@@ -54,8 +55,10 @@ DevUILayout dev_ui_begin(DevUI *dev_ui);
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout);
+bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value);
 bool dev_ui_section(DevUILayout *layout, const char *name);
 void dev_ui_end_section(DevUILayout *layout);
+void dev_ui_last_line(DevUILayout *layout);
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group);
 
 #define DEVUI_HH 1

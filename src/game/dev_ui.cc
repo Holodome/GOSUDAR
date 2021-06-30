@@ -1,4 +1,4 @@
-#include "framework/dev_ui.hh"
+#include "game/dev_ui.hh"
 
 #include "game/game.hh"
 
@@ -6,9 +6,8 @@
 #define DEV_UI_PADDING 2.0f
 
 static DevUIID id_from_cstr(const char *cstr) {
-    size_t count = strlen(cstr);
     DevUIID result;
-    result.v = crc32(cstr, count);
+    result.v = crc32_cstr(cstr);
     return result;
 }
 
@@ -83,7 +82,15 @@ static Vec2 get_text_size(DevUILayout *layout, const char *text) {
 }
 
 static void element_size(DevUILayout *layout, Vec2 size) {
+    layout->p.x += size.x + DEV_UI_PADDING;
+    layout->last_line_p = layout->p;
+    
+    layout->p.x = 0;
     layout->p.y += size.y + DEV_UI_PADDING;
+}
+
+void dev_ui_last_line(DevUILayout *layout) {
+    layout->p = layout->last_line_p;
 }
 
 static bool is_same(DevUIID a, DevUIID b) {
@@ -133,6 +140,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
 }
 
 void dev_ui_init(DevUI *dev_ui, Assets *assets) {
+    dev_ui->assets = assets;
     dev_ui->active_id = id_empty();
     dev_ui->font_info = assets->get_info(Asset_Font);
     dev_ui->font = assets->get_font(Asset_Font);
@@ -172,6 +180,19 @@ bool dev_ui_button(DevUILayout *layout, const char *label) {
     return bstate.is_pressed;    
 }
 
+bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
+    Vec2 text_size = get_text_size(layout, label);
+    Rect button_rect = Rect(layout->p, text_size);
+    ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
+    if (bstate.is_pressed) {
+        *value = !*value;
+    }
+    Vec4 color = (*value ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
+    push_text(layout, button_rect.p, label, color);
+    element_size(layout, button_rect.size());
+    return bstate.is_pressed;    
+}
+
 static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
     assert(is_set(id));
     u32 hash_slot_init = id.v % ARRAY_SIZE(ui->view_hash);
@@ -204,8 +225,8 @@ static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
 bool dev_ui_section(DevUILayout *layout, const char *label) {
     Vec2 text_size = get_text_size(layout, label);
     Rect button_rect = Rect(layout->p, text_size);
-    ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     DevUIID id = id_from_cstr(label);
+    ButtonState bstate = update_button(layout, button_rect, id);
     DevUIView *view = get_dev_ui_view(layout->dev_ui, id);
     if (bstate.is_pressed) {
         view->is_opened = !view->is_opened;

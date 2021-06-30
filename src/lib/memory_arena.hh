@@ -49,8 +49,6 @@ void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNM
             
             result = ptr;
         } else {
-            // data = os_alloc(size);
-            // data = result;
             assert(!"Memory is out of bounds");
         }
         
@@ -63,6 +61,12 @@ void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNM
         arena->peak_size = arena->data_size;
     }
     
+    return result;
+}
+
+MemoryArena subarena(MemoryArena *arena, size_t capacity) {
+    MemoryArena result;
+    arena_init(&result, arena_alloc(arena, capacity), capacity);
     return result;
 }
 

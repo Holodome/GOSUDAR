@@ -81,8 +81,6 @@ void Assets::init() {
     this->asset_infos[Asset_FontAtlas].kind = AssetKind::Image;
     this->asset_infos[Asset_FontAtlas].state = AssetState::Unloaded;
     
-    // @TODO
-    this->get_tex(Asset_White);
     logprintln("Assets", "Init end");
 }
 
@@ -107,11 +105,11 @@ Texture Assets::get_tex(AssetID id) {
     } else {
         // logprintln("Assets", "Loading texture '%s'", name);
         
-        FileHandle file = OS::open_file(info->filename);
-        assert(OS::is_file_handle_valid(file));
-        size_t file_size = OS::get_file_size(file);
+        FileHandle file = open_file(info->filename);
+        assert(file_handle_valid(file));
+        size_t file_size = get_file_size(file);
         void *buffer = Mem::alloc(file_size);
-        OS::read_file(file, 0, file_size, buffer);
+        read_file(file, 0, file_size, buffer);
         assert((int)file_size == file_size);
         int w, h;
         void *data = stbi_load_from_memory((const stbi_uc *)buffer, (int)file_size, &w, &h, 0, 4);
@@ -138,11 +136,11 @@ FontData *Assets::get_font(AssetID id) {
     } else {
         // logprintln("Assets", "Loading font '%s'", name);
          
-        FileHandle file = OS::open_file(info->filename);
-        assert(OS::is_file_handle_valid(file));
-        size_t file_size = OS::get_file_size(file);
+        FileHandle file = open_file(info->filename);
+        assert(file_handle_valid(file));
+        size_t file_size = get_file_size(file);
         void *buffer = Mem::alloc(file_size);
-        OS::read_file(file, 0, file_size, buffer);
+        read_file(file, 0, file_size, buffer);
         
         const u32 atlas_width  = 512;
         const u32 atlas_height = 512;

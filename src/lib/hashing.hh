@@ -29,5 +29,15 @@ inline u32 crc32(const void *data_init, size_t data_size, u32 seed = 0) {
     return ~crc;
 }
 
+inline u32 crc32_cstr(const char *cstr, u32 seed = 0) {
+    u32 crc = ~seed;
+    u8  *data = (u8 *)cstr;
+    u32 *crc32_lut = crc32_lookup_table;
+    while (*cstr) {
+        crc = (crc >> 8) ^ crc32_lut[(crc & 0xFF) ^ *cstr++];
+    }
+    return ~crc;
+}
+
 #define HASHING_HH 1
 #endif

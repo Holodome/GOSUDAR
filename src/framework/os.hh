@@ -13,6 +13,7 @@ enum struct Key {
     D,
     Z,
     B,
+    X,
     Shift,
     Ctrl,
     Space,
@@ -91,6 +92,7 @@ struct RealWorldTime {
 };
 
 struct FileHandle {
+    bool errors;
     u8 storage[8];
 };
 
@@ -120,12 +122,7 @@ struct OS {
     static void mkdir(const char *name);
     static void sleep(u32 ms);
     
-    static FileHandle open_file(const char *name, bool read = true);
-    static bool is_file_handle_valid(FileHandle handle);
-    static size_t get_file_size(FileHandle handle);
-    static void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
-    static void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
-    static void close_file(FileHandle handle);
+    
     
     static FileWritetime get_file_write_time(const char *name);
     static bool file_write_time_cmp(FileWritetime a, FileWritetime b);
@@ -134,6 +131,13 @@ struct OS {
 // Virtual memory management
 void *os_alloc(size_t size);
 void os_free(void *ptr);
+// Filesytem
+FileHandle open_file(const char *name, bool read = true);
+size_t get_file_size(FileHandle handle);
+bool file_handle_valid(FileHandle handle);
+void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
+void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
+void close_file(FileHandle handle);
 
 #define OS_H 1
 #endif

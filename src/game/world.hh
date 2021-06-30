@@ -157,7 +157,7 @@ struct World {
     size_t entity_count;
     Entity *entities;
     
-    size_t DEBUG_external_chunks_allocated;
+    // size_t DEBUG_external_chunks_allocated;
 };  
 
 // EntityID add_world_entity(World *world, WorldPosition pos);

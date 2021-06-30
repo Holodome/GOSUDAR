@@ -4,6 +4,8 @@
 #include "lib/math.hh"
 #include "lib/memory_arena.hh"
 
+#include "game/dev_ui.hh"
+
 #include <intrin.h>
 
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
@@ -28,7 +30,7 @@ struct DebugEvent {
 
 struct DebugTable {
     u32 current_event_array_index;
-    volatile u64 event_array_index_event_index; // (array_index << 32 | event_index)
+    u64 event_array_index_event_index; // (array_index << 32 | event_index)
     
     u32 event_counts [DEBUG_MAX_EVENT_ARRAY_COUNT];
     DebugEvent events[DEBUG_MAX_EVENT_ARRAY_COUNT][DEBUG_MAX_EVENT_COUNT];
@@ -38,7 +40,7 @@ extern DebugTable *debug_table;
 
 #define DEBUG_NAME__(a, b, c) a "|" #b "|" #c
 #define DEBUG_NAME_(a, b, c) DEBUG_NAME__(a, b, c)
-#define DEBUG_NAME(name) DEBUG_NAME_(__FILE__, __LINE__, __COUNTER__)
+#define DEBUG_NAME() DEBUG_NAME_(__FILE__, __LINE__, __COUNTER__)
 
 // @TODO(hl): Can actualy replace interlocked_add with interlocked_increment
 #define RecordDebugEvent(event_type, debug_name_init, name_init)                                  \
@@ -56,35 +58,28 @@ extern DebugTable *debug_table;
 
 #define TIMED_BLOCK__(debug_name, name, number) DebugTimedBlock __timed_block_##number(debug_name, name)
 #define TIMED_BLOCK_(debug_name, name, number) TIMED_BLOCK__(debug_name, name, number)
-#define TIMED_BLOCK(name) TIMED_BLOCK_(DEBUG_NAME(name), name, __LINE__)
+#define TIMED_BLOCK(name) TIMED_BLOCK_(DEBUG_NAME(), name, __LINE__)
 
 #define BEGIN_BLOCK_(debug_name, name) RecordDebugEvent(DEBUG_EVENT_BEGIN_BLOCK, debug_name, name)
-#define BEGIN_BLOCK(name) BEGIN_BLOCK_(DEBUG_NAME(name), name)
+#define BEGIN_BLOCK(name) BEGIN_BLOCK_(DEBUG_NAME(), name)
 #define END_BLOCK_(debug_name, name) RecordDebugEvent(DEBUG_EVENT_END_BLOCK, debug_name, name)
-#define END_BLOCK() END_BLOCK_(DEBUG_NAME("#END_BLOCK"), "#END_BLOCK")
+#define END_BLOCK() END_BLOCK_(DEBUG_NAME(), "#END_BLOCK")
 // @NOTE(hl): Cast to  char * beacuse clang has trobules with implicit cast from const char [] to char *
-#define TIMED_FUNCTION() TIMED_BLOCK((char *)__FUNCTION__)
+#define TIMED_FUNCTION() TIMED_BLOCK((const char *)__FUNCTION__)
 
-#define FRAME_MARKER() RecordDebugEvent(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME("#FRAME_MARKER"), "#FRAME_MARKER")
+#define FRAME_MARKER() RecordDebugEvent(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started
 // struct goes out of scope - destructor is called - block is ended
 struct DebugTimedBlock {
-    DebugTimedBlock(char *debug_name, char *name) {
+    DebugTimedBlock(const char *debug_name, const char *name) {
         BEGIN_BLOCK_(debug_name, name);
     }
 
     ~DebugTimedBlock() {
         END_BLOCK();
     }
-};
-
-struct DebugFrameRegion {
-    f32 time_min;
-    f32 time_max;
-    const char *debug_name; // see DEBUG_NAME
-    const char *name;       // user-defined block name
 };
 
 struct DebugRecord {
@@ -105,7 +100,7 @@ struct DebugFrame {
     u64 end_clock;
     
     u32 records_count;
-    DebugRecord records[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
+    DebugRecord records         [DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
     DebugRecordHash records_hash[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
 };
 
@@ -113,31 +108,48 @@ struct DebugOpenBlock {
     u32 frame_index;
     DebugEvent *opening_event;
     DebugOpenBlock *parent;
-
     DebugOpenBlock *next_free;
 };
 
-struct DebugMemoryArena {
-    const char *name;
-    
+enum {
+    DEV_MODE_NONE,  
+    DEV_MODE_INFO,  
+    DEV_MODE_PROFILER,  
+    DEV_MODE_MEMORY,  
+    DEV_MODE_SENTINEL,  
 };
 
-struct DebugState {
-    MemoryArena collate_arena;
+struct DebugStatistics {
+    u64 draw_call_count;  
+    u64 last_frame_sim_region_entity_count;
+};
 
+extern DebugStatistics *DEBUG;
+
+struct DebugState {
+    MemoryArena arena;
+
+    DebugStatistics statistics;
     DebugTable debug_table;
+    Assets *assets;
     
     u32 frame_index;
     DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
     DebugOpenBlock *current_open_block;
-        
     DebugOpenBlock *first_free_block;
     u32 collation_array_index;
     bool is_paused;
+    
+    u64 total_frame_count;
+    
+    DevUI dev_ui;
+    u32 dev_mode; // DEV_MODE
 };
 
-void debug_init(DebugState *debug_state);
-void debug_frame_end(DebugState *debug_state);
+DebugState *DEBUG_create();
+void DEBUG_init(DebugState *debug_state, struct Assets *assets);
+void DEBUG_update(DebugState *debug_state, struct GameState *game_state, struct Input *input, RendererCommands *commands);
+void DEBUG_frame_end(DebugState *debug_state);
 
 #define DEBUG_HH 1
 #endif

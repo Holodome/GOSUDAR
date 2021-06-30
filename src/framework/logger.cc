@@ -9,19 +9,19 @@ void logger_init() {
     RealWorldTime time = OS::get_real_world_time();
     snprintf(buffer, sizeof(buffer), "logs/%u.%u.%u.%u.%u.%u.log", time.year, time.month, time.day, time.hour, time.second, time.millisecond);
     OS::mkdir("logs");
-    log_file_handle = OS::open_file(buffer, false);
-    assert(OS::is_file_handle_valid(log_file_handle));
+    log_file_handle = open_file(buffer, false);
+    assert(file_handle_valid(log_file_handle));
 }
 
 void logger_cleanup() {
-    OS::close_file(log_file_handle);
+    close_file(log_file_handle);
 }
 
 void printv(const char *format, va_list args) {
     static char buffer[4096];
     size_t len = vsnprintf(buffer, sizeof(buffer), format, args);
     vprintf(buffer, args);
-    OS::write_file(log_file_handle, log_file_index, len, buffer);
+    write_file(log_file_handle, log_file_index, len, buffer);
     log_file_index += len;
 }
 

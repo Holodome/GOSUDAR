@@ -258,6 +258,9 @@ void OS::update_input(Input *input) {
                     case 0x030: {
                         key = Key::B;
                     } break;
+                    case 0x02D: {
+                        key = Key::X;
+                    } break;
                     case 0x02A: {
                         key = Key::Shift;
                     } break;
@@ -430,7 +433,7 @@ void OS::mkdir(const char *name) {
     // @TODO errors
 }
 
-FileHandle OS::open_file(const char *name, bool read) {
+FileHandle open_file(const char *name, bool read) {
     FileHandle result = {};
     CT_ASSERT(sizeof(result.storage) >= sizeof(HANDLE));
     HANDLE handle;
@@ -439,23 +442,23 @@ FileHandle OS::open_file(const char *name, bool read) {
     } else {
         handle = CreateFileA(name, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
     }
-    assert(handle != INVALID_HANDLE_VALUE);
+    result.errors = (handle == INVALID_HANDLE_VALUE);
     memcpy(result.storage, &handle, sizeof(handle));
     return result;
 }
 
-bool OS::is_file_handle_valid(FileHandle handle) {
-    return *((HANDLE *)handle.storage) != INVALID_HANDLE_VALUE;
+bool file_handle_valid(FileHandle handle) {
+    return !handle.errors;
 }
 
-size_t OS::get_file_size(FileHandle handle) {
+size_t get_file_size(FileHandle handle) {
     DWORD result = GetFileSize(*((HANDLE *)handle.storage), 0);
     return (size_t)result;
 }
 
-void OS::read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
+void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
     assert(dest);
-    if (is_file_handle_valid(handle))
+    if (!handle.errors)
     {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
@@ -478,9 +481,9 @@ void OS::read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
     }
 }
 
-void OS::write_file(FileHandle handle, size_t offset, size_t size, const void *source) {
+void write_file(FileHandle handle, size_t offset, size_t size, const void *source) {
     assert(source);
-    if (is_file_handle_valid(handle)) {
+    if (!handle.errors) {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
         overlapped.Offset     = (u32)((offset >> 0)  & 0xFFFFFFFF);
@@ -502,7 +505,7 @@ void OS::write_file(FileHandle handle, size_t offset, size_t size, const void *s
     }    
 }
 
-void OS::close_file(FileHandle handle) {
+void close_file(FileHandle handle) {
     BOOL result = CloseHandle(*((HANDLE *)handle.storage));
     assert(result);
 }

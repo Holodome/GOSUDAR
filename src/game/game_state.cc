@@ -2,6 +2,95 @@
 
 #include "game/ray_casting.hh"
 
+static InterfaceElement *add_element(Interface *interface, u32 kind) {
+    assert(interface->elements_count < MAX_INTERFACE_ELEMENTS);
+    InterfaceElement *element = interface->elements + interface->elements_count++;
+    element->kind = kind;
+    if (!interface->first_element) {
+        interface->first_element = element;
+    }
+    return element;
+}
+
+static void add_button(Interface *interface, Rect rect, u32 value_id) {
+    InterfaceElement *button = add_element(interface, INTERFACE_ELEMENT_BUTTON);
+    button->value_id = value_id;
+}
+
+void init_interface_for_game_state(Interface *interface, Assets *assets) {
+    interface->font_info = assets->get_info(Asset_Font);
+    interface->font = assets->get_font(Asset_Font);
+    
+    
+}
+
+InterfaceStats interface_update(Interface *interface, Input *input) {
+    InterfaceStats stats = {};
+    for (InterfaceElement *element = interface->first_element;
+         element;
+        ) {
+        if (element->is_alive) {
+            if (element->rect.collide(input->mpos)) {
+                stats.is_mouse_over_element = true;
+            }
+            
+            switch (element->kind) {
+                case INTERFACE_ELEMENT_BUTTON: {
+                    if (element->rect.collide(input->mpos) && input->is_key_pressed(Key::MouseLeft)) {
+                        stats.value_id = element->value_id;
+                        stats.interaction_occured = true;
+                    }
+                } break;
+            }
+        }        
+        
+        if (stats.interaction_occured) {
+            break;
+        }
+          
+        if (element->first_child && element->is_alive) {
+            element = element->first_child;  
+        } else if (element->next) {
+            element = element->next;
+        } else {
+            element = element->parent;
+        }
+    }
+    
+    return stats;
+}
+
+void interface_render(Interface *interface, RenderGroup *render_group) {
+    for (InterfaceElement *element = interface->first_element;
+         element;
+        ) {
+        if (element->is_alive) {
+            switch (element->kind) {
+                case INTERFACE_ELEMENT_RECTANGLE: {
+                    push_rect(render_group, element->rect, Vec4(0.4, 0.4, 0.4, 1.0));
+                } break;
+                case INTERFACE_ELEMENT_TEXT: {
+                    
+                } break;
+                case INTERFACE_ELEMENT_BUTTON: {
+                    
+                } break;
+                case INTERFACE_ELEMENT_IMAGE: {
+                
+                } break;
+            }
+        }
+        
+        if (element->first_child) {
+            element = element->first_child;  
+        } else if (element->next) {
+            element = element->next;
+        } else {
+            element = element->parent;
+        }
+    }
+}
+
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);
     Vec2 b_floor = floor_to_cell(b);
@@ -256,7 +345,10 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
                             assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING);
 #define BUILD_SPEED 0.1
                             ent->build_progress += BUILD_SPEED;
-                            ent->build_progress = Math::min(ent->build_progress, 1.0f);
+                            // ent->build_progress = Math::min(ent->build_progress, 1.0f);
+                            if (ent->build_progress > 1.0f) {
+                                ent->build_progress = 1.0f;
+                            }
                             if (ent->build_progress == 1.0f) {
                                 
                             }
@@ -314,6 +406,9 @@ static void update_interface(GameState *game_state, Input *input) {
     }
     if (input->is_key_pressed(Key::B)) {
         game_state->is_in_building_mode = !game_state->is_in_building_mode;
+    }
+    if (input->is_key_pressed(Key::X)) {
+        game_state->show_grid = !game_state->show_grid;
     }
     
     // Update camera input
@@ -426,24 +521,26 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         }
     }
     // Draw grid near mouse cursor
-    Vec2 mouse_cell_pos = floor_to_cell(frame->mouse_projection);
+    if (game_state->show_grid) {
+        Vec2 mouse_cell_pos = floor_to_cell(frame->mouse_projection);
 #define MOUSE_CELL_RAD 5
-    for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
-        for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
-            Vec2 cell_middle = Vec2(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE * 0.5f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE * 0.5f);
-            bool is_occupied = is_cell_occupied(sim, cell_middle);
-            if (!is_occupied) {
-                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, 0.01f);
-            } else {
-                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::red, 0.01f);
+        for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
+            for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
+                Vec2 cell_middle = Vec2(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE * 0.5f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE * 0.5f);
+                bool is_occupied = is_cell_occupied(sim, cell_middle);
+                if (!is_occupied) {
+                    Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                    Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                    Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::black, 0.01f);
+                } else {
+                    Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                    Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                    Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 2.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    push_quad_outline(&world_render_group, v0, v1, v2, v3, Colors::red, 0.01f);
+                }
             }
         }
     }

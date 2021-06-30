@@ -45,14 +45,6 @@ struct Texture {
 
 static Texture INVALID_TEXTURE = { INVALID_ASSET_ID, 0, 0 };
 
-struct RendererStatistics {
-    size_t draw_call_count;
-    
-    void begin_frame() {
-        draw_call_count = 0;
-    }
-};
-
 enum {
     RENDERER_COMMAND_NONE,
     RENDERER_COMMAND_QUADS,
@@ -118,7 +110,6 @@ struct Renderer {
     size_t texture_count;
     GLuint texture_array;
     
-    RendererStatistics current_statistics = {}, statistics = {};
     Vec2 display_size;
     Vec4 clear_color;
 };

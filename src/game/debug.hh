@@ -120,6 +120,7 @@ enum {
 };
 
 struct DebugStatistics {
+    u64 quads_dispatched;
     u64 draw_call_count;  
     u64 last_frame_sim_region_entity_count;
 };
@@ -146,8 +147,10 @@ struct DebugState {
     u32 dev_mode; // DEV_MODE
 };
 
+// @CLEANUP these two functions
 DebugState *DEBUG_create();
 void DEBUG_init(DebugState *debug_state, struct Assets *assets);
+void DEBUG_begin_frame(DebugState *debug_state);
 void DEBUG_update(DebugState *debug_state, struct GameState *game_state, struct Input *input, RendererCommands *commands);
 void DEBUG_frame_end(DebugState *debug_state);
 

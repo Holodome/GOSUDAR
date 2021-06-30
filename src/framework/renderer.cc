@@ -379,8 +379,6 @@ void renderer_cleanup(Renderer *renderer) {
 }
 
 RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Vec4 clear_color) {
-    renderer->statistics = renderer->current_statistics;
-    renderer->current_statistics = {};
     renderer->display_size = display_size;
     renderer->clear_color = clear_color;
     RendererCommands *commands = &renderer->commands;
@@ -417,6 +415,8 @@ void renderer_end_frame(Renderer *renderer) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(renderer->standard_shader);
+    DEBUG->draw_call_count = 0;
+    DEBUG->quads_dispatched = 0;
     for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
         RenderQuads *quads = renderer->commands.quads + i;
         
@@ -432,8 +432,8 @@ void renderer_end_frame(Renderer *renderer) {
         glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
             (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
             (GLint)quads->vertex_array_offset);
-            
-        ++renderer->current_statistics.draw_call_count;
+        ++DEBUG->draw_call_count;
+        DEBUG->quads_dispatched += quads->quad_count;       
     }
 }
 

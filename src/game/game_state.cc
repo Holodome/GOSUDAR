@@ -129,10 +129,7 @@ static EntityID add_tree(SimRegion *sim, Vec2 pos) {
     entity->p = pos;
     entity->kind = ENTITY_KIND_WORLD_OBJECT;
     entity->world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
-    entity->world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
-    entity->resource_kind = RESOURCE_KIND_WOOD;
     entity->resource_interactions_left = 1;
-    entity->resource_gain = 2;
     return entity->id;
 }
 
@@ -143,10 +140,7 @@ static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
     entity->p = pos;
     entity->kind = ENTITY_KIND_WORLD_OBJECT;
     entity->world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
-    entity->world_object_flags = WORLD_OBJECT_FLAG_IS_RESOURCE;
-    entity->resource_kind = RESOURCE_KIND_GOLD;
     entity->resource_interactions_left = 5;
-    entity->resource_gain = 10;
     return entity->id;
 }
 
@@ -182,7 +176,35 @@ static void world_gen(GameState *game_state) {
     end_sim(gen_sim);
 }
 
+static WorldObjectSettings tree_settings(u32 resource_gain) {
+    WorldObjectSettings result = {};
+    result.resource_kind = RESOURCE_KIND_WOOD;
+    result.resource_gain = resource_gain;
+    result.flags = WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE;
+    return result;
+}
+
+static WorldObjectSettings gold_settings(u32 resource_gain) {
+    WorldObjectSettings result = {};
+    result.resource_kind = RESOURCE_KIND_GOLD;
+    result.resource_gain = resource_gain;
+    result.flags = WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE;
+    return result;
+}
+
+static WorldObjectSettings building_settings() {
+    WorldObjectSettings result = {};
+    result.flags = WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING;
+    return result;
+}
+
 void game_state_init(GameState *game_state) {
+    game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_DESERT] = tree_settings(1);
+    game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_FOREST] = tree_settings(4);
+    game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_JUNGLE] = tree_settings(2);
+    game_state->world_object_settings[WORLD_OBJECT_KIND_GOLD_DEPOSIT] = gold_settings(10);
+    game_state->world_object_settings[WORLD_OBJECT_KIND_BUILDING1] = building_settings();
+    game_state->world_object_settings[WORLD_OBJECT_KIND_BUILDING2] = building_settings();
     // Initialize game_state params
     game_state->min_chunk = Vec2i(0);
     game_state->max_chunk = Vec2i(9);
@@ -199,7 +221,7 @@ void game_state_init(GameState *game_state) {
     game_state->world->world_arena = &game_state->arena;
     // Initialize world
     game_state->world->first_free = 0;
-    game_state->world->entity_count = 1; // !!!
+    game_state->world->_entity_count = 1; // !!!
     game_state->world->max_entity_count = 16384;
     game_state->world->entities = (Entity *)arena_alloc(game_state->world->world_arena, 
 														sizeof(Entity) * game_state->world->max_entity_count);
@@ -303,7 +325,7 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
     
     if (is_not_null(game_state->interactable)) {
         SimEntity *ent = get_entity_by_id(frame->sim, game_state->interactable);
-        // printf("%hhu %u\n", ent->world_object_flags, ent->id.value);
+        WorldObjectSettings *settings = game_state->world_object_settings + ent->world_object_kind;
 
         assert(ent->kind == ENTITY_KIND_WORLD_OBJECT);
         if (game_state->interaction_kind) {
@@ -324,15 +346,16 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
                     // finalize interaction
                     switch (game_state->interaction_kind) {
                         case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
-                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE);
+                            assert(settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE);
                             assert(ent->resource_interactions_left);
                             ent->resource_interactions_left -= 1;
-                            switch (ent->resource_kind) {
+                            
+                            switch (settings->resource_kind) {
                                 case RESOURCE_KIND_WOOD: {
-                                    game_state->wood_count += ent->resource_gain;
+                                    game_state->wood_count += settings->resource_gain;
                                 } break;
                                 case RESOURCE_KIND_GOLD: {
-                                    game_state->gold_count += ent->resource_gain;
+                                    game_state->gold_count += settings->resource_gain;
                                 } break;
                                 INVALID_DEFAULT_CASE;
                             }
@@ -342,12 +365,13 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
                             }
                         } break;
                         case PLAYER_INTERACTION_KIND_BUILD: {
-                            assert(ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING);
+                            assert(settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING);
 #define BUILD_SPEED 0.1
                             ent->build_progress += BUILD_SPEED;
                             // ent->build_progress = Math::min(ent->build_progress, 1.0f);
                             if (ent->build_progress > 1.0f) {
                                 ent->build_progress = 1.0f;
+                                ent->world_object_flags |= WORLD_OBJECT_FLAG_IS_BUILT;
                             }
                             if (ent->build_progress == 1.0f) {
                                 
@@ -363,11 +387,11 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
             }
         } else {
             u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
-            if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+            if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE) {
                 if (input->is_key_held(Key::MouseLeft)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
                 } 
-            } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+            } else if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
                 if (input->is_key_held(Key::MouseRight)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
                 }
@@ -376,11 +400,11 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
             if (interaction_kind) {
                 f32 interaction_time = 0.0f;
                 bool cancel_interaction = false;
-                if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_RESOURCE) {
+                if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE) {
                     assert(ent->resource_interactions_left > 0);
                     // switch on type...
                     interaction_time = 1.0f;
-                } else if (ent->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+                } else if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
                     if (ent->build_progress < 1.0f) {
                         interaction_time = 1.0f;
                     } else {
@@ -484,18 +508,63 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
     update_interactions(game_state, frame, input);
     
     if (game_state->is_in_building_mode) {
-        if (input->is_key_pressed(Key::MouseRight)) {
-            Vec2 p = floor_to_cell(mouse_point);
-            if (!is_cell_occupied(sim, p)) {
-                SimEntity *building = create_entity(sim);
-                building->p = p;
-                building->kind = ENTITY_KIND_WORLD_OBJECT;
-                building->world_object_flags = WORLD_OBJECT_FLAG_IS_BUILDING;
-                building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1;
+        Vec2 p = floor_to_cell(mouse_point);
+        if (!is_cell_occupied(sim, p)) {
+            SimEntity *building = create_entity(sim);
+            building->p = p;
+            building->kind = ENTITY_KIND_WORLD_OBJECT;
+            building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1 + game_state->selected_building;
+            if (input->is_key_pressed(Key::MouseRight)) {
                 game_state->is_in_building_mode = false;
+            } else {
+                building->flags |= ENTITY_FLAG_SINGLE_FRAME_LIFESPAN;
+                building->world_object_flags |= WORLD_OBJECT_FLAG_IS_BLUEPRINT;
             }
         }
     }
+}
+
+static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, Vec2 *size_dest) {
+    AssetID texture_id = INVALID_ASSET_ID;
+    Vec2 size = Vec2(0, 0);
+    switch(entity->kind) {
+        case ENTITY_KIND_PLAYER: {
+            texture_id = Asset_Dude;
+            size = Vec2(0.5f);
+        } break;
+        case ENTITY_KIND_WORLD_OBJECT: {
+            switch(entity->world_object_kind) {
+                case WORLD_OBJECT_KIND_TREE_FOREST: {
+                    texture_id = Asset_TreeForest;
+                } break;
+                case WORLD_OBJECT_KIND_TREE_JUNGLE: {
+                    texture_id = Asset_TreeJungle;
+                } break;
+                case WORLD_OBJECT_KIND_TREE_DESERT: {
+                    texture_id = Asset_TreeDesert;
+                } break;
+                case WORLD_OBJECT_KIND_GOLD_DEPOSIT: {
+                    texture_id = Asset_GoldVein;
+                } break;
+                case WORLD_OBJECT_KIND_BUILDING1: {
+                    if (entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILT) {
+                        texture_id = Asset_Building;
+                    } else {
+                        texture_id = Asset_Building1;
+                    }
+                } break;
+                case WORLD_OBJECT_KIND_BUILDING2: {
+                    texture_id = Asset_Building1;
+                } break;
+                INVALID_DEFAULT_CASE;
+            }
+            size = Vec2(0.5f);
+        } break;
+        INVALID_DEFAULT_CASE;
+    }
+        
+    *id_dest = texture_id;
+    *size_dest = size;
 }
 
 static void render_world(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
@@ -576,61 +645,19 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     BEGIN_BLOCK("Render billboards");
     for (size_t drawable_idx = 0; drawable_idx < drawable_entity_storage_index_count; ++drawable_idx) {
         SimEntity *entity = &sim->entities[drawable_entity_storage_indexs[drawable_idx]];
-        AssetID texture_id = INVALID_ASSET_ID;
-        Vec2 size = Vec2(0, 0);
-        switch(entity->kind) {
-            case ENTITY_KIND_PLAYER: {
-                texture_id = Asset_Dude;
-                size = Vec2(0.5f);
-            } break;
-            case ENTITY_KIND_WORLD_OBJECT: {
-                switch(entity->world_object_kind) {
-                    case WORLD_OBJECT_KIND_TREE_FOREST: {
-                        texture_id = Asset_TreeForest;
-                    } break;
-                    case WORLD_OBJECT_KIND_TREE_JUNGLE: {
-                        texture_id = Asset_TreeJungle;
-                    } break;
-                    case WORLD_OBJECT_KIND_TREE_DESERT: {
-                        texture_id = Asset_TreeDesert;
-                    } break;
-                    case WORLD_OBJECT_KIND_GOLD_DEPOSIT: {
-                        texture_id = Asset_GoldVein;
-                    } break;
-                    case WORLD_OBJECT_KIND_BUILDING1: {
-                        if (entity->build_progress == 1.0f) {
-                            texture_id = Asset_Building;
-                        } else {
-                            texture_id = Asset_Building1;
-                        }
-                    } break;
-                    case WORLD_OBJECT_KIND_BUILDING2: {
-                        texture_id = Asset_Building1;
-                    } break;
-                    INVALID_DEFAULT_CASE;
-                }
-                size = Vec2(0.5f);
-            } break;
-            INVALID_DEFAULT_CASE;
-        }
-        
+        AssetID texture_id;
+        Vec2 size;
+        get_sprite_settings_for_entity(entity, &texture_id, &size);
         Vec3 billboard[4];
         Vec3 pos = Vec3(entity->p.x, 0, entity->p.y);
+        Vec4 color = Colors::white;
+        if (entity->kind == ENTITY_KIND_WORLD_OBJECT && entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BLUEPRINT) {
+            color.a = 0.5f;
+        }
         get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), size.x, size.y, billboard);
-        push_quad(&world_render_group, billboard, texture_id);
+        push_quad(&world_render_group, billboard, color, texture_id);
     }
     END_BLOCK();
-    
-    if (game_state->is_in_building_mode) {
-        Vec3 billboard[4];
-        Vec2 cell_pos = floor_to_cell(frame->mouse_projection);
-        if (!is_cell_occupied(sim, cell_pos)) {
-            Vec3 pos = xz(cell_pos);
-            AssetID texture_id = Asset_Building;
-            get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), 0.5f, 0.5f, billboard);
-            push_quad(&world_render_group, billboard, Vec4(1, 1, 1, 0.5f), texture_id);
-        }
-    }
     
     render_group_end(&world_render_group); 
 }
@@ -650,6 +677,13 @@ void update_and_render(GameState *game_state, Input *input, RendererCommands *co
     update_interface(game_state, input);
     update_world_simulation(game_state, &frame, input);
     render_world(game_state, &frame, commands, assets);
-    game_state->DEBUG_last_frame_sim_region_entity_count = sim->entity_count;
+    DEBUG->last_frame_sim_region_entity_count = sim->entity_count;
     end_sim(sim);
+}
+
+
+WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object_kind) {
+    assert(world_object_kind);
+    assert(world_object_kind < ARRAY_SIZE(game_state->world_object_settings));
+    return game_state->world_object_settings + world_object_kind;
 }

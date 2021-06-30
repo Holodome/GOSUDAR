@@ -3,7 +3,8 @@
 #include "game/game.hh"
 
 #define DEV_UI_SECTION_OFFSET 20.0f
-#define DEV_UI_PADDING 2.0f
+#define DEV_UI_VERT_PADDING 2.0f
+#define DEV_UI_HORIZ_PADDING 10.0f
 
 static DevUIID id_from_cstr(const char *cstr) {
     DevUIID result;
@@ -82,11 +83,11 @@ static Vec2 get_text_size(DevUILayout *layout, const char *text) {
 }
 
 static void element_size(DevUILayout *layout, Vec2 size) {
-    layout->p.x += size.x + DEV_UI_PADDING;
+    layout->p.x += size.x + DEV_UI_HORIZ_PADDING;
     layout->last_line_p = layout->p;
     
     layout->p.x = 0;
-    layout->p.y += size.y + DEV_UI_PADDING;
+    layout->p.y += size.y + DEV_UI_VERT_PADDING;
 }
 
 void dev_ui_last_line(DevUILayout *layout) {

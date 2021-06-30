@@ -100,25 +100,38 @@ void advance(ChunkIterator *iter) {
     }
 }
 
-// EntityID add_world_entity(World *world, WorldPosition pos) {
-//     assert(world->entity_count < world->max_entity_count);
-//     EntityID id;
-//     assert(world->entity_count < UINT32_MAX);
-//     id.value = (u32)world->entity_count++; 
-//     Entity *entity = world->entities + id.value;
-//     memset(entity, 0, sizeof(*entity));
-//     entity->world_pos = pos;
-//     entity->sim.id = id;
-    
-//     Chunk *chunk = get_world_chunk(world, pos.chunk);
-//     add_entity_to_chunk(world, chunk, id);
-//     return id;    
-// }
+EntityID get_new_id(World *world) {
+    EntityID result;
+    if (world->free_id) {
+        IDListEntry *next_id = world->free_id->next;
+        
+        result = world->free_id->id;
+        world->free_id->next = world->first_free_entry;
+        world->first_free_entry = world->free_id;
+        world->free_id = next_id;
+    } else {
+        result = entity_id_from_storage_index(world->_entity_count++);
+    }
+    return result;
+}
+
+void free_id(World *world, EntityID id) {
+    IDListEntry *new_entry;
+    if (world->first_free_entry) {
+        new_entry = world->first_free_entry;
+        world->first_free_entry = world->first_free_entry->next;
+    } else {
+        new_entry = alloc_struct(world->world_arena, IDListEntry);
+    }
+    new_entry->id = id;
+    new_entry->next = world->free_id;
+    world->free_id = new_entry;
+}
 
 Entity *get_world_entity(World *world, EntityID id) {
     // @TODO clean, make 0 id invalid
     assert(id.value);
-    assert(id.value < world->entity_count);
+    assert(id.value < world->_entity_count);
     return world->entities + id.value;    
 }
 
@@ -267,22 +280,31 @@ void end_sim(SimRegion *sim) {
     TIMED_FUNCTION();
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         SimEntity *entity = sim->entities + entity_idx;
-        // Place entity in world 
-        WorldPosition new_position = pos_add(sim->origin, entity->p);
-        // if (is_same(entity->id, null_id()) && !(entity->flags & ENTITY_FLAG_IS_DELETED)) {
-        //     // entity->id = add_world_entity(sim->game_state->world, new_position);
-        //     Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
-        //     world_ent->sim = *entity;
-        // } else {
-        Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
-        if (entity->flags & ENTITY_FLAG_IS_DELETED) {
-            Chunk *old_chunk = get_world_chunk(sim->game_state->world, world_ent->world_pos.chunk);
-            remove_entity_from_chunk(sim->game_state->world, old_chunk, entity->id);
+        bool do_free_id = false;
+        if (entity->flags & ENTITY_FLAG_SINGLE_FRAME_LIFESPAN) {
+            do_free_id = true;
         } else {
-            world_ent->sim = *entity;
-            move_entity(sim->game_state->world, entity->id, new_position, world_ent->world_pos);
+            // Place entity in world 
+            WorldPosition new_position = pos_add(sim->origin, entity->p);
+            // if (is_same(entity->id, null_id()) && !(entity->flags & ENTITY_FLAG_IS_DELETED)) {
+            //     // entity->id = add_world_entity(sim->game_state->world, new_position);
+            //     Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
+            //     world_ent->sim = *entity;
+            // } else {
+            Entity *world_ent = get_world_entity(sim->game_state->world, entity->id);
+            if (entity->flags & ENTITY_FLAG_IS_DELETED) {
+                Chunk *old_chunk = get_world_chunk(sim->game_state->world, world_ent->world_pos.chunk);
+                remove_entity_from_chunk(sim->game_state->world, old_chunk, entity->id);
+                do_free_id = true;
+            } else {
+                world_ent->sim = *entity;
+                move_entity(sim->game_state->world, entity->id, new_position, world_ent->world_pos);
+            }
         }
-        // }
+        
+        if (do_free_id) {
+            free_id(sim->game_state->world, entity->id);
+        }
     }
 }
 
@@ -336,8 +358,7 @@ SimEntity *create_entity(SimRegion *sim) {
     assert(sim->entity_count < sim->max_entity_count);
     SimEntity *entity = sim->entities + sim->entity_count++;
     memset(entity, 0, sizeof(*entity));
-    // @TODO make this more explicit
-    entity->id.value = sim->game_state->world->entity_count++;
+    entity->id = get_new_id(sim->game_state->world);
     SimEntityHash *hash = get_hash_from_storage_index(sim, entity->id);
     hash->id = entity->id;
     hash->ptr = entity;

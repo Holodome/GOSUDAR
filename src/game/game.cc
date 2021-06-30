@@ -44,18 +44,18 @@ void game_cleanup(Game *game) {
 
 void game_update_and_render(Game *game) {
     FRAME_MARKER();
+    DEBUG_begin_frame(game->debug_state);
     game->os.update_input(&game->input);
 #define MIN_DT 0.001f
 #define MAX_DT 0.1f
     game->input.dt = Math::clamp(game->input.dt, MIN_DT, MAX_DT);
     
-    // Non-game related keybinds
     if (game->input.is_key_pressed(Key::Escape) || game->input.is_quit_requested) {
         game->is_running = false;
     }    
     RendererCommands *commands = renderer_begin_frame(&game->renderer, game->input.winsize, Vec4(0.2));
-    DEBUG_update(game->debug_state, &game->game_state, &game->input, commands);
     update_and_render(&game->game_state, &game->input, commands, &game->assets);
+    DEBUG_update(game->debug_state, &game->game_state, &game->input, commands);
     renderer_end_frame(&game->renderer);
     game->os.update_window();
     DEBUG_frame_end(game->debug_state);

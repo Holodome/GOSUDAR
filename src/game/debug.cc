@@ -124,8 +124,8 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, Input *input, 
     RenderGroup interface_render_group = render_group_begin(commands, debug_state->assets,
         setup_2d(Mat4x4::ortographic_2d(0, input->winsize.x, input->winsize.y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
-        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; E: %llu; S: %llu", 1.0f / input->dt, (u32)(input->dt * 1000), 
-            DEBUG->draw_call_count, game_state->world->entity_count,
+        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; Q: %llu; E: %llu; S: %llu", 1.0f / input->dt, (u32)(input->dt * 1000), 
+            DEBUG->draw_call_count, DEBUG->quads_dispatched, game_state->world->_entity_count,
             DEBUG->last_frame_sim_region_entity_count);
         Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
         Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
@@ -136,9 +136,19 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, Input *input, 
         dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game_state->wood_count, game_state->gold_count);    
         dev_ui_checkbox(&dev_ui, "In building mode", &game_state->is_in_building_mode);
         dev_ui_checkbox(&dev_ui, "Allow camera controls", &game_state->allow_camera_controls);
+        dev_ui_checkbox(&dev_ui, "Show grid", &game_state->show_grid);
+        dev_ui_labelf(&dev_ui, "Selected building kind: %hhu", game_state->selected_building);
+        if (dev_ui_button(&dev_ui, "Building 1")) {
+            game_state->selected_building = 0;
+        } 
+        dev_ui_last_line(&dev_ui);
+        if (dev_ui_button(&dev_ui, "Building 2")) {
+            game_state->selected_building = 1;
+        } 
         if (!is_same(game_state->interactable, null_id())) {
             SimEntity *interactable = &get_world_entity(game_state->world, game_state->interactable)->sim;
-            if (interactable->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILDING) {
+            WorldObjectSettings *settings = get_object_settings(game_state, interactable->world_object_kind);
+            if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
                 dev_ui_labelf(&dev_ui, "Building build progress: %.2f", interactable->build_progress);
             }
         }
@@ -157,6 +167,7 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, Input *input, 
         }
         
         qsort_s(records_sorted, record_count, sizeof(*records_sorted), records_sort, frame);
+        dev_ui_labelf(&dev_ui, "Frame %llu", debug_state->total_frame_count);    
         dev_ui_labelf(&dev_ui, "Collation: %.2f%%", (f32)frame->collation_clocks / frame_time * 100);    
         for (size_t i = 0; i < frame->records_count; ++i) {
             DebugRecord *record = frame->records + records_sorted[i];
@@ -180,7 +191,12 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, Input *input, 
     dev_ui_end(&dev_ui, &interface_render_group);
 }
 
+void DEBUG_begin_frame(DebugState *debug_state) {
+    DEBUG->last_frame_sim_region_entity_count = 0;
+}
+
 void DEBUG_frame_end(DebugState *debug_state) {
+    ++debug_state->total_frame_count;
     ++debug_table->current_event_array_index;
     if (debug_table->current_event_array_index >= DEBUG_MAX_EVENT_ARRAY_COUNT) {
         debug_table->current_event_array_index = 0;
@@ -198,14 +214,7 @@ void DEBUG_frame_end(DebugState *debug_state) {
 }
 
 void DEBUG_init(DebugState *debug_state, Assets *assets) {
-    debug_table = &debug_state->debug_table;
-    DEBUG = &debug_state->statistics;
-    
     debug_state->assets = assets;
-    debug_state->first_free_block = 0;
-    debug_state->current_open_block = 0;
-    debug_state->collation_array_index = 0;    
-    
     size_t dev_ui_arena_size = MEGABYTES(8);
     debug_state->dev_ui.arena = subarena(&debug_state->arena, dev_ui_arena_size);
     dev_ui_init(&debug_state->dev_ui, assets);
@@ -215,6 +224,13 @@ DebugState *DEBUG_create() {
     DebugState *debug_state = (DebugState *)os_alloc(sizeof(DebugState));
     size_t debug_arena_size = MEGABYTES(256);
     arena_init(&debug_state->arena, os_alloc(debug_arena_size), debug_arena_size);
+    
+    debug_table = &debug_state->debug_table;
+    DEBUG = &debug_state->statistics;
+    
+    debug_state->first_free_block = 0;
+    debug_state->current_open_block = 0;
+    debug_state->collation_array_index = 0;   
     return debug_state;
     
 }

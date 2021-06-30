@@ -68,12 +68,35 @@ enum {
     GAME_STATE_BUTTON_MOVE_BUILDING2,  
 };
 
+struct InputManager {
+    Input *input;
+    bool is_locked;  
+    const char *DEBUG_lock_author;
+};
+
+void manage_input(InputManager *manager);
+void lock_input(InputManager *manager);
+void unlock_input(InputManager *manager);
+
+enum {
+    WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE = 0x1,
+    WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING = 0x2,
+};
+
+struct WorldObjectSettings {
+    u32 resource_gain;
+    u32 resource_kind;
+    u32 flags;
+};  
+
 // All game-related data is stored here. Like player resources, debug thigs etc.
 struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
     // Interface interface;
+    
+    WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
     
     SimCamera cam;
     EntityID camera_followed_entity_id;
@@ -94,9 +117,9 @@ struct GameState {
     bool is_in_building_mode;
     bool allow_camera_controls;
     bool show_grid;
-    
-    size_t DEBUG_last_frame_sim_region_entity_count;
 };
+
+WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object_kind);
 
 void game_state_init(GameState *game_state);
 void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets);

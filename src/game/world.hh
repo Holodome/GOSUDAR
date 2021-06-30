@@ -42,6 +42,7 @@ inline EntityID entity_id_from_storage_index(u32 index);
 // Entity flags
 enum {
     ENTITY_FLAG_IS_DELETED = 0x1,
+    ENTITY_FLAG_SINGLE_FRAME_LIFESPAN = 0x2,
     ENTITY_FLAG_SENTINEL
 };
 // Entity kind
@@ -54,12 +55,12 @@ enum {
     ENTITY_KIND_WORLD_OBJECT,
     ENTITY_KIND_SENTINEL,
 };  
-// World object flags
+
 enum {
-    WORLD_OBJECT_FLAG_IS_RESOURCE = 0x1,
-    WORLD_OBJECT_FLAG_IS_BUILDING = 0x2,
-    WORLD_OJBECT_FLAG_SENTINEL
+    WORLD_OBJECT_FLAG_IS_BUILT = 0x1,
+    WORLD_OBJECT_FLAG_IS_BLUEPRINT = 0x2
 };
+
 // World object kind
 enum {
     WORLD_OBJECT_KIND_NONE,
@@ -95,9 +96,7 @@ struct SimEntity {
     // Per-kind values
     u8 world_object_flags;
     u8 world_object_kind;
-    u8 resource_kind;
     u8 resource_interactions_left;
-    u8 resource_gain;
     // For building
     f32 build_progress; // [0-1]
 };  
@@ -105,8 +104,6 @@ struct SimEntity {
 CT_ASSERT(ENUM_FITS_IN_VARIABLE(ENTITY_FLAG_SENTINEL, STRUCT_FIELD(SimEntity, flags)));
 CT_ASSERT(ENUM_FITS_IN_VARIABLE(ENTITY_KIND_SENTINEL, STRUCT_FIELD(SimEntity, kind)));
 CT_ASSERT(ENUM_FITS_IN_VARIABLE(WORLD_OBJECT_KIND_SENTINEL, STRUCT_FIELD(SimEntity, world_object_kind)));
-CT_ASSERT(ENUM_FITS_IN_VARIABLE(WORLD_OJBECT_FLAG_SENTINEL, STRUCT_FIELD(SimEntity, world_object_flags)));
-CT_ASSERT(ENUM_FITS_IN_VARIABLE(RESOURCE_KIND_SENTINEL, STRUCT_FIELD(SimEntity, resource_kind)));
 
 // Entity stored in world
 struct Entity {
@@ -140,6 +137,11 @@ ChunkIterator iterate_chunk_entities(Chunk *chunk);
 bool is_valid(ChunkIterator *iter);
 void advance(ChunkIterator *iter);
 
+struct IDListEntry {
+    EntityID id;
+    IDListEntry *next;  
+};
+
 #define WORLD_CHUNK_HASH_SIZE 4096
 CT_ASSERT(IS_POW2(WORLD_CHUNK_HASH_SIZE));
 // @TODO make world inners inaccessable, use api calls for all
@@ -154,12 +156,15 @@ struct World {
     Chunk chunk_hash[WORLD_CHUNK_HASH_SIZE];
     
     size_t max_entity_count;
-    size_t entity_count;
+    size_t _entity_count;
     Entity *entities;
-    
-    // size_t DEBUG_external_chunks_allocated;
+
+    IDListEntry *free_id;
+    IDListEntry *first_free_entry;
 };  
 
+EntityID get_new_id(World *world);
+void free_id(World *world, EntityID id);
 // EntityID add_world_entity(World *world, WorldPosition pos);
 Entity *get_world_entity(World *world, EntityID id);
 Chunk *get_world_chunk(World *world, Vec2i coord);

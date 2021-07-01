@@ -2,95 +2,6 @@
 
 #include "game/ray_casting.hh"
 
-static InterfaceElement *add_element(Interface *interface, u32 kind) {
-    assert(interface->elements_count < MAX_INTERFACE_ELEMENTS);
-    InterfaceElement *element = interface->elements + interface->elements_count++;
-    element->kind = kind;
-    if (!interface->first_element) {
-        interface->first_element = element;
-    }
-    return element;
-}
-
-static void add_button(Interface *interface, Rect rect, u32 value_id) {
-    InterfaceElement *button = add_element(interface, INTERFACE_ELEMENT_BUTTON);
-    button->value_id = value_id;
-}
-
-void init_interface_for_game_state(Interface *interface, Assets *assets) {
-    interface->font_info = assets->get_info(Asset_Font);
-    interface->font = assets->get_font(Asset_Font);
-    
-    
-}
-
-InterfaceStats interface_update(Interface *interface, Input *input) {
-    InterfaceStats stats = {};
-    for (InterfaceElement *element = interface->first_element;
-         element;
-        ) {
-        if (element->is_alive) {
-            if (element->rect.collide(input->mpos)) {
-                stats.is_mouse_over_element = true;
-            }
-            
-            switch (element->kind) {
-                case INTERFACE_ELEMENT_BUTTON: {
-                    if (element->rect.collide(input->mpos) && input->is_key_pressed(Key::MouseLeft)) {
-                        stats.value_id = element->value_id;
-                        stats.interaction_occured = true;
-                    }
-                } break;
-            }
-        }        
-        
-        if (stats.interaction_occured) {
-            break;
-        }
-          
-        if (element->first_child && element->is_alive) {
-            element = element->first_child;  
-        } else if (element->next) {
-            element = element->next;
-        } else {
-            element = element->parent;
-        }
-    }
-    
-    return stats;
-}
-
-void interface_render(Interface *interface, RenderGroup *render_group) {
-    for (InterfaceElement *element = interface->first_element;
-         element;
-        ) {
-        if (element->is_alive) {
-            switch (element->kind) {
-                case INTERFACE_ELEMENT_RECTANGLE: {
-                    push_rect(render_group, element->rect, Vec4(0.4, 0.4, 0.4, 1.0));
-                } break;
-                case INTERFACE_ELEMENT_TEXT: {
-                    
-                } break;
-                case INTERFACE_ELEMENT_BUTTON: {
-                    
-                } break;
-                case INTERFACE_ELEMENT_IMAGE: {
-                
-                } break;
-            }
-        }
-        
-        if (element->first_child) {
-            element = element->first_child;  
-        } else if (element->next) {
-            element = element->next;
-        } else {
-            element = element->parent;
-        }
-    }
-}
-
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);
     Vec2 b_floor = floor_to_cell(b);
@@ -147,7 +58,7 @@ static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
 static void world_gen(GameState *game_state) {
     Entropy entropy;
     entropy.state = 1233437824;
-    SimRegion *gen_sim = begin_sim(game_state, Vec2i(0), Vec2i(0));
+    SimRegion *gen_sim = begin_sim(&game_state->frame_arena, game_state->world, Vec2i(0), Vec2i(0));
     // Initialize game_state 
     game_state->camera_followed_entity_id = add_player(gen_sim);
     for (size_t i = 0; i < 1000; ++i) {
@@ -220,20 +131,10 @@ void game_state_init(GameState *game_state) {
     game_state->world = alloc_struct(&game_state->arena, World);
     game_state->world->world_arena = &game_state->arena;
     // Initialize world
-    game_state->world->first_free = 0;
-    game_state->world->_entity_count = 1; // !!!
-    game_state->world->max_entity_count = 16384;
-    game_state->world->entities = (Entity *)arena_alloc(game_state->world->world_arena, 
-														sizeof(Entity) * game_state->world->max_entity_count);
-    memset(game_state->world->chunk_hash, 0, sizeof(game_state->world->chunk_hash));
-    for (size_t i = 0; i < ARRAY_SIZE(game_state->world->chunk_hash); ++i) {
-        game_state->world->chunk_hash[i].coord = Vec2i(CHUNK_COORD_UNINITIALIZED, 0);
-    }
-    for (size_t i = 0; i < game_state->world->max_entity_count; ++i) {
-        game_state->world->entities[i].world_pos.chunk.x = CHUNK_COORD_UNINITIALIZED;
-    }
-    
+    world_init(game_state->world);
     world_gen(game_state);
+    
+    init_interface_for_game_state(&game_state->arena, &game_state->interface, Vec2(1264, 681));
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -292,7 +193,7 @@ static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
 }
 
 static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i *max) {
-#define REGION_CHUNK_RADIUS 2
+#define REGION_CHUNK_RADIUS 10
     *min = Vec2i(camera_coord.chunk.x - REGION_CHUNK_RADIUS, camera_coord.chunk.y - REGION_CHUNK_RADIUS);
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
@@ -368,13 +269,9 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
                             assert(settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING);
 #define BUILD_SPEED 0.1
                             ent->build_progress += BUILD_SPEED;
-                            // ent->build_progress = Math::min(ent->build_progress, 1.0f);
                             if (ent->build_progress > 1.0f) {
                                 ent->build_progress = 1.0f;
                                 ent->world_object_flags |= WORLD_OBJECT_FLAG_IS_BUILT;
-                            }
-                            if (ent->build_progress == 1.0f) {
-                                
                             }
                         } break;
                         INVALID_DEFAULT_CASE;
@@ -425,15 +322,17 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
 }
 
 static void update_interface(GameState *game_state, InputManager *input) {
-    if (is_key_held(input, Key::Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, Key::Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->allow_camera_controls = !game_state->allow_camera_controls;
     }
-    if (is_key_held(input, Key::B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, Key::B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->is_in_building_mode = !game_state->is_in_building_mode;
     }
-    if (is_key_held(input, Key::X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, Key::X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->show_grid = !game_state->show_grid;
     }
+    
+    InterfaceStats stats = interface_update(&game_state->interface, input);
     
     // Update camera input
     if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
@@ -492,13 +391,13 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
 #define CAMERA_FOV Math::rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  100.0f
-    Mat4x4 projection = Mat4x4::perspective(CAMERA_FOV, window_size(input).aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
-    Mat4x4 view = Mat4x4::identity() * Mat4x4::rotation(game_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game_state->cam.yaw, Vec3(0, 1, 0))
+    frame->projection = Mat4x4::perspective(CAMERA_FOV, window_size(input).aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    frame->view = Mat4x4::identity() * Mat4x4::rotation(game_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game_state->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-sim->cam_p);
-    sim->cam_mvp = projection * view;
+    sim->cam_mvp = frame->projection * frame->view;
     // Get mouse point projected on plane
-    Vec3 ray_dir = uv_to_world(projection, view, Vec2((2.0f * mouse_p(input).x) / window_size(input).x - 1.0f,
-													  1.0f - (2.0f * mouse_p(input).y) / window_size(input).y));
+    Vec3 ray_dir = uv_to_world(frame->projection, frame->view, Vec2((2.0f * mouse_p(input).x) / window_size(input).x - 1.0f,
+													           1.0f - (2.0f * mouse_p(input).y) / window_size(input).y));
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
@@ -554,7 +453,7 @@ static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, 
                     }
                 } break;
                 case WORLD_OBJECT_KIND_BUILDING2: {
-                    texture_id = Asset_Building1;
+                    texture_id = Asset_Building;
                 } break;
                 INVALID_DEFAULT_CASE;
             }
@@ -570,7 +469,7 @@ static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, 
 static void render_world(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
-    RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(sim->cam_mvp));
+    RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(frame->view, frame->projection));
     // Draw ground
     BEGIN_BLOCK("Render_ground");
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
@@ -671,11 +570,15 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
     Vec2i min_chunk_coord, max_chunk_coord;
     get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
-    frame.sim = begin_sim(game_state, min_chunk_coord, max_chunk_coord);
+    frame.sim = begin_sim(&game_state->frame_arena, game_state->world, min_chunk_coord, max_chunk_coord);
     update_interface(game_state, input);
     update_world_simulation(game_state, &frame, input);
     render_world(game_state, &frame, commands, assets);
-    DEBUG->last_frame_sim_region_entity_count = frame.sim->entity_count;
+    RenderGroup interface_render_group = render_group_begin(commands, assets,
+        setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
+    interface_render(&game_state->interface, &interface_render_group);
+    render_group_end(&interface_render_group);
+    // DEBUG->last_frame_sim_region_entity_count = frame.sim->entity_count;
     end_sim(frame.sim);
 }
 

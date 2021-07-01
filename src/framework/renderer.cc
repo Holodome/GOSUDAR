@@ -9,17 +9,21 @@ _type _name;
 
 #include "framework/renderer_internal.cc"
 
-RendererSetup setup_3d(Mat4x4 mvp) {
+RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection) {
     RendererSetup result;
-    result.mvp = mvp;
+    result.view = view;
+    result.projection = projection;
     result.has_depth = true;
+    result.mvp = projection * view;
     return result;
 }
 
-RendererSetup setup_2d(Mat4x4 mvp) {
+RendererSetup setup_2d(Mat4x4 projection) {
     RendererSetup result;
-    result.mvp = mvp;
+    result.projection = projection;
+    result.view = Mat4x4::identity();
     result.has_depth = false;
+    result.mvp = projection;
     return result;
 }
 
@@ -256,6 +260,7 @@ static GLuint create_shader(const Str &source) {
     }    
     
     assert(!shader_failed);
+    logprintln("Renderer", "Shader compiled");
     return id;
 }
 
@@ -276,32 +281,33 @@ out vec4 rect_color;
 out vec2 frag_uv;      
        
 flat out int frag_texture_index;       
-uniform mat4 mvp = mat4(1);     
-void main()        
-{      
+out float visibility;
+
+uniform mat4 view_matrix = mat4(1);     
+uniform mat4 projection_matrix = mat4(1);
+
+void main() {             
     vec4 world_space = position;       
-    vec4 clip_space = mvp * world_space;        
+    vec4 cam_space = view_matrix * world_space;
+    vec4 clip_space = projection_matrix * cam_space;        
     gl_Position = clip_space;      
        
     rect_color = color;        
     frag_uv = uv;      
     frag_texture_index = texture_index;        
+    
+    float d = length(cam_space.xyz);
+// #define DENSITY 0.007 * 10
+// #define GRADIENT 1.5
+//     visibility = exp(-pow((d * DENSITY), GRADIENT));
+//     visibility = clamp(visibility, 0, 1);    
 }      
 #else 
-
-float linear1_to_srgb(float l) {
-    l = clamp(l, 0, 1);
-    float s = l * 12.92f;
-    if (l > 0.0031308f)
-    {
-        s = 1.055f * pow(l, 1.0 / 2.4) - 0.055f;
-    }
-    return s;
-}
 
 in vec4 rect_color;        
 in vec2 frag_uv;       
 flat in int frag_texture_index;        
+in float visibility;
 uniform sampler2DArray tex;        
 out vec4 out_color;        
 void main()        
@@ -313,11 +319,17 @@ void main()
     } 
     
     out_color = texture_sample * rect_color;       
+// #define FOG_COLOR vec4(0.5, 0.5, 0.5, 1)
+//     out_color = mix(FOG_COLOR, out_color, visibility);
 }      
 #endif)FOO";
     renderer->standard_shader = create_shader(standard_shader_code);
-    renderer->mvp_location = glGetUniformLocation(renderer->standard_shader, "mvp");
+    renderer->projection_location = glGetUniformLocation(renderer->standard_shader, "projection_matrix");
+    assert(renderer->projection_location != (GLuint)-1);
     renderer->tex_location = glGetUniformLocation(renderer->standard_shader, "tex");
+    assert(renderer->tex_location != (GLuint)-1);
+    renderer->view_location = glGetUniformLocation(renderer->standard_shader, "view_matrix");
+    assert(renderer->view_location != (GLuint)-1);
    
     size_t max_quads_count = 1024;
     renderer->commands.max_quads_count = max_quads_count;
@@ -415,8 +427,8 @@ void renderer_end_frame(Renderer *renderer) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(renderer->standard_shader);
-    DEBUG->draw_call_count = 0;
-    DEBUG->quads_dispatched = 0;
+    u64 DEBUG_draw_call_count = 0;
+    u64 DEBUG_quads_dispatched = 0;
     for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
         RenderQuads *quads = renderer->commands.quads + i;
         
@@ -425,16 +437,21 @@ void renderer_end_frame(Renderer *renderer) {
         } else {
             glDisable(GL_DEPTH_TEST);
         }
-        glUniformMatrix4fv(renderer->mvp_location, 1, false, quads->setup.mvp.value_ptr());
+        glUniformMatrix4fv(renderer->view_location, 1, false, quads->setup.view.value_ptr());
+        glUniformMatrix4fv(renderer->projection_location, 1, false, quads->setup.projection.value_ptr());
         glUniform1i(renderer->tex_location, 0); 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
         glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
             (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
             (GLint)quads->vertex_array_offset);
-        ++DEBUG->draw_call_count;
-        DEBUG->quads_dispatched += quads->quad_count;       
+            
+        ++DEBUG_draw_call_count;
+        DEBUG_quads_dispatched += quads->quad_count;       
     }
+    
+    DEBUG_VALUE(DEBUG_draw_call_count);
+    DEBUG_VALUE(DEBUG_quads_dispatched);
 }
 
 Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size) {

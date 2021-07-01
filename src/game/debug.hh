@@ -18,7 +18,8 @@ enum {
     DEBUG_EVENT_NONE,
     DEBUG_EVENT_FRAME_MARKER,
     DEBUG_EVENT_BEGIN_BLOCK,
-    DEBUG_EVENT_END_BLOCK
+    DEBUG_EVENT_END_BLOCK,
+    DEBUG_EVENT_VALUE_U64,
 };
 
 struct DebugEvent {
@@ -26,6 +27,10 @@ struct DebugEvent {
     u64 clock;        // rdstc
     const char *debug_name; // see DEBUG_NAME
     const char *name;       // user-defined block name
+    union {
+        u64 value_u64;
+        
+    };
 };
 
 struct DebugTable {
@@ -43,31 +48,35 @@ extern DebugTable *debug_table;
 #define DEBUG_NAME() DEBUG_NAME_(__FILE__, __LINE__, __COUNTER__)
 
 // @TODO(hl): Can actualy replace interlocked_add with interlocked_increment
-#define RecordDebugEvent(event_type, debug_name_init, name_init)                                  \
-    do                                                                                            \
-    {                                                                                             \
-        u64 array_index_event_index = debug_table->event_array_index_event_index++;               \
-        u32 event_index = array_index_event_index & 0xFFFFFFFF;                                   \
-        assert(event_index < ARRAY_SIZE(debug_table->events[0]));                                 \
-        DebugEvent *event = debug_table->events[array_index_event_index >> 32] + event_index;     \
-        event->clock = __rdtsc();                                                                 \
-        event->type = (u8)event_type;                                                             \
-        event->debug_name = debug_name_init;                                                      \
-        event->name = name_init;                                                                  \
-    } while (0)
+#define RECORD_DEBUG_EVENT_INTERNAL(event_type, debug_name_init, name_init)                   \
+    u64 array_index_event_index = debug_table->event_array_index_event_index++;               \
+    u32 event_index = array_index_event_index & 0xFFFFFFFF;                                   \
+    assert(event_index < ARRAY_SIZE(debug_table->events[0]));                                 \
+    DebugEvent *event = debug_table->events[array_index_event_index >> 32] + event_index;     \
+    event->clock = __rdtsc();                                                                 \
+    event->type = (u8)event_type;                                                             \
+    event->debug_name = debug_name_init;                                                      \
+    event->name = name_init;                                                                  
+    
+#define RECORD_DEBUG_EVENT(_event_type, _debug_name_init, _name_init)           \
+    do {                                                                        \
+        RECORD_DEBUG_EVENT_INTERNAL(_event_type, _debug_name_init, _name_init); \
+    } while (0);
 
 #define TIMED_BLOCK__(debug_name, name, number) DebugTimedBlock __timed_block_##number(debug_name, name)
 #define TIMED_BLOCK_(debug_name, name, number) TIMED_BLOCK__(debug_name, name, number)
 #define TIMED_BLOCK(name) TIMED_BLOCK_(DEBUG_NAME(), name, __LINE__)
 
-#define BEGIN_BLOCK_(debug_name, name) RecordDebugEvent(DEBUG_EVENT_BEGIN_BLOCK, debug_name, name)
+#define BEGIN_BLOCK_(debug_name, name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_BLOCK, debug_name, name)
 #define BEGIN_BLOCK(name) BEGIN_BLOCK_(DEBUG_NAME(), name)
-#define END_BLOCK_(debug_name, name) RecordDebugEvent(DEBUG_EVENT_END_BLOCK, debug_name, name)
+#define END_BLOCK_(debug_name, name) RECORD_DEBUG_EVENT(DEBUG_EVENT_END_BLOCK, debug_name, name)
 #define END_BLOCK() END_BLOCK_(DEBUG_NAME(), "#END_BLOCK")
 // @NOTE(hl): Cast to  char * beacuse clang has trobules with implicit cast from const char [] to char *
 #define TIMED_FUNCTION() TIMED_BLOCK((const char *)__FUNCTION__)
 
-#define FRAME_MARKER() RecordDebugEvent(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
+#define FRAME_MARKER() RECORD_DEBUG_EVENT(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
+
+#define DEBUG_VALUE(_value) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_U64, DEBUG_NAME(), #_value); event->value_u64 = _value; } while (0);
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started
@@ -119,18 +128,25 @@ enum {
     DEV_MODE_SENTINEL,  
 };
 
-struct DebugStatistics {
-    u64 quads_dispatched;
-    u64 draw_call_count;  
-    u64 last_frame_sim_region_entity_count;
+enum {
+    DEBUG_VALUE_NONE,  
+    DEBUG_VALUE_U64  
 };
 
-extern DebugStatistics *DEBUG;
+struct DebugValue {
+    const char *name;
+    
+    u32 value_kind;
+    union {
+        u64 value_u64;  
+    };
+    DebugValue *next;
+};  
 
 struct DebugState {
     MemoryArena arena;
 
-    DebugStatistics statistics;
+    // DebugStatistics statistics;
     DebugTable debug_table;
     Assets *assets;
     
@@ -141,10 +157,13 @@ struct DebugState {
     u32 collation_array_index;
     bool is_paused;
     
+    DebugValue *first_free_value;
+    DebugValue *first_value;
+    
     u64 total_frame_count;
     
     DevUI dev_ui;
-    u32 dev_mode; // DEV_MODE
+    u32 dev_mode; 
 };
 
 // @CLEANUP these two functions

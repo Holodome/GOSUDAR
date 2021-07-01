@@ -4,7 +4,7 @@
 #include "game/game_state.hh"
 
 DebugTable *debug_table;
-DebugStatistics *DEBUG;
+// DebugStatistics *DEBUG;
 
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
     u64 collation_start_clock = __rdtsc();
@@ -84,6 +84,21 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     debug_state->first_free_block = matching_block;
                     debug_state->current_open_block = matching_block->parent;
                 } break;
+                case DEBUG_EVENT_VALUE_U64: {
+                    DebugValue *value = debug_state->first_free_value;
+                    if (value) {
+                        debug_state->first_free_value = value->next;
+                    } else {
+                        value = alloc_struct(&debug_state->arena, DebugValue);
+                    }
+                    
+                    value->value_kind = DEBUG_VALUE_U64;
+                    value->value_u64 = event->value_u64;
+                    value->name = event->name;
+                    
+                    value->next = debug_state->first_value;
+                    debug_state->first_value = value;
+                } break;
                 INVALID_DEFAULT_CASE;
             }
         }
@@ -121,9 +136,12 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
     RenderGroup interface_render_group = render_group_begin(commands, debug_state->assets,
         setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
-        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; Q: %llu; E: %llu; S: %llu", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000), 
-            DEBUG->draw_call_count, DEBUG->quads_dispatched, game_state->world->_entity_count,
-            DEBUG->last_frame_sim_region_entity_count);
+        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
+        for (DebugValue *value = debug_state->first_value;
+             value;
+             value = value->next) {
+            dev_ui_labelf(&dev_ui, "%s: %llu", value->name, value->value_u64);
+        }
         Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
         Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
         dev_ui_labelf(&dev_ui, "P: (%.2f %.2f); O: (%.3f %.3f); Chunk: (%d %d)", 
@@ -173,23 +191,12 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
         }
         temp_memory_end(records_sort_temp);
     } else if (debug_state->dev_mode == DEV_MODE_MEMORY) {
-        // dev_ui_labelf(&dev_ui, "Debug Arena: %llu/%llu (%.2f%%)", game->debug_state->collate_arena.data_size, game->debug_state->collate_arena.data_capacity,
-        //     game->debug_state->collate_arena.data_size * 100.0f / game->debug_state->collate_arena.data_capacity);
-        // dev_ui_labelf(&dev_ui, "Renderer Arena: %llu/%llu (%.2f%%)", game->renderer.arena.data_size, game->renderer.arena.data_capacity,
-        //     game->renderer.arena.data_size * 100.0f / game->renderer.arena.data_capacity);
-        // dev_ui_labelf(&dev_ui, "Assets Arena: %llu/%llu (%.2f%%)", game->assets.arena.data_size, game->assets.arena.data_capacity,
-        //     game->assets.arena.data_size * 100.0f /  game->assets.arena.data_capacity);
-        // dev_ui_labelf(&dev_ui, "Frame Arena: %llu/%llu (%.2f%%)", game->game_state.frame_arena.data_size, game->game_state.frame_arena.data_capacity,
-        //     game->game_state.frame_arena.data_size * 100.0f / game->game_state.frame_arena.data_capacity);
-        // dev_ui_labelf(&dev_ui, "Game Arena: %llu/%llu (%.2f%%)", game->game_state.arena.data_size, game->game_state.arena.data_capacity,
-        //     game->game_state.arena.data_size * 100.0f / game->game_state.arena.data_capacity);
     }
     
     dev_ui_end(&dev_ui, &interface_render_group);
 }
 
 void DEBUG_begin_frame(DebugState *debug_state) {
-    DEBUG->last_frame_sim_region_entity_count = 0;
 }
 
 void DEBUG_frame_end(DebugState *debug_state) {
@@ -205,9 +212,15 @@ void DEBUG_frame_end(DebugState *debug_state) {
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
     
+    if (debug_state->first_value) {
+        debug_state->first_value->next = debug_state->first_free_value;
+    }
+    debug_state->first_free_value = debug_state->first_value;
+    debug_state->first_value = 0;
     if (!debug_state->is_paused) {
         debug_collate_events(debug_state, debug_table->current_event_array_index);
     }
+    
 }
 
 void DEBUG_init(DebugState *debug_state, Assets *assets) {
@@ -223,7 +236,7 @@ DebugState *DEBUG_create() {
     arena_init(&debug_state->arena, os_alloc(debug_arena_size), debug_arena_size);
     
     debug_table = &debug_state->debug_table;
-    DEBUG = &debug_state->statistics;
+    // DEBUG = &debug_state->statistics;
     
     debug_state->first_free_block = 0;
     debug_state->current_open_block = 0;

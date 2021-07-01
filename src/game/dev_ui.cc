@@ -127,7 +127,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     bool is_pressed = false;
     bool is_held = false;
     if (is_same(layout->active_id, id)) {
-        if (is_key_pressed(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI)) {
+        if (is_key_held(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI)) {
             is_held = true;
             if (repeat_when_held && is_hot) {
                 is_pressed = true;
@@ -183,7 +183,7 @@ bool dev_ui_button(DevUILayout *layout, const char *label) {
     Vec2 text_size = get_text_size(layout, label);
     Rect button_rect = Rect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
-    Vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
+    Vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
     push_text(layout, button_rect.p, label, color);
     element_size(layout, button_rect.size());
     return bstate.is_pressed;    

@@ -151,7 +151,7 @@ CT_ASSERT(IS_POW2(WORLD_CHUNK_HASH_SIZE));
 struct World {
     MemoryArena *world_arena;
     // Linked list free entry
-    EntityBlock *first_free;
+    EntityBlock *first_free_entity_block;
     // Chunks hash table. Implemented with external collision resolving (other chunks are allocated separately)
     Chunk chunk_hash[WORLD_CHUNK_HASH_SIZE];
     
@@ -159,10 +159,13 @@ struct World {
     size_t _entity_count;
     Entity *entities;
 
-    IDListEntry *free_id;
-    IDListEntry *first_free_entry;
+    IDListEntry *free_id_list;
+    IDListEntry *free_id_list_free_entry;
+    
+    u64 DEBUG_id_list_entries_allocated;
 };  
 
+void world_init(World *world);
 EntityID get_new_id(World *world);
 void free_id(World *world, EntityID id);
 // EntityID add_world_entity(World *world, WorldPosition pos);
@@ -192,8 +195,7 @@ CT_ASSERT(IS_POW2(SIM_REGION_ENTITY_COUNT));
 // Also it provides space partitioning
 // This is going to be very computationally heavy piece of data, so we better do copies here instead of using pointers to world
 struct SimRegion {
-    // @TODO think if we need this back-pointer
-    struct GameState *game_state;
+    World *world;
     // So in case player positions are some huge float numbers,
     // map entities from world position to sim position and back after sim end
     WorldPosition origin;
@@ -213,7 +215,7 @@ struct SimRegion {
 
 // Create sim region in given world part
 // Puts all entities from selected world chunks into sim 
-SimRegion *begin_sim(struct GameState *game_state, Vec2i min_chunk, Vec2i max_chunk);
+SimRegion *begin_sim(MemoryArena *arena, World *world, Vec2i min_chunk, Vec2i max_chunk);
 // Puts all entities from sim region to their world storage2
 void end_sim(SimRegion *region);
 // Create new entity 

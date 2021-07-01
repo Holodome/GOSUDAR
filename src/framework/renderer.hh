@@ -55,11 +55,13 @@ enum {
 // So it is per-draw call opengl settings data
 struct RendererSetup {
     bool has_depth;
+    Mat4x4 view;
+    Mat4x4 projection;
     Mat4x4 mvp;
 };
 
-inline RendererSetup setup_3d(Mat4x4 mvp);
-inline RendererSetup setup_2d(Mat4x4 mvp);
+inline RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection);
+inline RendererSetup setup_2d(Mat4x4 projection);
 
 // Joined draw quads command.
 // Each RenderQuads can have as many quads in it as index type can fit indices of
@@ -98,7 +100,8 @@ struct Renderer {
     MemoryArena arena;
     
     GLuint standard_shader;
-    GLuint mvp_location;
+    GLuint view_location;
+    GLuint projection_location;
     GLuint tex_location;
     
     RendererCommands commands;

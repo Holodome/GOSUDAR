@@ -17,6 +17,7 @@ struct FrameData {
     SimRegion *sim;
     Mat4x4 view;
     Mat4x4 projection;
+    InputManager *input;
 };  
 
 enum {
@@ -79,7 +80,7 @@ struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
-    Interface interface;
+    GameStateInterface interface;
     WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
     
     SimCamera cam;

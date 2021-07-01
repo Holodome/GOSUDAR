@@ -114,7 +114,7 @@ struct Entity {
 
 struct EntityBlock {
     u32 entity_count;
-    EntityID entity_storage_indices[16];
+    EntityID entity_storage_indices[32];
     EntityBlock *next;
 };  
 
@@ -155,8 +155,8 @@ struct World {
     // Chunks hash table. Implemented with external collision resolving (other chunks are allocated separately)
     Chunk chunk_hash[WORLD_CHUNK_HASH_SIZE];
     
-    size_t max_entity_count;
-    size_t _entity_count;
+    u64 max_entity_count;
+    u64 _entity_count;
     Entity *entities;
 
     IDListEntry *free_id_list;

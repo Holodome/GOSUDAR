@@ -289,7 +289,7 @@ SimRegion *begin_sim(MemoryArena *arena, World *world, Vec2i min_chunk, Vec2i ma
             }        
         }
     }
-    DEBUG_VALUE(sim->entity_count)
+    DEBUG_VALUE(sim->entity_count);
     DEBUG_VALUE(sim->world->_entity_count);
     
     return sim;
@@ -328,6 +328,7 @@ void end_sim(SimRegion *sim) {
 }
 
 SimEntityHash *get_hash_from_storage_index(SimRegion *sim, EntityID entity_id) {
+    TIMED_FUNCTION();
     SimEntityHash *result = 0;
     u32 hash_value = entity_id.value;
     u32 hash_mask = (ARRAY_SIZE(sim->entity_hash) - 1);

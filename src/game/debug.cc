@@ -84,21 +84,25 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     debug_state->first_free_block = matching_block;
                     debug_state->current_open_block = matching_block->parent;
                 } break;
-                case DEBUG_EVENT_VALUE_U64: {
-                    DebugValue *value = debug_state->first_free_value;
-                    if (value) {
-                        debug_state->first_free_value = value->next;
-                    } else {
-                        value = alloc_struct(&debug_state->arena, DebugValue);
-                    }
-                    
-                    value->value_kind = DEBUG_VALUE_U64;
-                    value->value_u64 = event->value_u64;
-                    value->name = event->name;
-                    
-                    value->next = debug_state->first_value;
-                    debug_state->first_value = value;
-                } break;
+#define DEBUG_EVENT_VALUE_DEF(_type)                             \
+case DEBUG_EVENT_VALUE_##_type: {                                   \
+    DebugValue *value = debug_state->first_free_value;          \
+    if (value) {                                                \
+        debug_state->first_free_value = value->next;            \
+    } else {                                                    \
+        value = alloc_struct(&debug_state->arena, DebugValue);  \
+    }                                                           \
+    value->value_kind = DEBUG_VALUE_##_type;                    \
+    value->value_##_type = event->value_##_type;                \
+    value->name = event->name;                                  \
+    value->next = debug_state->first_value;                     \
+    debug_state->first_value = value;                           \
+} break;
+DEBUG_EVENT_VALUE_DEF(u64)
+DEBUG_EVENT_VALUE_DEF(f32)
+DEBUG_EVENT_VALUE_DEF(Vec2)
+DEBUG_EVENT_VALUE_DEF(Vec3)
+DEBUG_EVENT_VALUE_DEF(Vec2i)
                 INVALID_DEFAULT_CASE;
             }
         }
@@ -137,20 +141,40 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
         setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
         dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
-        for (DebugValue *value = debug_state->first_value;
-             value;
-             value = value->next) {
-            dev_ui_labelf(&dev_ui, "%s: %llu", value->name, value->value_u64);
+        if (dev_ui_section(&dev_ui, "Variables")) {
+            for (DebugValue *value = debug_state->first_value;
+                value;
+                value = value->next) {
+                char buffer[64];
+                switch (value->value_kind) {
+                    case DEBUG_VALUE_f32: {
+                        snprintf(buffer, sizeof(buffer), "%.2f", value->value_f32);
+                    } break;
+                    case DEBUG_VALUE_u64: {
+                        snprintf(buffer, sizeof(buffer), "%llu", value->value_u64);
+                    } break;
+                    case DEBUG_VALUE_Vec2: {
+                        snprintf(buffer, sizeof(buffer), "(%.2f %.2f)", value->value_Vec2.x, value->value_Vec2.y);
+                    } break;
+                    case DEBUG_VALUE_Vec2i: {
+                        snprintf(buffer, sizeof(buffer), "(%d %d)", value->value_Vec2i.x, value->value_Vec2i.y);
+                    } break;
+                    case DEBUG_VALUE_Vec3: {
+                        snprintf(buffer, sizeof(buffer), "(%.2f %.2f %.2f)", value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
+                    } break;
+                }
+                dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
+            }
+            dev_ui_end_section(&dev_ui);
         }
-        Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
-        Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
-        dev_ui_labelf(&dev_ui, "P: (%.2f %.2f); O: (%.3f %.3f); Chunk: (%d %d)", 
-            player_pos.x, player_pos.y,
-            player->world_pos.offset.x, player->world_pos.offset.y,
-            player->world_pos.chunk.x, player->world_pos.chunk.y);
-        dev_ui_labelf(&dev_ui, "Wood: %u; Gold: %u", game_state->wood_count, game_state->gold_count);    
-        dev_ui_checkbox(&dev_ui, "In building mode", &game_state->is_in_building_mode);
-        dev_ui_checkbox(&dev_ui, "Allow camera controls", &game_state->allow_camera_controls);
+        const char *INPUT_ACCESS_NAMES[] = {
+            "NO_LOCK", 
+            "GAME_INTERFACE",  
+            "GAME_MENU",  
+            "DEV_UI",  
+            "ALL",  
+        };
+        dev_ui_labelf(&dev_ui, "Input lock: %s", INPUT_ACCESS_NAMES[input->access_token]);
         dev_ui_checkbox(&dev_ui, "Show grid", &game_state->show_grid);
         dev_ui_labelf(&dev_ui, "Selected building kind: %hhu", game_state->selected_building);
         if (dev_ui_button(&dev_ui, "Building 1")) {
@@ -184,7 +208,7 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
         qsort_s(records_sorted, record_count, sizeof(*records_sorted), records_sort, frame);
         dev_ui_labelf(&dev_ui, "Frame %llu", debug_state->total_frame_count);    
         dev_ui_labelf(&dev_ui, "Collation: %.2f%%", (f32)frame->collation_clocks / frame_time * 100);    
-        for (size_t i = 0; i < frame->records_count; ++i) {
+        for (size_t i = 0; i < min(frame->records_count, 20); ++i) {
             DebugRecord *record = frame->records + records_sorted[i];
             dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                 record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));

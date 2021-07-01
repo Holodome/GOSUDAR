@@ -45,6 +45,7 @@ struct DevUILayout {
     
     bool is_focused;
     
+    f32 horizontal_offset;
     Vec2 p;
     Vec2 last_line_p;
 };  

@@ -57,7 +57,7 @@ static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
 
 static void world_gen(GameState *game_state) {
     Entropy entropy;
-    entropy.state = 1233437824;
+    entropy.state = 12345678;
     SimRegion *gen_sim = begin_sim(&game_state->frame_arena, game_state->world, Vec2i(0), Vec2i(0));
     // Initialize game_state 
     game_state->camera_followed_entity_id = add_player(gen_sim);
@@ -321,7 +321,8 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
     } 
 }
 
-static void update_interface(GameState *game_state, InputManager *input) {
+static void update_interface(GameState *game_state, FrameData *frame) {
+    InputManager *input = frame->input;
     if (is_key_pressed(input, Key::Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->allow_camera_controls = !game_state->allow_camera_controls;
     }
@@ -332,7 +333,7 @@ static void update_interface(GameState *game_state, InputManager *input) {
         game_state->show_grid = !game_state->show_grid;
     }
     
-    InterfaceStats stats = interface_update(&game_state->interface, input);
+    InterfaceStats stats = interface_update(&game_state->interface.interface, input);
     
     // Update camera input
     if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
@@ -346,13 +347,17 @@ static void update_interface(GameState *game_state, InputManager *input) {
 #define MIN_CAM_PITCH (Math::HALF_PI * 0.1f)
 #define MAX_CAM_PITCH (Math::HALF_PI * 0.9f)
         game_state->cam.pitch = Math::clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
-        game_state->cam.distance_from_player -= get_mwheel(input);
+        f32 delta_zoom = get_mwheel(input);
+        // printf("%f\n", delta_zoom);
+        game_state->cam.distance_from_player -= delta_zoom;
+        game_state->cam.distance_from_player = Math::clamp(game_state->cam.distance_from_player, 0.5f, 10);
     }
 }
 
-static void update_world_simulation(GameState *game_state, FrameData *frame, InputManager *input) {
+static void update_world_simulation(GameState *game_state, FrameData *frame) {
     TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
+    InputManager *input = frame->input;
 
     SimEntity *camera_followed_entity = get_entity_by_id(sim, game_state->camera_followed_entity_id);
     frame->camera_followed_entity = camera_followed_entity;
@@ -378,6 +383,7 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
         player_delta.x += x_speed * Math::cos(game_state->cam.yaw);
         player_delta.y += x_speed * Math::sin(game_state->cam.yaw);     
         camera_followed_entity->p += player_delta;
+        
     }
     Vec3 center_pos = xz(camera_followed_entity->p);
     f32 horiz_distance = game_state->cam.distance_from_player * Math::cos(game_state->cam.pitch);
@@ -432,14 +438,17 @@ static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, 
             size = Vec2(0.5f);
         } break;
         case ENTITY_KIND_WORLD_OBJECT: {
+            size = Vec2(0.5f);
             switch(entity->world_object_kind) {
                 case WORLD_OBJECT_KIND_TREE_FOREST: {
                     texture_id = Asset_TreeForest;
                 } break;
                 case WORLD_OBJECT_KIND_TREE_JUNGLE: {
+                    size = Vec2(0.6f);
                     texture_id = Asset_TreeJungle;
                 } break;
                 case WORLD_OBJECT_KIND_TREE_DESERT: {
+                    size = Vec2(0.4f);
                     texture_id = Asset_TreeDesert;
                 } break;
                 case WORLD_OBJECT_KIND_GOLD_DEPOSIT: {
@@ -457,7 +466,6 @@ static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, 
                 } break;
                 INVALID_DEFAULT_CASE;
             }
-            size = Vec2(0.5f);
         } break;
         INVALID_DEFAULT_CASE;
     }
@@ -488,7 +496,9 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
             }
         }
     }
+    END_BLOCK();
     // Draw grid near mouse cursor
+    BEGIN_BLOCK("Show grid");
     if (game_state->show_grid) {
         Vec2 mouse_cell_pos = floor_to_cell(frame->mouse_projection);
 #define MOUSE_CELL_RAD 5
@@ -512,6 +522,7 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
             }
         }
     }
+    END_BLOCK();
     // Highlight selected entity    
     if (is_not_null(game_state->interactable)) {
         SimEntity *interactable = get_entity_by_id(sim, game_state->interactable);
@@ -525,7 +536,6 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         v[3] = xz(entity_p + Vec2(half_size.x, half_size.y),   10 * WORLD_EPSILON);
         push_quad(&world_render_group, v, Asset_SelectCircle);
     }
-    END_BLOCK();
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
     BEGIN_BLOCK("ZSORT");
     TempMemory zsort = temp_memory_begin(&game_state->frame_arena);
@@ -561,25 +571,41 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     render_group_end(&world_render_group); 
 }
 
+static void render_interface(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "Wood: %u", game_state->wood_count);
+    game_state->interface.text_for_wood_count->text = alloc_string(&game_state->frame_arena, buffer);
+    snprintf(buffer, sizeof(buffer), "Gold: %u", game_state->gold_count);
+    game_state->interface.text_for_gold_count->text = alloc_string(&game_state->frame_arena, buffer);
+    
+    RenderGroup interface_render_group = render_group_begin(commands, assets,
+        setup_2d(Mat4x4::ortographic_2d(0, window_size(frame->input).x, window_size(frame->input).y, 0)));
+    interface_render(&game_state->interface.interface, &interface_render_group);
+    render_group_end(&interface_render_group);
+}
+
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     arena_clear(&game_state->frame_arena);
     FrameData frame = {};
+    frame.input = input;
     // Since camera follows some entity and is never too far from it, we can assume that camera position is
     // the position of followed entity
     WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
     Vec2i min_chunk_coord, max_chunk_coord;
     get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
     frame.sim = begin_sim(&game_state->frame_arena, game_state->world, min_chunk_coord, max_chunk_coord);
-    update_interface(game_state, input);
-    update_world_simulation(game_state, &frame, input);
+    update_interface(game_state, &frame);
+    update_world_simulation(game_state, &frame);
     render_world(game_state, &frame, commands, assets);
-    RenderGroup interface_render_group = render_group_begin(commands, assets,
-        setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
-    interface_render(&game_state->interface, &interface_render_group);
-    render_group_end(&interface_render_group);
-    // DEBUG->last_frame_sim_region_entity_count = frame.sim->entity_count;
+    render_interface(game_state, &frame, commands, assets);
     end_sim(frame.sim);
+    
+    Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
+    Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
+    DEBUG_VALUE(player_pos);
+    DEBUG_VALUE(player->world_pos.offset);
+    DEBUG_VALUE(player->world_pos.chunk);
 }
 
 

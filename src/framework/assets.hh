@@ -98,6 +98,7 @@ enum AssetKind {
     AssetKind_Building, // Tags: kind, build progress, health
     AssetKind_Player, // Tags: facing direction, health 
     AssetKind_Font, // Tags: codepoint
+    AssetKind_InterfaceElement, // Tags: kind, state (if button)
 };
 // For example, when program wants to get some assetfor tree,
 // it does not need to specify all parameters itself and select asset from list
@@ -107,7 +108,7 @@ enum AssetKind {
 
 // If we keep ASSET_TAG_COUNT small, we can use bitmask for choosing asset tags needed
 // Tags-mask can be computed with knowing kind
-Asset *get_asset_internal(AssetKind kind, u32 tags_mask, AssetTags weights);
+Asset *get_asset_internal(AssetKind kind, AssetTags weights, AssetTags matches);
 Asset *get_asset(AssetKind kind, AssetTags weights);
 
 */

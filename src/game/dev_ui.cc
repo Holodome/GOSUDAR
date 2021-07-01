@@ -86,7 +86,7 @@ static void element_size(DevUILayout *layout, Vec2 size) {
     layout->p.x += size.x + DEV_UI_HORIZ_PADDING;
     layout->last_line_p = layout->p;
     
-    layout->p.x = 0;
+    layout->p.x = layout->horizontal_offset;
     layout->p.y += size.y + DEV_UI_VERT_PADDING;
 }
 
@@ -243,12 +243,16 @@ bool dev_ui_section(DevUILayout *layout, const char *label) {
     Vec4 color = (view->is_opened ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
     push_text(layout, button_rect.p, label, color);
     element_size(layout, button_rect.size());
-    layout->p.x += DEV_UI_SECTION_OFFSET;
+    if (view->is_opened) {
+        layout->p.x += DEV_UI_SECTION_OFFSET;
+        layout->horizontal_offset += DEV_UI_SECTION_OFFSET;
+    }
     return view->is_opened;
 }
 
 void dev_ui_end_section(DevUILayout *layout) {
     layout->p.x -= DEV_UI_SECTION_OFFSET;
+    layout->horizontal_offset -= DEV_UI_SECTION_OFFSET;
 }
 
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {

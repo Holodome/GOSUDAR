@@ -1,6 +1,7 @@
 #if !defined(MEMORY_ARENA_HH)
 
 #include "general.hh"
+// #include "game/debug.hh"
 
 #define DEFAULT_ALIGNMENT (2 * sizeof(void *))
 
@@ -35,6 +36,7 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
 
 #define alloc_struct(_arena, _type) (_type *)arena_alloc(_arena, sizeof(_type))
 #define alloc_arr(_arena, _count, _type) (_type *)arena_alloc(_arena, _count * sizeof(_type))
+#define alloc_string(_arena, _string) (const char *)arena_copy(_arena, strlen(_string) + 1, _string)
 void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
     void *result = 0;
 
@@ -61,6 +63,12 @@ void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNM
         arena->peak_size = arena->data_size;
     }
     
+    return result;
+}
+
+void *arena_copy(MemoryArena *arena, size_t size, void *src) {
+    void *result = arena_alloc(arena, size);
+    memcpy(result, src, size);
     return result;
 }
 

@@ -19,7 +19,11 @@ enum {
     DEBUG_EVENT_FRAME_MARKER,
     DEBUG_EVENT_BEGIN_BLOCK,
     DEBUG_EVENT_END_BLOCK,
-    DEBUG_EVENT_VALUE_U64,
+    DEBUG_EVENT_VALUE_u64,
+    DEBUG_EVENT_VALUE_f32,
+    DEBUG_EVENT_VALUE_Vec2,
+    DEBUG_EVENT_VALUE_Vec3,
+    DEBUG_EVENT_VALUE_Vec2i,
 };
 
 struct DebugEvent {
@@ -29,7 +33,10 @@ struct DebugEvent {
     const char *name;       // user-defined block name
     union {
         u64 value_u64;
-        
+        f32 value_f32;
+        Vec2 value_Vec2;
+        Vec3 value_Vec3;
+        Vec2i value_Vec2i;
     };
 };
 
@@ -76,7 +83,17 @@ extern DebugTable *debug_table;
 
 #define FRAME_MARKER() RECORD_DEBUG_EVENT(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
 
-#define DEBUG_VALUE(_value) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_U64, DEBUG_NAME(), #_value); event->value_u64 = _value; } while (0);
+#define DEBUG_VALUE_PROC_DEF(_type)                                                \
+inline void DEBUG_VALUE_(const char *debug_name, const char *name, _type value) {  \
+    RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_##_type, debug_name, name);      \
+    event->value_##_type = value;                                                  \
+}
+DEBUG_VALUE_PROC_DEF(u64)
+DEBUG_VALUE_PROC_DEF(f32)
+DEBUG_VALUE_PROC_DEF(Vec2)
+DEBUG_VALUE_PROC_DEF(Vec3)
+DEBUG_VALUE_PROC_DEF(Vec2i)
+#define DEBUG_VALUE(_value) DEBUG_VALUE_(DEBUG_NAME(), #_value, _value)
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started
@@ -130,7 +147,11 @@ enum {
 
 enum {
     DEBUG_VALUE_NONE,  
-    DEBUG_VALUE_U64  
+    DEBUG_VALUE_u64,  
+    DEBUG_VALUE_f32,  
+    DEBUG_VALUE_Vec2,  
+    DEBUG_VALUE_Vec2i, 
+    DEBUG_VALUE_Vec3, 
 };
 
 struct DebugValue {
@@ -139,6 +160,10 @@ struct DebugValue {
     u32 value_kind;
     union {
         u64 value_u64;  
+        f32 value_f32;
+        Vec2 value_Vec2;
+        Vec3 value_Vec3;
+        Vec2i value_Vec2i;
     };
     DebugValue *next;
 };  

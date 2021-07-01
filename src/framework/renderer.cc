@@ -141,6 +141,10 @@ void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, A
 }
 
 void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale) {
+    if (!text) {
+        return;
+    }
+    
     AssetInfo *info = render_group->assets->get_info(font_id);
     f32 font_height = info->height;
     f32 line_height = font_height * scale;

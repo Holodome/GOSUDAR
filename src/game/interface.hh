@@ -14,8 +14,13 @@ enum {
 struct InterfaceElement {
     u8 kind;  
     Rect rect;
+    Vec4 color;
     const char *text;
-    u32 value_id;
+    bool is_button_state_saving;
+    
+    Vec4 color_button_inactive;
+    Vec4 color_button_active;
+    bool is_button_pressed;
     
     InterfaceElement *next;
 };
@@ -23,7 +28,6 @@ struct InterfaceElement {
 struct InterfaceStats {
     bool is_mouse_over_element;
     bool interaction_occured;
-    u32 value_id;
 };
 
 struct Interface {
@@ -32,7 +36,15 @@ struct Interface {
     InterfaceElement *last_element;
 };
 
-void init_interface_for_game_state(MemoryArena *arena, Interface *interface);
+struct GameStateInterface {
+    Interface interface;
+    InterfaceElement *text_for_wood_count;
+    InterfaceElement *text_for_gold_count;
+    InterfaceElement *button_camera_controls;
+    InterfaceElement *button_build_mode;
+};  
+
+void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *interface, Vec2 winsize);
 InterfaceStats interface_update(Interface *interface, InputManager *input);
 void interface_render(Interface *interface, RenderGroup *render_group);
 

@@ -133,6 +133,7 @@ FontData *Assets::get_font(AssetID id) {
     assert(info->kind == AssetKind::Font);
     FontData *result = 0;
     if (info->state == AssetState::Loaded) {
+        result = this->fonts + info->array_entry_idx;
     } else {
         // logprintln("Assets", "Loading font '%s'", name);
          

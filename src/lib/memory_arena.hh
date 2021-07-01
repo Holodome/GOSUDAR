@@ -70,36 +70,6 @@ MemoryArena subarena(MemoryArena *arena, size_t capacity) {
     return result;
 }
 
-void *arena_realloc(MemoryArena *arena, void *old_mem, size_t old_size, size_t new_size, size_t align = DEFAULT_ALIGNMENT) {
-    void *result = 0;
-
-    u8 *old_mem_i = (u8 *)old_mem;
-    
-    if (!old_mem_i || !old_size) {
-        result = arena_alloc(arena, new_size, align);
-    } else if (arena->data <= old_mem_i && old_mem_i < arena->data + arena->data_capacity) {
-        if (arena->data + arena->last_data_size == old_mem_i) {
-            arena->data_size = arena->last_data_size + new_size;
-            if (new_size > old_size) {
-                memset(arena->data + arena->data_size, 0, new_size - old_size);
-            }
-            result = old_mem_i;
-        } else {
-            result = arena_alloc(arena, new_size, align);
-            u64 copy_size = new_size;
-            if (old_size < new_size) {
-                copy_size = old_size;
-            }
-            
-            memmove(result, old_mem_i, copy_size);
-        }
-    } else {
-        assert(!"Memory is out of bounds");
-    }
-
-    return result;
-}
-
 void arena_clear(MemoryArena *arena) {
     arena->data_size = 0;
     arena->last_data_size = 0;

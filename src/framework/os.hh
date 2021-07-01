@@ -139,5 +139,9 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
 void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
 void close_file(FileHandle handle);
 
+struct OSMemoryBlock {
+    
+};  
+
 #define OS_H 1
 #endif

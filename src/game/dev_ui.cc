@@ -109,10 +109,17 @@ struct ButtonState {
 };
 
 static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, bool repeat_when_held = false) {
-    bool is_hot = !is_set(layout->hot_id) && rect.collide(layout->dev_ui->mouse_p);
+    if (rect.collide(mouse_p(layout->input))) {
+        if (layout->input->access_token != INPUT_ACCESS_TOKEN_DEV_UI) {
+            lock_input(layout->input, INPUT_ACCESS_TOKEN_DEV_UI);
+        }
+        layout->is_focused = true;
+    }
+    
+    bool is_hot = !is_set(layout->hot_id) && rect.collide(mouse_p(layout->input));
     if (is_hot) {
         layout->hot_id = id;
-        if (layout->dev_ui->is_mouse_pressed && !is_set(layout->active_id)) {
+        if (is_key_pressed(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI) && !is_set(layout->active_id)) {
             layout->active_id = id;
         }
     }
@@ -120,7 +127,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     bool is_pressed = false;
     bool is_held = false;
     if (is_same(layout->active_id, id)) {
-        if (layout->dev_ui->is_mouse_pressed) {
+        if (is_key_pressed(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI)) {
             is_held = true;
             if (repeat_when_held && is_hot) {
                 is_pressed = true;
@@ -147,13 +154,14 @@ void dev_ui_init(DevUI *dev_ui, Assets *assets) {
     dev_ui->font = assets->get_font(Asset_Font);
 }
 
-DevUILayout dev_ui_begin(DevUI *dev_ui) {
+DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input) {
     DevUILayout layout = {};
     layout.dev_ui = dev_ui;
     layout.active_id = dev_ui->active_id;
     layout.temp_mem = temp_memory_begin(&dev_ui->arena);
     layout.max_draw_queue_entry_count = 4096;
     layout.draw_queue = alloc_arr(&dev_ui->arena, layout.max_draw_queue_entry_count, DevUIDrawQueueEntry);
+    layout.input = input;
     return layout;
 }
 
@@ -253,5 +261,9 @@ void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
     }
     temp_memory_end(layout->temp_mem);
     layout->dev_ui->active_id = layout->active_id;
+    
+    if (!layout->is_focused && layout->input->access_token == INPUT_ACCESS_TOKEN_DEV_UI) {
+        unlock_input(layout->input);
+    }
 }
 

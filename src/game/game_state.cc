@@ -297,7 +297,7 @@ static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i 
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
 
-static void update_interactions(GameState *game_state, FrameData *frame, Input *input) {
+static void update_interactions(GameState *game_state, FrameData *frame, InputManager *input) {
     if (game_state->is_in_building_mode) {
         game_state->interactable = null_id();
         game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
@@ -332,16 +332,16 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
             bool continue_interaction = false;
             switch (game_state->interaction_kind) {
                 case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
-                    continue_interaction = input->is_key_held(Key::MouseLeft);
+                    continue_interaction = is_key_held(input, Key::MouseLeft, INPUT_ACCESS_TOKEN_NO_LOCK);
                 } break;
                 case PLAYER_INTERACTION_KIND_BUILD: {
-                    continue_interaction = input->is_key_held(Key::MouseRight);
+                    continue_interaction = is_key_held(input, Key::MouseRight, INPUT_ACCESS_TOKEN_NO_LOCK);
                 } break;
                 INVALID_DEFAULT_CASE;
             }
             
             if (continue_interaction) {
-                game_state->interaction_current_time += input->dt;
+                game_state->interaction_current_time += get_dt(input);
                 if (game_state->interaction_current_time >= game_state->interaction_time) {
                     // finalize interaction
                     switch (game_state->interaction_kind) {
@@ -388,11 +388,11 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
         } else {
             u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
             if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE) {
-                if (input->is_key_held(Key::MouseLeft)) {
+                if (is_key_held(input, Key::MouseLeft, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
                 } 
             } else if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
-                if (input->is_key_held(Key::MouseRight)) {
+                if (is_key_held(input, Key::MouseRight, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
                 }
             }
@@ -424,34 +424,34 @@ static void update_interactions(GameState *game_state, FrameData *frame, Input *
     } 
 }
 
-static void update_interface(GameState *game_state, Input *input) {
-    if (input->is_key_pressed(Key::Z)) {
+static void update_interface(GameState *game_state, InputManager *input) {
+    if (is_key_held(input, Key::Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->allow_camera_controls = !game_state->allow_camera_controls;
     }
-    if (input->is_key_pressed(Key::B)) {
+    if (is_key_held(input, Key::B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->is_in_building_mode = !game_state->is_in_building_mode;
     }
-    if (input->is_key_pressed(Key::X)) {
+    if (is_key_held(input, Key::X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
         game_state->show_grid = !game_state->show_grid;
     }
     
     // Update camera input
-    if (game_state->allow_camera_controls) {
-        f32 x_view_coef = 1.0f * input->dt;
-        f32 y_view_coef = 0.6f * input->dt;
-        f32 x_angle_change = input->mdelta.x * x_view_coef;
-        f32 y_angle_change = input->mdelta.y * y_view_coef;
+    if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
+        f32 x_view_coef = 1.0f * get_dt(input);
+        f32 y_view_coef = 0.6f * get_dt(input);
+        f32 x_angle_change = mouse_d(input).x * x_view_coef;
+        f32 y_angle_change = mouse_d(input).y * y_view_coef;
         game_state->cam.yaw += x_angle_change;
         game_state->cam.yaw = Math::unwind_rad(game_state->cam.yaw);
         game_state->cam.pitch += y_angle_change;
 #define MIN_CAM_PITCH (Math::HALF_PI * 0.1f)
 #define MAX_CAM_PITCH (Math::HALF_PI * 0.9f)
         game_state->cam.pitch = Math::clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
-        game_state->cam.distance_from_player -= input->mwheel;
+        game_state->cam.distance_from_player -= get_mwheel(input);
     }
 }
 
-static void update_world_simulation(GameState *game_state, FrameData *frame, Input *input) {
+static void update_world_simulation(GameState *game_state, FrameData *frame, InputManager *input) {
     TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
 
@@ -460,20 +460,20 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
     if (!game_state->interaction_kind) {
         // Calculate player movement
         Vec2 player_delta = Vec2(0);
-        f32 move_coef = 4.0f * input->dt;
+        f32 move_coef = 4.0f * get_dt(input);
         f32 z_speed = 0;
-        if (input->is_key_held(Key::W)) {
+        if (is_key_held(input, Key::W, INPUT_ACCESS_TOKEN_NO_LOCK)) {
             z_speed = move_coef;
-        } else if (input->is_key_held(Key::S)) {
+        } else if (is_key_held(input, Key::S, INPUT_ACCESS_TOKEN_NO_LOCK)) {
             z_speed = -move_coef;
         }
         player_delta.x += z_speed *  Math::sin(game_state->cam.yaw);
         player_delta.y += z_speed * -Math::cos(game_state->cam.yaw);
         
         f32 x_speed = 0;
-        if (input->is_key_held(Key::D)) {
+        if (is_key_held(input, Key::D, INPUT_ACCESS_TOKEN_NO_LOCK)) {
             x_speed = move_coef;
-        } else if (input->is_key_held(Key::A)) {
+        } else if (is_key_held(input, Key::A, INPUT_ACCESS_TOKEN_NO_LOCK)) {
             x_speed = -move_coef;
         }
         player_delta.x += x_speed * Math::cos(game_state->cam.yaw);
@@ -492,13 +492,13 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
 #define CAMERA_FOV Math::rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  100.0f
-    Mat4x4 projection = Mat4x4::perspective(CAMERA_FOV, input->winsize.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    Mat4x4 projection = Mat4x4::perspective(CAMERA_FOV, window_size(input).aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     Mat4x4 view = Mat4x4::identity() * Mat4x4::rotation(game_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game_state->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-sim->cam_p);
     sim->cam_mvp = projection * view;
     // Get mouse point projected on plane
-    Vec3 ray_dir = uv_to_world(projection, view, Vec2((2.0f * input->mpos.x) / input->winsize.x - 1.0f,
-													  1.0f - (2.0f * input->mpos.y) / input->winsize.y));
+    Vec3 ray_dir = uv_to_world(projection, view, Vec2((2.0f * mouse_p(input).x) / window_size(input).x - 1.0f,
+													  1.0f - (2.0f * mouse_p(input).y) / window_size(input).y));
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
@@ -514,7 +514,7 @@ static void update_world_simulation(GameState *game_state, FrameData *frame, Inp
             building->p = p;
             building->kind = ENTITY_KIND_WORLD_OBJECT;
             building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1 + game_state->selected_building;
-            if (input->is_key_pressed(Key::MouseRight)) {
+            if (is_key_held(input, Key::MouseRight, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                 game_state->is_in_building_mode = false;
             } else {
                 building->flags |= ENTITY_FLAG_SINGLE_FRAME_LIFESPAN;
@@ -662,23 +662,21 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     render_group_end(&world_render_group); 
 }
 
-void update_and_render(GameState *game_state, Input *input, RendererCommands *commands, Assets *assets) {
+void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
-    FrameData frame = {};
     arena_clear(&game_state->frame_arena);
+    FrameData frame = {};
     // Since camera follows some entity and is never too far from it, we can assume that camera position is
     // the position of followed entity
     WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
     Vec2i min_chunk_coord, max_chunk_coord;
     get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
     frame.sim = begin_sim(game_state, min_chunk_coord, max_chunk_coord);
-    SimRegion *sim = frame.sim;
-    
     update_interface(game_state, input);
     update_world_simulation(game_state, &frame, input);
     render_world(game_state, &frame, commands, assets);
-    DEBUG->last_frame_sim_region_entity_count = sim->entity_count;
-    end_sim(sim);
+    DEBUG->last_frame_sim_region_entity_count = frame.sim->entity_count;
+    end_sim(frame.sim);
 }
 
 
@@ -686,4 +684,63 @@ WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object
     assert(world_object_kind);
     assert(world_object_kind < ARRAY_SIZE(game_state->world_object_settings));
     return game_state->world_object_settings + world_object_kind;
+}
+
+
+void manage_input(InputManager *manager) {
+    
+}
+
+void lock_input(InputManager *manager, u32 access_token) {
+    assert(!manager->access_token);
+    manager->access_token = access_token;
+}
+
+void unlock_input(InputManager *manager) {
+    assert(manager->access_token);
+    manager->access_token = INPUT_ACCESS_TOKEN_NO_LOCK;
+}
+
+bool is_key_pressed(InputManager *manager, Key key, u32 access_token) {
+    bool result = false;
+    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
+        result = manager->input->is_key_pressed(key);
+    }
+    return result;
+}
+
+bool is_key_released(InputManager *manager, Key key, u32 access_token) {
+    bool result = false;
+    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
+        // result = manager->input->is_key_released(key);
+    }
+    return result;
+}
+
+bool is_key_held(InputManager *manager, Key key, u32 access_token) {
+    bool result = false;
+    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
+        result = manager->input->is_key_held(key);
+    }
+    return result;
+}
+
+f32 get_mwheel(InputManager *manager) {
+    return manager->input->mwheel;
+}
+
+Vec2 mouse_p(InputManager *manager) {
+    return manager->input->mpos;
+}
+
+Vec2 mouse_d(InputManager *manager) {
+    return manager->input->mdelta;
+}
+
+Vec2 window_size(InputManager *manager) {
+    return manager->input->winsize;   
+}
+
+f32 get_dt(InputManager *manager) {
+    return manager->input->dt;
 }

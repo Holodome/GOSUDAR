@@ -19,10 +19,6 @@ struct DevUI {
     MemoryArena arena;
     Assets *assets;
     
-    Vec2 mouse_p;
-    Vec2 mouse_d;
-    bool is_mouse_pressed;
-    
     DevUIID active_id;
     DevUIView view_hash[128];
     
@@ -38,6 +34,7 @@ struct DevUIDrawQueueEntry {
 struct DevUILayout {
     TempMemory temp_mem;
     DevUI *dev_ui;
+    struct InputManager *input;
     
     size_t max_draw_queue_entry_count;
     size_t draw_queue_entry_count;
@@ -46,12 +43,14 @@ struct DevUILayout {
     DevUIID hot_id;
     DevUIID active_id;
     
+    bool is_focused;
+    
     Vec2 p;
     Vec2 last_line_p;
 };  
 
 void dev_ui_init(DevUI *dev_ui, Assets *assets);
-DevUILayout dev_ui_begin(DevUI *dev_ui);
+DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input);
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout, const char *label);

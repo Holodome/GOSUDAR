@@ -151,7 +151,7 @@ struct DebugState {
 DebugState *DEBUG_create();
 void DEBUG_init(DebugState *debug_state, struct Assets *assets);
 void DEBUG_begin_frame(DebugState *debug_state);
-void DEBUG_update(DebugState *debug_state, struct GameState *game_state, struct Input *input, RendererCommands *commands);
+void DEBUG_update(DebugState *debug_state, struct GameState *game_state, struct InputManager *input, RendererCommands *commands);
 void DEBUG_frame_end(DebugState *debug_state);
 
 #define DEBUG_HH 1

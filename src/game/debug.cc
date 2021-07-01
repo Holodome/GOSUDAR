@@ -99,32 +99,29 @@ static int records_sort(void *ctx, const void *a, const void *b) {
     return frame->records[index_a].total_clocks < frame->records[index_b].total_clocks ? 1 : -1;
 }
 
-void DEBUG_update(DebugState *debug_state, GameState *game_state, Input *input, RendererCommands *commands) {
+void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *input, RendererCommands *commands) {
     TIMED_FUNCTION();
-    if (input->is_key_pressed(Key::F1)) {
+    if (is_key_pressed(input, Key::F1, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_NONE;
     }
-    if (input->is_key_pressed(Key::F2)) {
+    if (is_key_pressed(input, Key::F2, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_INFO;
     }
-    if (input->is_key_pressed(Key::F3)) {
+    if (is_key_pressed(input, Key::F3, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_PROFILER;
     }
-    if (input->is_key_pressed(Key::F4)) {
+    if (is_key_pressed(input, Key::F4, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->is_paused = !debug_state->is_paused;
     } 
-    if (input->is_key_pressed(Key::F5)) {
+    if (is_key_pressed(input, Key::F5, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_MEMORY;
     }
-    debug_state->dev_ui.mouse_d = input->mdelta;
-    debug_state->dev_ui.mouse_p = input->mpos;
-    debug_state->dev_ui.is_mouse_pressed = input->is_key_held(Key::MouseLeft);
-    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui);
+    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input);
     
     RenderGroup interface_render_group = render_group_begin(commands, debug_state->assets,
-        setup_2d(Mat4x4::ortographic_2d(0, input->winsize.x, input->winsize.y, 0)));
+        setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
-        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; Q: %llu; E: %llu; S: %llu", 1.0f / input->dt, (u32)(input->dt * 1000), 
+        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums; D: %llu; Q: %llu; E: %llu; S: %llu", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000), 
             DEBUG->draw_call_count, DEBUG->quads_dispatched, game_state->world->_entity_count,
             DEBUG->last_frame_sim_region_entity_count);
         Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);

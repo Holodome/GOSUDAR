@@ -15,7 +15,8 @@
 struct Game {
     OS os;
     Renderer renderer;
-    Input input;
+    Input input_;
+    InputManager input;
     Assets assets;
     DebugState *debug_state;
     

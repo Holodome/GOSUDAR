@@ -1,3 +1,0 @@
-- Free camera
-- Sorting 
-- Creating entities inside sim region and storing them in world later

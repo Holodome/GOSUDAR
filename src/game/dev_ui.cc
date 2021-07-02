@@ -16,7 +16,7 @@ static DevUIID id_empty() {
     return {};
 }
 
-static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = Colors::white, AssetID tex_id = Asset_White, Rect uv_rect = Rect(0, 0, 1, 1)) {
+static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetID tex_id = Asset_White, Rect uv_rect = Rect(0, 0, 1, 1)) {
     DevUIDrawQueueEntry entry = {};
     entry.v[0].p = Vec3(rect.top_left());
     entry.v[0].uv = uv_rect.top_left();
@@ -36,7 +36,7 @@ static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = Colors::white
     layout->draw_queue[layout->draw_queue_entry_count++] = entry;
 }
 
-static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color = Colors::white) {
+static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color = WHITE) {
     FontData *font = layout->dev_ui->font;
     f32 line_height = layout->dev_ui->font_info->height;
 	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
@@ -45,7 +45,7 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 	offset.y += line_height;
 	for (const char *scan = text; *scan; ++scan) {
 		u8 symbol = *scan;
-		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
+		if ((symbol >= font->first_codepoint)) {
 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x);
 			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y);
@@ -72,7 +72,7 @@ static Vec2 get_text_size(DevUILayout *layout, const char *text) {
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         u8 codepoint = text[i];
-        if (codepoint >= font->first_codepoint && codepoint < (font->first_codepoint + font->glyphs.len)) {
+        if (codepoint >= font->first_codepoint) {
             FontGlyph *glyph = &font->glyphs[codepoint - font->first_codepoint];
             // FontGlyph *glyph = &glyphs[first_codepoint];
             result.x += glyph->x_advance;
@@ -119,7 +119,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     bool is_hot = !is_set(layout->hot_id) && rect.collide(mouse_p(layout->input));
     if (is_hot) {
         layout->hot_id = id;
-        if (is_key_pressed(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI) && !is_set(layout->active_id)) {
+        if (is_key_pressed(layout->input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_DEV_UI) && !is_set(layout->active_id)) {
             layout->active_id = id;
         }
     }
@@ -127,7 +127,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     bool is_pressed = false;
     bool is_held = false;
     if (is_same(layout->active_id, id)) {
-        if (is_key_held(layout->input, Key::MouseLeft, INPUT_ACCESS_TOKEN_DEV_UI)) {
+        if (is_key_held(layout->input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_DEV_UI)) {
             is_held = true;
             if (repeat_when_held && is_hot) {
                 is_pressed = true;

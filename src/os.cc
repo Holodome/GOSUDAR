@@ -1,4 +1,4 @@
-#include "framework/os.hh"
+#include "os.hh"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -12,7 +12,10 @@
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
 
-struct OSInternal {
+struct OS {
+    MemoryArena arena;
+    
+    Input input;
     HINSTANCE instance;
     HWND hwnd;
     
@@ -37,11 +40,11 @@ struct OSInternal {
 static bool window_close_requested;
 
 static void 
-set_pixel_format(OSInternal *internal, HDC hdc) {
+set_pixel_format(OS *os, HDC hdc) {
     i32 suggested_pixel_format_index = 0;
     u32 extended_pick = 0;
 
-    if (internal->wglChoosePixelFormatARB) {
+    if (os->wglChoosePixelFormatARB) {
         int attributes[] = {
             WGL_DRAW_TO_WINDOW_ARB,				GL_TRUE,
 			WGL_SUPPORT_OPENGL_ARB,				GL_TRUE,
@@ -57,7 +60,7 @@ set_pixel_format(OSInternal *internal, HDC hdc) {
 			WGL_SAMPLES_ARB,					4,
 			0
         };
-        internal->wglChoosePixelFormatARB(hdc, attributes, 0, 1,
+        os->wglChoosePixelFormatARB(hdc, attributes, 0, 1,
 									&suggested_pixel_format_index, &extended_pick);
     }
 
@@ -99,84 +102,90 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     return result;
 }
 
-void OS::init() {
+OS *os_init() {
     logprintln("OS", "Init start");
-    this->internal = new OSInternal;
-    memset(this->internal, 0, sizeof(*this->internal));
+    OS *os = bootstrap_alloc_struct(OS, arena);
     
     // Create window
-    internal->instance = GetModuleHandle(0);
+    os->instance = GetModuleHandle(0);
     WNDCLASSA wndclss = {};
     wndclss.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wndclss.lpfnWndProc = main_window_proc;
-    wndclss.hInstance = internal->instance;
-    wndclss.lpszClassName = "WINDOW";
+    wndclss.hInstance = os->instance;
+    wndclss.lpszClassName = "lpszClassName";
     wndclss.hCursor = LoadCursorA(0, (LPCSTR)IDC_ARROW);
     wndclss.hbrBackground = (HBRUSH)(COLOR_WINDOW);
     RegisterClassA(&wndclss);
     
-    u32 window_width = 1280;
-    u32 window_height = 720;
-    char *window_name = "HEHE";
-    internal->hwnd = CreateWindowExA(WS_EX_APPWINDOW, wndclss.lpszClassName, window_name, 
-                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
-                                     window_width, window_height, 0, 0, internal->instance, 0);
-    ShowWindow(internal->hwnd, SW_SHOW);
-    UpdateWindow(internal->hwnd);
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
+#define WINDOW_NAME "GOSUDAR"
+    os->hwnd = CreateWindowExA(WS_EX_APPWINDOW, wndclss.lpszClassName, WINDOW_NAME, 
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
+        WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
+    ShowWindow(os->hwnd, SW_SHOW);
+    UpdateWindow(os->hwnd);
     
     LARGE_INTEGER pf;
     QueryPerformanceFrequency(&pf);
-    internal->perf_count_frequency = pf.QuadPart;
+    os->perf_count_frequency = pf.QuadPart;
     
     LARGE_INTEGER time;
     QueryPerformanceCounter(&time);
-    internal->last_frame_time = internal->game_start_time = time;
+    os->last_frame_time = os->game_start_time = time;
     logprintln("OS", "Init end");
+    return os;
 }
 
-void OS::cleanup() {
-    logprintln("OS", "Cleanup");
-    delete internal;        
-}
-
-void OS::init_renderer_backend() {
+void init_renderer_backend(OS *os) {
     HMODULE opengl_dll = LoadLibraryA("opengl32.dll");
     assert(opengl_dll);
     
-    *(FARPROC *)&internal->wglCreateContext = GetProcAddress(opengl_dll, "wglCreateContext");
-    *(FARPROC *)&internal->wglDeleteContext = GetProcAddress(opengl_dll, "wglDeleteContext");
-    *(FARPROC *)&internal->wglGetProcAddress = GetProcAddress(opengl_dll, "wglGetProcAddress");
-    *(FARPROC *)&internal->wglGetCurrentDC = GetProcAddress(opengl_dll, "wglGetCurrentDC");
-    *(FARPROC *)&internal->wglMakeCurrent = GetProcAddress(opengl_dll, "wglMakeCurrent");
-    *(FARPROC *)&internal->wglSwapLayerBuffers = GetProcAddress(opengl_dll, "wglSwapLayerBuffers");
+    *(FARPROC *)&os->wglCreateContext = GetProcAddress(opengl_dll, "wglCreateContext");
+    *(FARPROC *)&os->wglDeleteContext = GetProcAddress(opengl_dll, "wglDeleteContext");
+    *(FARPROC *)&os->wglGetProcAddress = GetProcAddress(opengl_dll, "wglGetProcAddress");
+    *(FARPROC *)&os->wglGetCurrentDC = GetProcAddress(opengl_dll, "wglGetCurrentDC");
+    *(FARPROC *)&os->wglMakeCurrent = GetProcAddress(opengl_dll, "wglMakeCurrent");
+    *(FARPROC *)&os->wglSwapLayerBuffers = GetProcAddress(opengl_dll, "wglSwapLayerBuffers");
+    assert(os->wglCreateContext);
+    assert(os->wglDeleteContext);
+    assert(os->wglGetProcAddress);
+    assert(os->wglGetCurrentDC);
+    assert(os->wglMakeCurrent);
+    assert(os->wglSwapLayerBuffers);
     
     WNDCLASSA temp_wndclss = {};
     temp_wndclss.lpfnWndProc = DefWindowProcA;
-    temp_wndclss.hInstance = internal->instance;
+    temp_wndclss.hInstance = os->instance;
     temp_wndclss.lpszClassName = "GLLOADER";
     RegisterClassA(&temp_wndclss);
     HWND temp_hwnd = CreateWindowA(temp_wndclss.lpszClassName, "", 0,
                                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-                                   0, 0, internal->instance, 0);
+                                   0, 0, os->instance, 0);
     HDC temp_hwnd_dc = GetDC(temp_hwnd);
-    set_pixel_format(internal, temp_hwnd_dc);
+    set_pixel_format(os, temp_hwnd_dc);
     
-    HGLRC temp_gl_rc = internal->wglCreateContext(temp_hwnd_dc);
-    internal->wglMakeCurrent(temp_hwnd_dc, temp_gl_rc);
+    HGLRC temp_gl_rc = os->wglCreateContext(temp_hwnd_dc);
+    os->wglMakeCurrent(temp_hwnd_dc, temp_gl_rc);
     
-    *(FARPROC *)&internal->wglChoosePixelFormatARB = internal->wglGetProcAddress("wglChoosePixelFormatARB");
-    *(FARPROC *)&internal->wglCreateContextAttribsARB = internal->wglGetProcAddress("wglCreateContextAttribsARB");
-    *(FARPROC *)&internal->wglMakeContextCurrentARB = internal->wglGetProcAddress("wglMakeContextCurrentARB");
-    *(FARPROC *)&internal->wglSwapIntervalEXT = internal->wglGetProcAddress("wglSwapIntervalEXT");
-    *(FARPROC *)&internal->wglGetSwapIntervalEXT = internal->wglGetProcAddress("wglGetSwapIntervalEXT");
+    *(FARPROC *)&os->wglChoosePixelFormatARB = os->wglGetProcAddress("wglChoosePixelFormatARB");
+    *(FARPROC *)&os->wglCreateContextAttribsARB = os->wglGetProcAddress("wglCreateContextAttribsARB");
+    *(FARPROC *)&os->wglMakeContextCurrentARB = os->wglGetProcAddress("wglMakeContextCurrentARB");
+    *(FARPROC *)&os->wglSwapIntervalEXT = os->wglGetProcAddress("wglSwapIntervalEXT");
+    *(FARPROC *)&os->wglGetSwapIntervalEXT = os->wglGetProcAddress("wglGetSwapIntervalEXT");
+    assert(os->wglChoosePixelFormatARB);
+    assert(os->wglCreateContextAttribsARB);
+    assert(os->wglMakeContextCurrentARB);
+    assert(os->wglSwapIntervalEXT);
+    assert(os->wglGetSwapIntervalEXT);
     
-    internal->wglDeleteContext(temp_gl_rc);
+    os->wglDeleteContext(temp_gl_rc);
     
     ReleaseDC(temp_hwnd, temp_hwnd_dc);
     DestroyWindow(temp_hwnd);
     
-    HDC hwnd_dc = GetDC(internal->hwnd);
-    set_pixel_format(internal, hwnd_dc);
+    HDC hwnd_dc = GetDC(os->hwnd);
+    set_pixel_format(os, hwnd_dc);
     
     int opengl_attributes[] = {
         WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
@@ -186,24 +195,25 @@ void OS::init_renderer_backend() {
 	    WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 	    0
     };
-    HGLRC gl_rc = internal->wglCreateContextAttribsARB(hwnd_dc, 0, opengl_attributes);
-    internal->wglMakeCurrent(hwnd_dc, gl_rc);
+    HGLRC gl_rc = os->wglCreateContextAttribsARB(hwnd_dc, 0, opengl_attributes);
+    os->wglMakeCurrent(hwnd_dc, gl_rc);
     
-#define GLPROC(_name, _type)                                        \
-    *(void **)&_name = (void *)internal->wglGetProcAddress(#_name);                  \
+#define GLPROC(_name, _type)                                                   \
+    *(void **)&_name = (void *)os->wglGetProcAddress(#_name);                  \
     if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
     if (!_name) logprintln("OpenGL", "Failed to load " #_name " OGL procedure.");
 #include "framework/gl_procs.inc"
 #undef GLPROC
     
-    internal->wglSwapIntervalEXT(1);
+    os->wglSwapIntervalEXT(1);
 }
 
-void OS::update_input(Input *input) {
+Input *update_input(OS *os) {
+    Input *input = &os->input;
     input->mwheel = 0;
         
     for (u32 key_index = 0;
-        key_index < (u32)Key::Count;
+        key_index < KEY_COUNT;
         ++key_index) {
         (input->keys + key_index)->transition_count = 0;        
     }
@@ -238,97 +248,97 @@ void OS::update_input(Input *input) {
                     scancode = MapVirtualKeyW((UINT)msg.wParam, MAPVK_VK_TO_VSC);
                 }
 
-                Key key = Key::None;
+                u32 key = KEY_NONE;
                 switch (scancode) {
                     case 0x011: {
-                        key = Key::W;
+                        key = KEY_W;
                     } break;
                     case 0x01E: {
-                        key = Key::A;
+                        key = KEY_A;
                     } break;
                     case 0x01F: {
-                        key = Key::S;
+                        key = KEY_S;
                     } break;
                     case 0x020: {
-                        key = Key::D;
+                        key = KEY_D;
                     } break;
                     case 0x02C: {
-                        key = Key::Z;
+                        key = KEY_Z;
                     } break;
                     case 0x030: {
-                        key = Key::B;
+                        key = KEY_B;
                     } break;
                     case 0x02D: {
-                        key = Key::X;
+                        key = KEY_X;
                     } break;
                     case 0x02A: {
-                        key = Key::Shift;
+                        key = KEY_SHIFT;
                     } break;
                     case 0x01D: {
-                        key = Key::Ctrl;
+                        key = KEY_CTRL;
                     } break;
                     case 0x039: {
-                        key = Key::Space;
+                        key = KEY_SPACE;
                     } break;
                     case 0x01C: {
-                        key = Key::Enter;
+                        key = KEY_ENTER;
                     } break;
                     case 0x001: {
-                        key = Key::Escape;
+                        key = KEY_ESCAPE;
                     } break;
                     case 0x00E: {
-                        key = Key::Backspace;
+                        key = KEY_BACKSPACE;
                     } break;
                     case 0x153: {
-                        key = Key::Delete;
+                        key = KEY_DELETE;
                     } break;
                     case 0x147: {
-                        key = Key::Home;
+                        key = KEY_HOME;
                     } break;
                     case 0x14F: {
-                        key = Key::End;
+                        key = KEY_END;
                     } break;
                     case 0x14B: {
-                        key = Key::Left;
+                        key = KEY_LEFT;
                     } break;
                     case 0x14D: {
-                        key = Key::Right;
+                        key = KEY_RIGHT;
                     } break;
                     case 0x03B: {
-                        key = Key::F1;
+                        key = KEY_F1;
                     } break;
                     case 0x03C: {
-                        key = Key::F2;
+                        key = KEY_F2;
                     } break;
                     case 0x03D: {
-                        key = Key::F3;
+                        key = KEY_F3;
                     } break;
                     case 0x03E: {
-                        key = Key::F4;
+                        key = KEY_F4;
                     } break;
                     case 0x03F: {
-                        key = Key::F5;
+                        key = KEY_F5;
                     } break;
                     case 0x040: {
-                        key = Key::F6;
+                        key = KEY_F6;
                     } break;
                     case 0x041: {
-                        key = Key::F7;
+                        key = KEY_F7;
                     } break;
                     case 0x042: {
-                        key = Key::F8;
+                        key = KEY_F8;
                     } break;
                     case 0x043: {
-                        key = Key::F9;
+                        key = KEY_F9;
                     } break;
                     case 0x044: {
-                        key = Key::F10;
+                        key = KEY_F10;
                     } break;
                     case 0x057: {
-                        key = Key::F11;
+                        key = KEY_F11;
                     } break;
                     case 0x058: {
-                        key = Key::F12;
+                        key = KEY_F12;
                     } break;
                 }
 
@@ -341,53 +351,51 @@ void OS::update_input(Input *input) {
         }
     }
     
-    input->keys[(u32)Key::MouseLeft].update(GetKeyState(VK_LBUTTON) & (1 << 31));
-    input->keys[(u32)Key::MouseRight].update(GetKeyState(VK_RBUTTON) & (1 << 31));
+    input->keys[KEY_MOUSE_LEFT].update(GetKeyState(VK_LBUTTON) & (1 << 31));
+    input->keys[KEY_MOUSE_RIGHT].update(GetKeyState(VK_RBUTTON) & (1 << 31));
     
     POINT mp;
     GetCursorPos(&mp);
-    ScreenToClient(internal->hwnd, &mp);
+    ScreenToClient(os->hwnd, &mp);
     Vec2 mouse = Vec2((f32)mp.x, (f32)mp.y);
     
     input->mdelta = mouse - input->mpos;
     input->mpos = mouse;
     
     RECT wr;
-    GetClientRect(internal->hwnd, &wr);
+    GetClientRect(os->hwnd, &wr);
     input->winsize = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
-    f32 delta_time = (f32)(current_time.QuadPart - internal->last_frame_time.QuadPart) / (f32)internal->perf_count_frequency;
-    internal->last_frame_time = current_time;
+    f32 delta_time = (f32)(current_time.QuadPart - os->last_frame_time.QuadPart) / (f32)os->perf_count_frequency;
+    os->last_frame_time = current_time;
     input->dt = delta_time;
     
-    f32 time = (f32)(current_time.QuadPart - internal->game_start_time.QuadPart) / (f32)internal->perf_count_frequency;
-    input->time = time;
-    
     input->is_quit_requested = window_close_requested;
+    return input;
 }
 
-void OS::update_window() {
+void update_window(OS *os) {
     TIMED_FUNCTION();
-    internal->wglSwapLayerBuffers(internal->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
+    os->wglSwapLayerBuffers(os->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
 }
 
-void OS::go_fullscreen(bool fullscreen) {
+void go_fullscreen(OS *os, bool fullscreen) {
     static WINDOWPLACEMENT LastWindowPlacement = {sizeof(WINDOWPLACEMENT)};
 
-    DWORD WindowStyle = GetWindowLong(this->internal->hwnd, GWL_STYLE);
+    DWORD WindowStyle = GetWindowLong(os->hwnd, GWL_STYLE);
     // Set fullscreen (actually this is windowed fullscreen!)
     if (fullscreen)
     {
         MONITORINFO MonitorInfo = {sizeof(MONITORINFO)};
-        if (GetWindowPlacement(this->internal->hwnd, &LastWindowPlacement) &&
-            GetMonitorInfo(MonitorFromWindow(this->internal->hwnd, MONITOR_DEFAULTTOPRIMARY),
+        if (GetWindowPlacement(os->hwnd, &LastWindowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(os->hwnd, MONITOR_DEFAULTTOPRIMARY),
                            &MonitorInfo))
         {
-            SetWindowLong(this->internal->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
+            SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
 
-            SetWindowPos(this->internal->hwnd, HWND_TOP,
+            SetWindowPos(os->hwnd, HWND_TOP,
                          MonitorInfo.rcMonitor.left,
                          MonitorInfo.rcMonitor.top,
                          MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
@@ -397,21 +405,14 @@ void OS::go_fullscreen(bool fullscreen) {
     }
     else
     {
-        SetWindowLong(this->internal->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(this->internal->hwnd, &LastWindowPlacement);
-        SetWindowPos(this->internal->hwnd, 0, 0, 0, 0, 0,
+        SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(os->hwnd, &LastWindowPlacement);
+        SetWindowPos(os->hwnd, 0, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
 }
 
-f32 OS::get_time() const {
-    LARGE_INTEGER current_time;
-    QueryPerformanceCounter(&current_time);
-    f32 delta_time = (f32)(current_time.QuadPart - internal->game_start_time.QuadPart) / (f32)internal->perf_count_frequency;
-    return delta_time;
-}
-
-RealWorldTime OS::get_real_world_time() {
+RealWorldTime get_real_world_time() {
     SYSTEMTIME time;
     GetLocalTime(&time);
     RealWorldTime result;
@@ -426,7 +427,7 @@ RealWorldTime OS::get_real_world_time() {
 }
 
 
-void OS::mkdir(const char *name) {
+void mkdir(const char *name) {
     HRESULT result = CreateDirectoryA(name, 0);
     UNREFERENCED_VARIABLE(result);
     // assert(result);
@@ -510,23 +511,7 @@ void close_file(FileHandle handle) {
     assert(result);
 }
 
-FileWritetime OS::get_file_write_time(const char *name) {
-    WIN32_FILE_ATTRIBUTE_DATA data;
-    BOOL success = GetFileAttributesExA(name, GetFileExInfoStandard, &data);
-    assert(success);
-    FILETIME filetime = data.ftLastWriteTime;
-    FileWritetime result = {};
-    CT_ASSERT(sizeof(result.storage) >= sizeof(FILETIME));
-    memcpy(result.storage, &filetime, sizeof(filetime));
-    return result;
-}
-
-bool OS::file_write_time_cmp(FileWritetime a, FileWritetime b) {
-    LONG result = CompareFileTime((FILETIME *)a.storage, (FILETIME *)b.storage);
-    return result != 0;
-}
-
-void OS::sleep(u32 ms) {
+void sleep(u32 ms) {
     Sleep(ms);
 }
 

@@ -1,6 +1,6 @@
 #if !defined(RENDERER_H)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 
 #include "thirdparty/glcorearb.h"
 
@@ -141,12 +141,12 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
     Vec2 uv00 = Vec2(0, 0), Vec2 uv01 = Vec2(0, 1), Vec2 uv10 = Vec2(1, 0), Vec2 uv11 = Vec2(1, 1),
     Texture texture = INVALID_TEXTURE);
 void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-    Vec4 c = Colors::white, AssetID texture_id = INVALID_ASSET_ID);
+    Vec4 c = WHITE, AssetID texture_id = INVALID_ASSET_ID);
 void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id);
 void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), AssetID texture_id = INVALID_ASSET_ID);
-void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color = Colors::white, f32 thickness = 1.0f);
-void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color = Colors::white, f32 thickness = 1.0f);
-void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color = Colors::white, f32 thickness = 1.0f);
+void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color = WHITE, f32 thickness = 1.0f);
+void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color = WHITE, f32 thickness = 1.0f);
+void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color = WHITE, f32 thickness = 1.0f);
 void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale);
 
 #define RENDERER_H 1

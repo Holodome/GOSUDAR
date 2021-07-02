@@ -1,6 +1,6 @@
 #include "game/debug.hh"
 
-#include "framework/os.hh"
+#include "os.hh"
 #include "game/game_state.hh"
 
 DebugTable *debug_table;
@@ -120,19 +120,19 @@ static int records_sort(void *ctx, const void *a, const void *b) {
 
 void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *input, RendererCommands *commands) {
     TIMED_FUNCTION();
-    if (is_key_pressed(input, Key::F1, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F1, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_NONE;
     }
-    if (is_key_pressed(input, Key::F2, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F2, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_INFO;
     }
-    if (is_key_pressed(input, Key::F3, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F3, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_PROFILER;
     }
-    if (is_key_pressed(input, Key::F4, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F4, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->is_paused = !debug_state->is_paused;
     } 
-    if (is_key_pressed(input, Key::F5, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F5, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_MEMORY;
     }
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input);

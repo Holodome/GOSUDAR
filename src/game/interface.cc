@@ -67,6 +67,14 @@ void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *inter
     Rect build_button_rect = Rect(camera_controls_button_rect.bottom_left() + Vec2(0, info_padding), Vec2(50, 25));
     interface->button_build_mode = add_button(arena, &interface->interface, Vec4(1, 0, 0, 1), Vec4(0.4, 0, 0, 1), 
         build_button_rect, true, "Build");
+    Rect select_building1_rect = Rect(camera_controls_button_rect.top_right() + Vec2(info_padding, 0), Vec2(100, 25));
+    interface->button_selected_building1 = add_button(arena, &interface->interface, Vec4(1, 0, 0, 1), Vec4(0.4, 0, 0, 1),
+        select_building1_rect, true, "Building 1");
+    Rect select_building2_rect = Rect(select_building1_rect.top_right() + Vec2(info_padding, 0), Vec2(100, 25));
+    interface->button_selected_building1 = add_button(arena, &interface->interface, Vec4(1, 0, 0, 1), Vec4(0.4, 0, 0, 1),
+        select_building2_rect, true, "Building 2");
+    Vec2 building_state_p = select_building2_rect.bottom_left() + Vec2(0, info_padding);
+    interface->building_state = add_label(arena, &interface->interface, building_state_p, Vec4(1), "Not building");
 }
 
 InterfaceStats interface_update(Interface *interface, InputManager *input) {
@@ -83,11 +91,11 @@ InterfaceStats interface_update(Interface *interface, InputManager *input) {
         }
         switch (element->kind) {
             case INTERFACE_ELEMENT_BUTTON: {
-                if (!element->is_button_state_saving && !is_key_held(input, Key::MouseLeft, INPUT_ACCESS_TOKEN_GAME_INTERFACE)) {
+                if (!element->is_button_state_saving && !is_key_held(input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_GAME_INTERFACE)) {
                     element->is_button_pressed = false;
                 }
                 
-                if (element->rect.collide(mouse_p(input)) && is_key_pressed(input, Key::MouseLeft, INPUT_ACCESS_TOKEN_GAME_INTERFACE)) {
+                if (element->rect.collide(mouse_p(input)) && is_key_pressed(input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_GAME_INTERFACE)) {
                     element->is_button_pressed = !element->is_button_pressed;
                     assert(!stats.interaction_occured);
                     stats.interaction_occured = true;

@@ -1,6 +1,6 @@
 #if !defined(GAME_WORLD_HH)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 #include "game/world.hh"
 
 enum {
@@ -27,40 +27,6 @@ enum {
     GAME_STATE_BUTTON_MOVE_BUILDING1,  
     GAME_STATE_BUTTON_MOVE_BUILDING2,  
 };
-
-enum {
-    INPUT_ACCESS_TOKEN_NO_LOCK, 
-    INPUT_ACCESS_TOKEN_GAME_INTERFACE,  
-    INPUT_ACCESS_TOKEN_GAME_MENU,  
-    INPUT_ACCESS_TOKEN_DEV_UI,  
-    INPUT_ACCESS_TOKEN_ALL,  
-};
-
-// Wrapper for input locking in case some game sections overlap
-// So when game detects that dev ui is focused, it locks input for it
-// Access tokens are ordered by priority
-// For example, game may set lock for interface after updating, but dev ui is actually focused
-// Then we let interface use input this frame, but set more high priority dev ui to be locked
-// This actually allows single frame input delay, but due to imm nature of dev ui this is hard to 
-// do different. And usually there will be only maximum of two levels of input anyway, so 
-// this delay does not occure in game circumstances, and can be easilly avoided in other cases, 
-// for example setting lock in the begging of the frame
-struct InputManager {
-    Input *input;
-    u32 access_token;
-};
-
-void manage_input(InputManager *manager);
-void lock_input(InputManager *manager, u32 access_token);
-void unlock_input(InputManager *manager);
-bool is_key_pressed(InputManager *manager, Key key, u32 access_token);
-bool is_key_released(InputManager *manager, Key key, u32 access_token);
-bool is_key_held(InputManager *manager, Key key, u32 access_token);
-f32 get_mwheel(InputManager *manager);
-Vec2 mouse_p(InputManager *manager);
-Vec2 mouse_d(InputManager *manager);
-Vec2 window_size(InputManager *manager);
-f32 get_dt(InputManager *manager);
 
 enum {
     WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE = 0x1,

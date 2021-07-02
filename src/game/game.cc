@@ -6,9 +6,9 @@ void game_init(Game *game) {
 
     game->debug_state = DEBUG_create();
     
-    game->os.init();
-    game->os.init_renderer_backend();
-    f32 init_start = game->os.get_time();
+    game->os = os_init();
+    init_renderer_backend(game->os);
+    
     size_t renderer_arena_size = MEGABYTES(256);
     arena_init(&game->renderer.arena, os_alloc(renderer_arena_size), renderer_arena_size);
     renderer_init(&game->renderer);
@@ -25,13 +25,6 @@ void game_init(Game *game) {
     size_t world_arena_size = MEGABYTES(512);
     arena_init(&game->game_state.arena, os_alloc(world_arena_size), world_arena_size);
     game_state_init(&game->game_state);
-    
-    game->input.input = &game->input_;
-    game->input.access_token = INPUT_ACCESS_TOKEN_NO_LOCK;
-    
-    f32 init_end = game->os.get_time();
-    
-    logprintln("Game", "Init took %llums", (u64)((init_end - init_start) * 1000));
 }
 
 void game_cleanup(Game *game) {
@@ -42,24 +35,22 @@ void game_cleanup(Game *game) {
     os_free(game->assets.arena.data);
     renderer_cleanup(&game->renderer);
     os_free(game->renderer.arena.data);
-    game->os.cleanup();
 }
 
 void game_update_and_render(Game *game) {
     FRAME_MARKER();
     DEBUG_begin_frame(game->debug_state);
-    game->os.update_input(&game->input_);
-#define MIN_DT 0.001f
-#define MAX_DT 0.1f
-    game->input_.dt = Math::clamp(game->input_.dt, MIN_DT, MAX_DT);
-    
-    if (is_key_pressed(&game->input, Key::Escape, INPUT_ACCESS_TOKEN_ALL) || game->input_.is_quit_requested) {
+    Input *os_input = update_input(game->os);
+    InputManager input_ = create_input_manager(os_input);
+    InputManager *input = &input_;
+    if (is_key_pressed(input, KEY_ESCAPE, INPUT_ACCESS_TOKEN_ALL) || os_input->is_quit_requested) {
         game->is_running = false;
     }    
-    RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(&game->input), Vec4(0.2));
-    update_and_render(&game->game_state, &game->input, commands, &game->assets);
-    DEBUG_update(game->debug_state, &game->game_state, &game->input, commands);
+    
+    RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(input), Vec4(0.2));
+    update_and_render(&game->game_state, input, commands, &game->assets);
+    DEBUG_update(game->debug_state, &game->game_state, input, commands);
     renderer_end_frame(&game->renderer);
-    game->os.update_window();
+    update_window(game->os);
     DEBUG_frame_end(game->debug_state);
 }

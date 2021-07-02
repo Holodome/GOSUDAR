@@ -1,8 +1,8 @@
 #if !defined(GAME_H)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 
-#include "framework/os.hh"
+#include "os.hh"
 #include "framework/renderer.hh"
 #include "framework/assets.hh"
 
@@ -13,10 +13,8 @@
 // Game state is the logic of the game
 // It decides how to use all data recived from input, what to render when to close etc.
 struct Game {
-    OS os;
+    OS *os;
     Renderer renderer;
-    Input input_;
-    InputManager input;
     Assets assets;
     DebugState *debug_state;
     

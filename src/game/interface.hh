@@ -1,6 +1,6 @@
 #if !defined(INTERFACE_HH)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 
 enum {
     INTERFACE_ELEMENT_NONE,   
@@ -42,6 +42,9 @@ struct GameStateInterface {
     InterfaceElement *text_for_gold_count;
     InterfaceElement *button_camera_controls;
     InterfaceElement *button_build_mode;
+    InterfaceElement *building_state;
+    InterfaceElement *button_selected_building1;
+    InterfaceElement *button_selected_building2;
 };  
 
 void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *interface, Vec2 winsize);

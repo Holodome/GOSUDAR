@@ -1,15 +1,10 @@
 #include "framework/assets.hh"
 
-#include "framework/os.hh"
+#include "os.hh"
 
-#define STBI_MALLOC Mem::alloc
-#define STBI_REALLOC Mem::realloc
-#define STBI_FREE Mem::free
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
 
-#define STBTT_malloc(x,u)  ((void)(u),Mem::alloc(x))
-#define STBTT_free(x,u)    ((void)(u),Mem::free(x))
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "thirdparty/stb_truetype.h"
 
@@ -108,23 +103,23 @@ Texture Assets::get_tex(AssetID id) {
         FileHandle file = open_file(info->filename);
         assert(file_handle_valid(file));
         size_t file_size = get_file_size(file);
-        void *buffer = Mem::alloc(file_size);
+        void *buffer = malloc(file_size);
         read_file(file, 0, file_size, buffer);
         assert((int)file_size == file_size);
         int w, h;
         void *data = stbi_load_from_memory((const stbi_uc *)buffer, (int)file_size, &w, &h, 0, 4);
         Vec2i tex_size = Vec2i(w, h);
-        Mem::free(buffer);
+        free(buffer);
         
-        void *mips_data = Mem::alloc(get_total_size_for_mips(w, h));
+        void *mips_data = malloc(get_total_size_for_mips(w, h));
         memcpy(mips_data, data, w * h * 4);
         generate_sequential_mips(w, h, mips_data);
         
         Texture tex = renderer_create_texture(this->renderer, mips_data, tex_size);
         size_t idx = this->texture_count++;
         this->textures[idx] = tex;
-        Mem::free(data);
-        Mem::free(mips_data);
+        free(data);
+        free(mips_data);
         
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
@@ -145,7 +140,7 @@ FontData *Assets::get_font(AssetID id) {
         FileHandle file = open_file(info->filename);
         assert(file_handle_valid(file));
         size_t file_size = get_file_size(file);
-        void *buffer = Mem::alloc(file_size);
+        void *buffer = malloc(file_size);
         read_file(file, 0, file_size, buffer);
         
         const u32 atlas_width  = 512;
@@ -161,7 +156,7 @@ FontData *Assets::get_font(AssetID id) {
         stbtt_PackFontRange(&context, (u8 *)buffer, 0, info->height, first_codepoint, codepoint_count, glyphs);
         stbtt_PackEnd(&context);
         
-        Mem::free(buffer);
+        free(buffer);
 
         u8 *atlas_data = new u8[atlas_width * atlas_height * 4];
         for (u32 i = 0; i < atlas_width * atlas_height; ++i) {
@@ -176,11 +171,11 @@ FontData *Assets::get_font(AssetID id) {
         size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
         result = font;
-        void *mips_data = Mem::alloc(get_total_size_for_mips(atlas_width, atlas_height));
+        void *mips_data = malloc(get_total_size_for_mips(atlas_width, atlas_height));
         memcpy(mips_data, atlas_data, atlas_width * atlas_height * 4);
         generate_sequential_mips(atlas_width, atlas_height, mips_data);
         this->textures[this->texture_count] = renderer_create_texture(this->renderer, mips_data, Vec2i(atlas_width, atlas_height));
-        Mem::free(mips_data);
+        free(mips_data);
         AssetInfo *tex_info = this->get_info(Asset_FontAtlas);
         tex_info->state = AssetState::Loaded;
         tex_info->array_entry_idx = this->texture_count;
@@ -190,10 +185,8 @@ FontData *Assets::get_font(AssetID id) {
         font->texture_id = Asset_FontAtlas;
         font->tex_size = Vec2i(atlas_width, atlas_height);
         font->first_codepoint = first_codepoint;
-        font->glyphs.resize(codepoint_count);
 
         for (u32 i = 0; i < codepoint_count; ++i) {
-            ++font->glyphs.len;
             font->glyphs[i].utf32 = first_codepoint + i;
             font->glyphs[i].min_x = glyphs[i].x0;
             font->glyphs[i].min_y = glyphs[i].y0;
@@ -224,7 +217,7 @@ Vec2 Assets::get_text_size(AssetID id, const char *text, size_t count, f32 scale
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         u8 codepoint = text[i];
-        if (codepoint >= font->first_codepoint && codepoint < (font->first_codepoint + font->glyphs.len)) {
+        if (codepoint >= font->first_codepoint ) {
             FontGlyph *glyph = &font->glyphs[codepoint - font->first_codepoint];
             // FontGlyph *glyph = &glyphs[first_codepoint];
             result.x += glyph->x_advance * scale;

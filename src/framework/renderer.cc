@@ -2,6 +2,8 @@
 #include "framework/assets.hh"
 #include "game/game.hh"
 
+#include "mips.hh"
+
 #define GLPROC(_name, _type) \
 _type _name;
 #include "framework/gl_procs.inc"
@@ -121,7 +123,7 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
 
 void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id) {
     Texture tex = render_group->assets->get_tex(texture_id);
-    push_quad(render_group, v[0], v[1], v[2], v[3], Colors::white, Colors::white, Colors::white, Colors::white,
+    push_quad(render_group, v[0], v[1], v[2], v[3], WHITE, WHITE, WHITE, WHITE,
         Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
@@ -159,7 +161,7 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
     
 	for (const char *scan = text; *scan; ++scan) {
 		u8 symbol = *scan;
-		if ((symbol >= font->first_codepoint) && (symbol < font->first_codepoint + font->glyphs.len)) {
+		if ((symbol >= font->first_codepoint)) {
 			FontGlyph *glyph = &font->glyphs[symbol - font->first_codepoint];
 
 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
@@ -186,9 +188,9 @@ void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color, f32 thickn
     // @TODO not behaving properly when ab is close to parallel with cam_z
     Vec3 cam_z = render_group->setup.mvp.get_z();
     Vec3 line = (b - a);
-    line -= cam_z * Math::dot(cam_z, line);
-    Vec3 line_perp = Math::cross(line, cam_z);
-    line_perp = Math::normalize(line_perp);
+    line -= cam_z * dot(cam_z, line);
+    Vec3 line_perp = cross(line, cam_z);
+    line_perp = normalize(line_perp);
     line_perp *= thickness;
     push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
     
@@ -220,11 +222,11 @@ void render_group_end(RenderGroup *group) {
     // group->renderer->has_render_group = false;
 }
 
-static GLuint create_shader(const Str &source) {
+static GLuint create_shader(const char *source) {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source.data };
-    const char *const fragment_source[] = { "#version 330\n", "", source.data };
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source };
+    const char *const fragment_source[] = { "#version 330\n", "", source };
     glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
     glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
     glCompileShader(vertex_shader);
@@ -268,13 +270,25 @@ static GLuint create_shader(const Str &source) {
     return id;
 }
 
-
 void renderer_init(Renderer *renderer) {
     logprintln("Renderer", "Init start");
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
+    glCullFace(GL_BACK);
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
-    Str standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
+#define MAX_QUADS_COUNT 1024
+#define MAX_VERTEX_COUNT (1 << 16)
+#define MAX_INDEX_COUNT (MAX_VERTEX_COUNT / 2 * 3)
+    renderer->commands.max_quads_count = MAX_QUADS_COUNT;
+    renderer->commands.quads = alloc_arr(&renderer->arena, MAX_QUADS_COUNT, RenderQuads);
+    renderer->commands.max_vertex_count = MAX_VERTEX_COUNT;
+    renderer->commands.vertices = alloc_arr(&renderer->arena, MAX_VERTEX_COUNT, Vertex);
+    renderer->commands.max_index_count = MAX_INDEX_COUNT;
+    renderer->commands.indices = alloc_arr(&renderer->arena, MAX_INDEX_COUNT, RENDERER_INDEX_TYPE);
+    
+    const char *standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
 layout(location = 0) in vec4 position;     
 layout(location = 1) in vec2 uv;       
 layout(location = 2) in vec3 n;        
@@ -285,7 +299,7 @@ out vec4 rect_color;
 out vec2 frag_uv;      
        
 flat out int frag_texture_index;       
-out float visibility;
+// out float visibility;
 
 uniform mat4 view_matrix = mat4(1);     
 uniform mat4 projection_matrix = mat4(1);
@@ -301,7 +315,7 @@ void main() {
     frag_texture_index = texture_index;        
     
     float d = length(cam_space.xyz);
-// #define DENSITY 0.007 * 10
+// #define DENSITY 0.007 * 5
 // #define GRADIENT 1.5
 //     visibility = exp(-pow((d * DENSITY), GRADIENT));
 //     visibility = clamp(visibility, 0, 1);    
@@ -311,7 +325,7 @@ void main() {
 in vec4 rect_color;        
 in vec2 frag_uv;       
 flat in int frag_texture_index;        
-in float visibility;
+// in float visibility;
 uniform sampler2DArray tex;        
 out vec4 out_color;        
 void main()        
@@ -334,17 +348,7 @@ void main()
     assert(renderer->tex_location != (GLuint)-1);
     renderer->view_location = glGetUniformLocation(renderer->standard_shader, "view_matrix");
     assert(renderer->view_location != (GLuint)-1);
-   
-    size_t max_quads_count = 1024;
-    renderer->commands.max_quads_count = max_quads_count;
-    renderer->commands.quads = alloc_arr(&renderer->arena, max_quads_count, RenderQuads);
-    size_t max_vertex_count = (1 << 16);
-    renderer->commands.max_vertex_count = max_vertex_count;
-    renderer->commands.vertices = alloc_arr(&renderer->arena, max_vertex_count, Vertex);
-    size_t max_index_count = max_vertex_count / 2 * 3;
-    renderer->commands.max_index_count = max_index_count;
-    renderer->commands.indices = alloc_arr(&renderer->arena, max_index_count, RENDERER_INDEX_TYPE);
-   
+
     glGenVertexArrays(1, &renderer->vertex_array);
     glBindVertexArray(renderer->vertex_array);
 
@@ -369,25 +373,21 @@ void main()
 
     glBindVertexArray(0);
     
-    renderer->texture_count = 0;
-    renderer->max_texture_count = 256;
+#define MAX_TEXTURE_COUNT 256
+    renderer->max_texture_count = MAX_TEXTURE_COUNT;
     glGenTextures(1, &renderer->texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
     for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM, 0);
          is_valid(&iter);
          advance(&iter)) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
-            iter.image.width, iter.image.height, (GLsizei)renderer->max_texture_count,
+            iter.image.width, iter.image.height, (GLsizei)MAX_TEXTURE_COUNT,
             0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
     }
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    glCullFace(GL_BACK);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     logprintln("Renderer", "Init end");
 }

@@ -1,6 +1,6 @@
 #if !defined(DEVUI_HH)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 
 #include "framework/renderer.hh"
 #include "framework/assets.hh"

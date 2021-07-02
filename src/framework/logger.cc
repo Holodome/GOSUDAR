@@ -1,14 +1,12 @@
-#include "framework/logger.hh"
-#include "framework/os.hh"
 
 static FileHandle log_file_handle = {};
 static size_t log_file_index = 0;
 
 void logger_init() {
     char buffer[64];
-    RealWorldTime time = OS::get_real_world_time();
+    RealWorldTime time = get_real_world_time();
     snprintf(buffer, sizeof(buffer), "logs/%u.%u.%u.%u.%u.%u.log", time.year, time.month, time.day, time.hour, time.second, time.millisecond);
-    OS::mkdir("logs");
+    mkdir("logs");
     log_file_handle = open_file(buffer, false);
     assert(file_handle_valid(log_file_handle));
 }

@@ -1,6 +1,6 @@
 #if !defined(WORLD_HH)
 
-#include "lib/lib.hh"
+#include "lib.hh"
 
 #define WORLD_EPSILON 0.001f
 

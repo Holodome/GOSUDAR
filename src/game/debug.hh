@@ -1,8 +1,6 @@
 #if !defined(DEBUG_HH)
 
-#include "lib/general.hh"
-#include "lib/math.hh"
-#include "lib/memory_arena.hh"
+#include "lib.hh"
 
 #include "game/dev_ui.hh"
 

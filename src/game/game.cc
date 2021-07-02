@@ -25,10 +25,18 @@ void game_update_and_render(Game *game) {
     DEBUG_begin_frame(game->debug_state);
     
     DEBUG_SWITCH(&game->game_state.show_grid, "Show grid");
-    DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 10, "Frame arena size");
-    DEBUG_VALUE(game->game_state.arena.peak_size >> 10, "Game arena size");
-    DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
-    DEBUG_VALUE(game->assets.arena.peak_size >> 10, "Assets arena size");
+    DEBUG_BEGIN_VALUE_BLOCK("Debug");
+    DEBUG_VALUE(game->debug_state->value_blocks_allocated, "Value blocks allocated");
+    DEBUG_VALUE(game->debug_state->debug_open_blocks_allocated, "Blocks allocated");
+    DEBUG_VALUE(game->debug_state->debug_values_allocated, "Values allocated");
+    DEBUG_END_VALUE_BLOCK();
+    DEBUG_BEGIN_VALUE_BLOCK("Memory");
+    DEBUG_VALUE(game->debug_state->arena.peak_size >> 20, "Debug arena size");
+    DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 20, "Frame arena size");
+    DEBUG_VALUE(game->game_state.arena.peak_size >> 20, "Game arena size");
+    DEBUG_VALUE(game->renderer.arena.peak_size >> 20, "Renderer arena size");
+    DEBUG_VALUE(game->assets.arena.peak_size >> 20, "Assets arena size");
+    DEBUG_END_VALUE_BLOCK();
     
     Input *os_input = update_input(game->os);
     InputManager input_ = create_input_manager(os_input);

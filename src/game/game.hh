@@ -2,6 +2,7 @@
 
 #include "lib.hh"
 
+#include "debug.hh"
 #include "os.hh"
 #include "framework/renderer.hh"
 #include "framework/assets.hh"

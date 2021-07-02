@@ -17,6 +17,8 @@ enum {
     DEBUG_EVENT_FRAME_MARKER,
     DEBUG_EVENT_BEGIN_BLOCK,
     DEBUG_EVENT_END_BLOCK,
+    DEBUG_EVENT_BEGIN_VALUE_BLOCK,
+    DEBUG_EVENT_END_VALUE_BLOCK,
     DEBUG_EVENT_VALUE_SWITCH,
     DEBUG_EVENT_VALUE_u64,
     DEBUG_EVENT_VALUE_f32,
@@ -95,6 +97,8 @@ DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
+#define DEBUG_BEGIN_VALUE_BLOCK(_name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_VALUE_BLOCK, DEBUG_NAME(), _name)
+#define DEBUG_END_VALUE_BLOCK()   RECORD_DEBUG_EVENT(DEBUG_EVENT_END_VALUE_BLOCK, DEBUG_NAME(), "#END_VALUE_BLOCK")
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started
@@ -158,7 +162,6 @@ enum {
 
 struct DebugValue {
     const char *name;
-    
     u32 value_kind;
     union {
         bool *value_switch;
@@ -171,6 +174,12 @@ struct DebugValue {
     DebugValue *next;
 };  
 
+struct DebugValueBlock {
+    const char *name;
+    DebugValue *first_value;
+    DebugValueBlock *next;
+};
+
 struct DebugState {
     MemoryArena arena;
 
@@ -178,13 +187,17 @@ struct DebugState {
     
     u32 frame_index;
     DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
-    DebugOpenBlock *current_open_block;
+    u64 debug_open_blocks_allocated;
     DebugOpenBlock *first_free_block;
     u32 collation_array_index;
     bool is_paused;
     
+    u64 debug_values_allocated;
     DebugValue *first_free_value;
     DebugValue *first_value;
+    u64 value_blocks_allocated;
+    DebugValueBlock *first_free_value_block;
+    DebugValueBlock *first_value_block;
     
     u64 total_frame_count;
     

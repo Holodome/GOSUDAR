@@ -4,7 +4,17 @@
 #include "game/game_state.hh"
 
 DebugTable *debug_table;
-// DebugStatistics *DEBUG;
+
+static DebugValueBlock *get_value_block(DebugState *debug_state) {
+    DebugValueBlock *block = debug_state->first_free_value_block;
+    if (block) {
+        debug_state->first_free_value_block = block->next;
+    } else {
+        ++debug_state->value_blocks_allocated;
+        block = alloc_struct(&debug_state->arena, DebugValueBlock);
+    }
+    return block;
+}
 
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
     u64 collation_start_clock = __rdtsc();
@@ -19,6 +29,8 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
         }
         
         DebugFrame *collation_frame = debug_state->frames + debug_state->frame_index;
+        DebugOpenBlock *current_open_block = 0;
+        DebugValueBlock *current_value_block = 0;
         for (u32 event_index = 0; event_index < debug_table->event_counts[event_array_index]; ++event_index) {
             DebugEvent *event = debug_table->events[event_array_index] + event_index;
             
@@ -36,19 +48,20 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     if (debug_block) {
                         debug_state->first_free_block = debug_block->next_free;
                     } else {
+                        ++debug_state->debug_open_blocks_allocated;
                         debug_block = alloc_struct(&debug_state->arena, DebugOpenBlock);
                     }
                     
                     debug_block->frame_index = debug_state->frame_index;
                     debug_block->opening_event = event;
-                    debug_block->parent = debug_state->current_open_block;
+                    debug_block->parent = current_open_block;
                     debug_block->next_free = 0;
                     
-                    debug_state->current_open_block = debug_block;
+                    current_open_block = debug_block;
                 } break;
                 case DEBUG_EVENT_END_BLOCK: {
-                    assert(debug_state->current_open_block);
-                    DebugOpenBlock *matching_block = debug_state->current_open_block;
+                    assert(current_open_block);
+                    DebugOpenBlock *matching_block = current_open_block;
                     DebugEvent *opening_event = matching_block->opening_event;
                     // Get debug record from frame hash
                     DebugRecord *record = 0;
@@ -82,7 +95,7 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     
                     matching_block->next_free = debug_state->first_free_block;
                     debug_state->first_free_block = matching_block;
-                    debug_state->current_open_block = matching_block->parent;
+                    current_open_block = matching_block->parent;
                 } break;
 #define DEBUG_EVENT_VALUE_DEF(_type)                            \
 case DEBUG_EVENT_VALUE_##_type: {                               \
@@ -90,13 +103,19 @@ case DEBUG_EVENT_VALUE_##_type: {                               \
     if (value) {                                                \
         debug_state->first_free_value = value->next;            \
     } else {                                                    \
+        debug_state->debug_values_allocated++;                  \
         value = alloc_struct(&debug_state->arena, DebugValue);  \
     }                                                           \
     value->value_kind = DEBUG_VALUE_##_type;                    \
     value->value_##_type = event->value_##_type;                \
     value->name = event->name;                                  \
-    value->next = debug_state->first_value;                     \
-    debug_state->first_value = value;                           \
+    if (!current_value_block) {                                 \
+        value->next = debug_state->first_value;                 \
+        debug_state->first_value = value;                       \
+    } else {                                                    \
+        value->next = current_value_block->first_value;         \
+        current_value_block->first_value = value;               \
+    }                                                           \
 } break;
 DEBUG_EVENT_VALUE_DEF(u64)
 DEBUG_EVENT_VALUE_DEF(f32)
@@ -107,15 +126,34 @@ DEBUG_EVENT_VALUE_DEF(Vec2i)
                     DebugValue *value = debug_state->first_free_value;         
                     if (value) {                                               
                         debug_state->first_free_value = value->next;           
-                    } else {                                                   
+                    } else {                          
+                        ++debug_state->debug_values_allocated;                         
                         value = alloc_struct(&debug_state->arena, DebugValue); 
                     }                                                          
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
                     value->value_switch = event->value_switch;               
                     value->name = event->name;                                 
-                    value->next = debug_state->first_value;                    
-                    debug_state->first_value = value;                          
+                    if (!current_value_block) {
+                        value->next = debug_state->first_value;                    
+                        debug_state->first_value = value;                          
+                    } else {
+                        value->next = current_value_block->first_value;
+                        current_value_block->first_value = value;
+                    }
                 } break; 
+                case DEBUG_EVENT_BEGIN_VALUE_BLOCK: {
+                    assert(!current_value_block);
+                    DebugValueBlock *block = get_value_block(debug_state);
+                    block->name = event->name;
+                    block->next = debug_state->first_value_block;
+                    debug_state->first_value_block = block;
+                    
+                    current_value_block = block;
+                } break;
+                case DEBUG_EVENT_END_VALUE_BLOCK: {
+                    assert(current_value_block);
+                    current_value_block = 0;
+                } break;
                 INVALID_DEFAULT_CASE;
             }
         }
@@ -155,6 +193,44 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
     if (debug_state->dev_mode == DEV_MODE_INFO) {
         dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
         if (dev_ui_section(&dev_ui, "Variables")) {
+            for (DebugValueBlock *block = debug_state->first_value_block;
+                 block;
+                 block = block->next) {
+                if (dev_ui_section(&dev_ui, block->name)) {
+                    for (DebugValue *value = block->first_value;
+                        value;
+                        value = value->next) {
+                        char buffer[64];
+                        switch (value->value_kind) {
+                            case DEBUG_VALUE_f32: {
+                                snprintf(buffer, sizeof(buffer), "%.2f", value->value_f32);
+                            } break;
+                            case DEBUG_VALUE_u64: {
+                                snprintf(buffer, sizeof(buffer), "%llu", value->value_u64);
+                            } break;
+                            case DEBUG_VALUE_Vec2: {
+                                snprintf(buffer, sizeof(buffer), "(%.2f %.2f)", value->value_Vec2.x, value->value_Vec2.y);
+                            } break;
+                            case DEBUG_VALUE_Vec2i: {
+                                snprintf(buffer, sizeof(buffer), "(%d %d)", value->value_Vec2i.x, value->value_Vec2i.y);
+                            } break;
+                            case DEBUG_VALUE_Vec3: {
+                                snprintf(buffer, sizeof(buffer), "(%.2f %.2f %.2f)", value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
+                            } break;
+                            case DEBUG_VALUE_SWITCH: {
+                                snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
+                            } break;
+                        }
+                        
+                        if (value->value_kind == DEBUG_VALUE_SWITCH) {
+                            dev_ui_checkbox(&dev_ui, buffer, value->value_switch);
+                        } else {
+                            dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
+                        }
+                    }
+                    dev_ui_end_section(&dev_ui);
+                }            
+            }
             for (DebugValue *value = debug_state->first_value;
                 value;
                 value = value->next) {
@@ -238,11 +314,45 @@ void DEBUG_frame_end(DebugState *debug_state) {
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
     
-    if (debug_state->first_value) {
-        debug_state->first_value->next = debug_state->first_free_value;
+    for (DebugValue *value = debug_state->first_value;
+         value;
+         ) {
+        if (!value->next) {
+            value->next = debug_state->first_free_value;
+            break; 
+        } else {
+            value = value->next;
+        }
     }
     debug_state->first_free_value = debug_state->first_value;
     debug_state->first_value = 0;
+    
+    for (DebugValueBlock *block = debug_state->first_value_block;
+         block;
+         ) {
+        for (DebugValue *value = block->first_value;
+            value;
+            ) {
+            if (!value->next) {
+                value->next = debug_state->first_free_value;
+                break; 
+            } else {
+                value = value->next;
+            }
+        }
+        debug_state->first_free_value = block->first_value;
+        block->first_value = 0;
+
+        if (!block->next) {
+            block->next = debug_state->first_free_value_block;
+            break; 
+        } else {
+            block = block->next;
+        }
+    }
+    debug_state->first_free_value_block = debug_state->first_value_block;
+    debug_state->first_value_block = 0;
+    
     if (!debug_state->is_paused) {
         debug_collate_events(debug_state, debug_table->current_event_array_index);
     }

@@ -116,10 +116,15 @@ Texture Assets::get_tex(AssetID id) {
         Vec2i tex_size = Vec2i(w, h);
         Mem::free(buffer);
         
-        Texture tex = renderer_create_texture(this->renderer, data, tex_size);
+        void *mips_data = Mem::alloc(get_total_size_for_mips(w, h));
+        memcpy(mips_data, data, w * h * 4);
+        generate_sequential_mips(w, h, mips_data);
+        
+        Texture tex = renderer_create_texture(this->renderer, mips_data, tex_size);
         size_t idx = this->texture_count++;
         this->textures[idx] = tex;
         Mem::free(data);
+        Mem::free(mips_data);
         
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
@@ -171,7 +176,11 @@ FontData *Assets::get_font(AssetID id) {
         size_t array_idx = this->font_count++;
         FontData *font = &this->fonts[array_idx];
         result = font;
-        this->textures[this->texture_count] = renderer_create_texture(this->renderer, atlas_data, Vec2i(atlas_width, atlas_height));
+        void *mips_data = Mem::alloc(get_total_size_for_mips(atlas_width, atlas_height));
+        memcpy(mips_data, atlas_data, atlas_width * atlas_height * 4);
+        generate_sequential_mips(atlas_width, atlas_height, mips_data);
+        this->textures[this->texture_count] = renderer_create_texture(this->renderer, mips_data, Vec2i(atlas_width, atlas_height));
+        Mem::free(mips_data);
         AssetInfo *tex_info = this->get_info(Asset_FontAtlas);
         tex_info->state = AssetState::Loaded;
         tex_info->array_entry_idx = this->texture_count;

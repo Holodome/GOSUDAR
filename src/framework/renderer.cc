@@ -373,12 +373,14 @@ void main()
     renderer->max_texture_count = 256;
     glGenTextures(1, &renderer->texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1,
-                   GL_RGBA8,
-                   RENDERER_TEXTURE_DIM,
-                   RENDERER_TEXTURE_DIM,
-                   (GLsizei)renderer->max_texture_count);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM, 0);
+         is_valid(&iter);
+         advance(&iter)) {
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
+            iter.image.width, iter.image.height, (GLsizei)renderer->max_texture_count,
+            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
+    }
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -466,8 +468,12 @@ Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size) {
     tex.height = (u16)size.y;
     assert(tex.width == size.x && tex.height == size.y);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0,
-                    tex.index, size.x, size.y, 1,
-                    GL_RGBA, GL_UNSIGNED_BYTE, data);    
+    for (MipIterator iter = iterate_mips(size.x, size.y, data);
+         is_valid(&iter);
+         advance(&iter)) { 
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, iter.level, 0, 0,
+                        tex.index, iter.image.width, iter.image.height, 1,
+                        GL_RGBA, GL_UNSIGNED_BYTE, iter.image.data);    
+    }
     return tex;
 }

@@ -46,7 +46,7 @@ static InterfaceElement *add_label(MemoryArena *arena, Interface *interface, Vec
 
 void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *interface, Vec2 winsize) {
     f32 hotbar_relative_width = 1.0f;
-    f32 hotbat_height = 100.0f;
+    f32 hotbat_height = 120.0f;
     // Down menu rect
     Rect down_menu_rect = Rect(winsize.x * (1.0f - hotbar_relative_width) * 0.5f, winsize.y - hotbat_height, 
         winsize.x * hotbar_relative_width, hotbat_height);
@@ -64,7 +64,6 @@ void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *inter
     Rect camera_controls_button_rect = Rect(info_menu_rect.top_right() + Vec2(info_padding, 0), Vec2(50, 25));
     interface->button_camera_controls = add_button(arena, &interface->interface, Vec4(1, 0, 0, 1), Vec4(0.4, 0, 0, 1), 
         camera_controls_button_rect, true, "Cam");
-        
     Rect build_button_rect = Rect(camera_controls_button_rect.bottom_left() + Vec2(0, info_padding), Vec2(50, 25));
     interface->button_build_mode = add_button(arena, &interface->interface, Vec4(1, 0, 0, 1), Vec4(0.4, 0, 0, 1), 
         build_button_rect, true, "Build");

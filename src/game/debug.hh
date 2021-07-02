@@ -17,6 +17,7 @@ enum {
     DEBUG_EVENT_FRAME_MARKER,
     DEBUG_EVENT_BEGIN_BLOCK,
     DEBUG_EVENT_END_BLOCK,
+    DEBUG_EVENT_VALUE_SWITCH,
     DEBUG_EVENT_VALUE_u64,
     DEBUG_EVENT_VALUE_f32,
     DEBUG_EVENT_VALUE_Vec2,
@@ -30,6 +31,7 @@ struct DebugEvent {
     const char *debug_name; // see DEBUG_NAME
     const char *name;       // user-defined block name
     union {
+        bool *value_switch;
         u64 value_u64;
         f32 value_f32;
         Vec2 value_Vec2;
@@ -92,6 +94,7 @@ DEBUG_VALUE_PROC_DEF(Vec2)
 DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
 #define DEBUG_VALUE(_value) DEBUG_VALUE_(DEBUG_NAME(), #_value, _value)
+#define DEBUG_SWITCH(_value) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), #_value); event->value_switch = _value; } while (0);
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started
@@ -145,6 +148,7 @@ enum {
 
 enum {
     DEBUG_VALUE_NONE,  
+    DEBUG_VALUE_SWITCH,  
     DEBUG_VALUE_u64,  
     DEBUG_VALUE_f32,  
     DEBUG_VALUE_Vec2,  
@@ -157,6 +161,7 @@ struct DebugValue {
     
     u32 value_kind;
     union {
+        bool *value_switch;
         u64 value_u64;  
         f32 value_f32;
         Vec2 value_Vec2;
@@ -169,9 +174,7 @@ struct DebugValue {
 struct DebugState {
     MemoryArena arena;
 
-    // DebugStatistics statistics;
     DebugTable debug_table;
-    Assets *assets;
     
     u32 frame_index;
     DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
@@ -189,11 +192,9 @@ struct DebugState {
     u32 dev_mode; 
 };
 
-// @CLEANUP these two functions
-DebugState *DEBUG_create();
-void DEBUG_init(DebugState *debug_state, struct Assets *assets);
+DebugState *DEBUG_init();
 void DEBUG_begin_frame(DebugState *debug_state);
-void DEBUG_update(DebugState *debug_state, struct GameState *game_state, struct InputManager *input, RendererCommands *commands);
+void DEBUG_update(DebugState *debug_state, struct InputManager *input, RendererCommands *commands, Assets *assets);
 void DEBUG_frame_end(DebugState *debug_state);
 
 #define DEBUG_HH 1

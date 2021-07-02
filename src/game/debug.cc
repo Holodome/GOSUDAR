@@ -84,8 +84,8 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     debug_state->first_free_block = matching_block;
                     debug_state->current_open_block = matching_block->parent;
                 } break;
-#define DEBUG_EVENT_VALUE_DEF(_type)                             \
-case DEBUG_EVENT_VALUE_##_type: {                                   \
+#define DEBUG_EVENT_VALUE_DEF(_type)                            \
+case DEBUG_EVENT_VALUE_##_type: {                               \
     DebugValue *value = debug_state->first_free_value;          \
     if (value) {                                                \
         debug_state->first_free_value = value->next;            \
@@ -103,6 +103,19 @@ DEBUG_EVENT_VALUE_DEF(f32)
 DEBUG_EVENT_VALUE_DEF(Vec2)
 DEBUG_EVENT_VALUE_DEF(Vec3)
 DEBUG_EVENT_VALUE_DEF(Vec2i)
+                case DEBUG_EVENT_VALUE_SWITCH: {
+                    DebugValue *value = debug_state->first_free_value;         
+                    if (value) {                                               
+                        debug_state->first_free_value = value->next;           
+                    } else {                                                   
+                        value = alloc_struct(&debug_state->arena, DebugValue); 
+                    }                                                          
+                    value->value_kind = DEBUG_VALUE_SWITCH;                   
+                    value->value_switch = event->value_switch;               
+                    value->name = event->name;                                 
+                    value->next = debug_state->first_value;                    
+                    debug_state->first_value = value;                          
+                } break; 
                 INVALID_DEFAULT_CASE;
             }
         }
@@ -118,7 +131,7 @@ static int records_sort(void *ctx, const void *a, const void *b) {
     return frame->records[index_a].total_clocks < frame->records[index_b].total_clocks ? 1 : -1;
 }
 
-void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *input, RendererCommands *commands) {
+void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     if (is_key_pressed(input, KEY_F1, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_NONE;
@@ -135,9 +148,9 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
     if (is_key_pressed(input, KEY_F5, INPUT_ACCESS_TOKEN_ALL)) {
         debug_state->dev_mode = DEV_MODE_MEMORY;
     }
-    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input);
+    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets);
     
-    RenderGroup interface_render_group = render_group_begin(commands, debug_state->assets,
+    RenderGroup interface_render_group = render_group_begin(commands, assets,
         setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
         dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
@@ -162,8 +175,16 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
                     case DEBUG_VALUE_Vec3: {
                         snprintf(buffer, sizeof(buffer), "(%.2f %.2f %.2f)", value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
                     } break;
+                    case DEBUG_VALUE_SWITCH: {
+                        snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
+                    } break;
                 }
-                dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
+                
+                if (value->value_kind == DEBUG_VALUE_SWITCH) {
+                    dev_ui_checkbox(&dev_ui, buffer, value->value_switch);
+                } else {
+                    dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
+                }
             }
             dev_ui_end_section(&dev_ui);
         }
@@ -175,25 +196,6 @@ void DEBUG_update(DebugState *debug_state, GameState *game_state, InputManager *
             "ALL",  
         };
         dev_ui_labelf(&dev_ui, "Input lock: %s", INPUT_ACCESS_NAMES[input->access_token]);
-        dev_ui_checkbox(&dev_ui, "Show grid", &game_state->show_grid);
-        dev_ui_labelf(&dev_ui, "Selected building kind: %hhu", game_state->selected_building);
-        if (dev_ui_button(&dev_ui, "Building 1")) {
-            game_state->selected_building = 0;
-        } 
-        dev_ui_last_line(&dev_ui);
-        if (dev_ui_button(&dev_ui, "Building 2")) {
-            game_state->selected_building = 1;
-        } 
-        if (!is_same(game_state->interactable, null_id())) {
-            SimEntity *interactable = &get_world_entity(game_state->world, game_state->interactable)->sim;
-            WorldObjectSettings *settings = get_object_settings(game_state, interactable->world_object_kind);
-            if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
-                dev_ui_labelf(&dev_ui, "Building build progress: %.2f", interactable->build_progress);
-            }
-        }
-        if (game_state->interaction_kind) {
-            dev_ui_labelf(&dev_ui, "I: %u%%", (u32)(game_state->interaction_current_time / game_state->interaction_time * 100));    
-        }
     } else if (debug_state->dev_mode == DEV_MODE_PROFILER) {
         DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
         // DebugFrame *frame = game->debug_state->frames;
@@ -247,24 +249,11 @@ void DEBUG_frame_end(DebugState *debug_state) {
     
 }
 
-void DEBUG_init(DebugState *debug_state, Assets *assets) {
-    debug_state->assets = assets;
+DebugState *DEBUG_init() {
+#define DEBUG_ARENA_SIZE MEGABYTES(256)
+    DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena, DEBUG_ARENA_SIZE);
+    debug_table = &debug_state->debug_table;
     size_t dev_ui_arena_size = MEGABYTES(8);
     debug_state->dev_ui.arena = subarena(&debug_state->arena, dev_ui_arena_size);
-    dev_ui_init(&debug_state->dev_ui, assets);
-}
-
-DebugState *DEBUG_create() {
-    DebugState *debug_state = (DebugState *)os_alloc(sizeof(DebugState));
-    size_t debug_arena_size = MEGABYTES(256);
-    arena_init(&debug_state->arena, os_alloc(debug_arena_size), debug_arena_size);
-    
-    debug_table = &debug_state->debug_table;
-    // DEBUG = &debug_state->statistics;
-    
-    debug_state->first_free_block = 0;
-    debug_state->current_open_block = 0;
-    debug_state->collation_array_index = 0;   
     return debug_state;
-    
 }

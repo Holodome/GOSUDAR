@@ -17,24 +17,22 @@ struct DevUIView {
 
 struct DevUI {
     MemoryArena arena;
-    Assets *assets;
     
     DevUIID active_id;
     DevUIView view_hash[128];
-    
-    AssetInfo *font_info;
-    FontData *font;
 };
 
 struct DevUIDrawQueueEntry {
     Vertex v[4];
-    Texture texture;
+    AssetID texture;
 };  
 
 struct DevUILayout {
     TempMemory temp_mem;
     DevUI *dev_ui;
     struct InputManager *input;
+    AssetInfo *font_info;
+    FontData *font;
     
     size_t max_draw_queue_entry_count;
     size_t draw_queue_entry_count;
@@ -50,8 +48,7 @@ struct DevUILayout {
     Vec2 last_line_p;
 };  
 
-void dev_ui_init(DevUI *dev_ui, Assets *assets);
-DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input);
+DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input, Assets *assets);
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout, const char *label);

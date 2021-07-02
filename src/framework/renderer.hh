@@ -118,7 +118,6 @@ struct Renderer {
 };
 
 void renderer_init(Renderer *renderer);
-void renderer_cleanup(Renderer *renderer);
 RendererCommands * renderer_begin_frame(Renderer *renderer, Vec2 winsize, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size);

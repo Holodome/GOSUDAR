@@ -110,6 +110,10 @@ static WorldObjectSettings building_settings() {
 }
 
 void game_state_init(GameState *game_state) {
+#define FRAME_ARENA_SIZE MEGABYTES(256)
+    arena_init(&game_state->frame_arena, os_alloc(FRAME_ARENA_SIZE), FRAME_ARENA_SIZE);
+#define WORLD_ARENA_SIZE MEGABYTES(512)
+    arena_init(&game_state->arena, os_alloc(WORLD_ARENA_SIZE), WORLD_ARENA_SIZE);
     game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_DESERT] = tree_settings(1);
     game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_FOREST] = tree_settings(4);
     game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_JUNGLE] = tree_settings(2);

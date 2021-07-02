@@ -1,5 +1,6 @@
 #include "game/debug.cc"
 #include "framework/logger.cc"
+#include "mips.cc"
 #include "os.cc"
 #include "framework/renderer.cc"
 #include "framework/assets.cc"

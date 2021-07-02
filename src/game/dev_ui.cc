@@ -30,15 +30,15 @@ static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetI
     entry.v[3].p = Vec3(rect.bottom_right());
     entry.v[3].uv = uv_rect.bottom_right();
     entry.v[3].c = color;
-    entry.texture = layout->dev_ui->assets->get_tex(tex_id);
+    entry.texture = tex_id;
     
     assert(layout->draw_queue_entry_count < layout->max_draw_queue_entry_count);
     layout->draw_queue[layout->draw_queue_entry_count++] = entry;
 }
 
 static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color = WHITE) {
-    FontData *font = layout->dev_ui->font;
-    f32 line_height = layout->dev_ui->font_info->height;
+    FontData *font = layout->font;
+    f32 line_height = layout->font_info->height;
 	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
 	f32 rheight = 1.0f / (f32)font->tex_size.y;
 	Vec3 offset = Vec3(p, 0);
@@ -65,8 +65,8 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 }
 
 static Vec2 get_text_size(DevUILayout *layout, const char *text) {
-    AssetInfo *info = layout->dev_ui->font_info;
-    FontData *font = layout->dev_ui->font;
+    AssetInfo *info = layout->font_info;
+    FontData *font = layout->font;
     
     size_t count = strlen(text);
     Vec2 result = {};
@@ -147,14 +147,7 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     return result;
 }
 
-void dev_ui_init(DevUI *dev_ui, Assets *assets) {
-    dev_ui->assets = assets;
-    dev_ui->active_id = id_empty();
-    dev_ui->font_info = assets->get_info(Asset_Font);
-    dev_ui->font = assets->get_font(Asset_Font);
-}
-
-DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input) {
+DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets) {
     DevUILayout layout = {};
     layout.dev_ui = dev_ui;
     layout.active_id = dev_ui->active_id;
@@ -162,6 +155,8 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input) {
     layout.max_draw_queue_entry_count = 4096;
     layout.draw_queue = alloc_arr(&dev_ui->arena, layout.max_draw_queue_entry_count, DevUIDrawQueueEntry);
     layout.input = input;
+    layout.font_info = assets->get_info(Asset_Font);
+    layout.font = assets->get_font(Asset_Font);
     return layout;
 }
 
@@ -258,10 +253,11 @@ void dev_ui_end_section(DevUILayout *layout) {
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
     for (size_t i = 0; i < layout->draw_queue_entry_count; ++i) {
         DevUIDrawQueueEntry *entry = layout->draw_queue + i;
+        Texture tex = render_group->assets->get_tex(entry->texture);
         push_quad(render_group, entry->v[0].p, entry->v[1].p, entry->v[2].p, entry->v[3].p, 
             entry->v[0].c, entry->v[1].c, entry->v[2].c, entry->v[3].c, 
             entry->v[0].uv, entry->v[1].uv, entry->v[2].uv, entry->v[3].uv,
-            entry->texture);
+            tex);
     }
     temp_memory_end(layout->temp_mem);
     layout->dev_ui->active_id = layout->active_id;

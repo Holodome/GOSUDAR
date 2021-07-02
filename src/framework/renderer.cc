@@ -271,10 +271,20 @@ static GLuint create_shader(const char *source) {
 }
 
 void renderer_init(Renderer *renderer) {
-    logprintln("Renderer", "Init start");
+#define RENDERER_ARENA_SIZE MEGABYTES(256)
+    arena_init(&renderer->arena, os_alloc(RENDERER_ARENA_SIZE), RENDERER_ARENA_SIZE);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
     glCullFace(GL_BACK);
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_SCISSOR_TEST);
+    glDepthMask(GL_TRUE);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthFunc(GL_LEQUAL);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -348,7 +358,7 @@ void main()
     assert(renderer->tex_location != (GLuint)-1);
     renderer->view_location = glGetUniformLocation(renderer->standard_shader, "view_matrix");
     assert(renderer->view_location != (GLuint)-1);
-
+    // Generate vertex arrays
     glGenVertexArrays(1, &renderer->vertex_array);
     glBindVertexArray(renderer->vertex_array);
 
@@ -372,28 +382,22 @@ void main()
     glEnableVertexAttribArray(4);
 
     glBindVertexArray(0);
-    
+    // Generate textures
 #define MAX_TEXTURE_COUNT 256
     renderer->max_texture_count = MAX_TEXTURE_COUNT;
     glGenTextures(1, &renderer->texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM, 0);
+    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
          is_valid(&iter);
          advance(&iter)) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
-            iter.image.width, iter.image.height, (GLsizei)MAX_TEXTURE_COUNT,
+            iter.width, iter.height, MAX_TEXTURE_COUNT,
             0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
     }
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    logprintln("Renderer", "Init end");
-}
-
-void renderer_cleanup(Renderer *renderer) {
-    (void)(renderer);    
 }
 
 RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Vec4 clear_color) {
@@ -409,16 +413,6 @@ RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Ve
 
 void renderer_end_frame(Renderer *renderer) {
     TIMED_FUNCTION();
-    // glEnable(GL_DEPTH_TEST);
-    glEnable(GL_SCISSOR_TEST);
-    glDepthMask(GL_TRUE);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glDepthFunc(GL_LEQUAL);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glViewport(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
     glScissor(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
     // Upload data from vertex array to OpenGL buffer
@@ -463,17 +457,19 @@ void renderer_end_frame(Renderer *renderer) {
 Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size) {
     assert(size.x <= RENDERER_TEXTURE_DIM && size.y <= RENDERER_TEXTURE_DIM);
     Texture tex;
+    assert(renderer->texture_count + 1 < renderer->max_texture_count);
     tex.index = (u32)renderer->texture_count++;
     tex.width  = (u16)size.x;
     tex.height = (u16)size.y;
     assert(tex.width == size.x && tex.height == size.y);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(size.x, size.y, data);
+    for (MipIterator iter = iterate_mips(size.x, size.y);
          is_valid(&iter);
          advance(&iter)) { 
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, iter.level, 0, 0,
-                        tex.index, iter.image.width, iter.image.height, 1,
-                        GL_RGBA, GL_UNSIGNED_BYTE, iter.image.data);    
+            tex.index, iter.width, iter.height, 1,
+            GL_RGBA, GL_UNSIGNED_BYTE, (u32 *)data + iter.pixel_offset);    
     }
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     return tex;
 }

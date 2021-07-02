@@ -450,8 +450,8 @@ void renderer_end_frame(Renderer *renderer) {
         DEBUG_quads_dispatched += quads->quad_count;       
     }
     
-    DEBUG_VALUE(DEBUG_draw_call_count);
-    DEBUG_VALUE(DEBUG_quads_dispatched);
+    DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
+    DEBUG_VALUE(DEBUG_quads_dispatched, "Quads dispatched");
 }
 
 Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size) {

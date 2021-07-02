@@ -1,7 +1,5 @@
 #include "game/game_state.hh"
 
-#include "game/ray_casting.hh"
-
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);
     Vec2 b_floor = floor_to_cell(b);
@@ -602,9 +600,9 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     
     Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
     Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
-    DEBUG_VALUE(player_pos);
-    DEBUG_VALUE(player->world_pos.offset);
-    DEBUG_VALUE(player->world_pos.chunk);
+    DEBUG_VALUE(player_pos, "Player pos");
+    DEBUG_VALUE(player->world_pos.offset, "Chunk offset");
+    DEBUG_VALUE(player->world_pos.chunk, "Chunk coord");
 }
 
 

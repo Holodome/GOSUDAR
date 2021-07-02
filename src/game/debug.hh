@@ -93,8 +93,8 @@ DEBUG_VALUE_PROC_DEF(f32)
 DEBUG_VALUE_PROC_DEF(Vec2)
 DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
-#define DEBUG_VALUE(_value) DEBUG_VALUE_(DEBUG_NAME(), #_value, _value)
-#define DEBUG_SWITCH(_value) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), #_value); event->value_switch = _value; } while (0);
+#define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
+#define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started

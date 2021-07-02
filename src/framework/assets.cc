@@ -99,19 +99,18 @@ Texture Assets::get_tex(AssetID id) {
     if (info->state == AssetState::Loaded) {
     } else {
         // logprintln("Assets", "Loading texture '%s'", name);
-        
+        TempMemory temp = temp_memory_begin(&this->arena);
         FileHandle file = open_file(info->filename);
         assert(file_handle_valid(file));
         size_t file_size = get_file_size(file);
-        void *buffer = malloc(file_size);
+        void *buffer = arena_alloc(&this->arena, file_size);
         read_file(file, 0, file_size, buffer);
         assert((int)file_size == file_size);
         int w, h;
         void *data = stbi_load_from_memory((const stbi_uc *)buffer, (int)file_size, &w, &h, 0, 4);
         Vec2i tex_size = Vec2i(w, h);
-        free(buffer);
         
-        void *mips_data = malloc(get_total_size_for_mips(w, h));
+        void *mips_data = arena_alloc(&this->arena, get_total_size_for_mips(w, h));
         memcpy(mips_data, data, w * h * 4);
         generate_sequential_mips(w, h, mips_data);
         
@@ -119,10 +118,10 @@ Texture Assets::get_tex(AssetID id) {
         size_t idx = this->texture_count++;
         this->textures[idx] = tex;
         free(data);
-        free(mips_data);
         
         info->state = AssetState::Loaded;
         info->array_entry_idx = idx;
+        temp_memory_end(temp);
         // logprintln("Assets", "Loaded texture '%s'", name);
     }
     return this->textures[info->array_entry_idx];

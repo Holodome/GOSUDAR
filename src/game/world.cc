@@ -1,8 +1,6 @@
 #include "game/world.hh"
 #include "game/game.hh"
 
-#include "game/ray_casting.hh"
-
 // @TODO do we want to introduce threshold here to avoid pointlessly moving entities when they are at chunk edge
 static bool is_canonical(f32 chunk_rel) {
     bool result = ((chunk_rel >= -0.001f) && (chunk_rel <= CHUNK_SIZE + 0.001f));
@@ -289,8 +287,9 @@ SimRegion *begin_sim(MemoryArena *arena, World *world, Vec2i min_chunk, Vec2i ma
             }        
         }
     }
-    DEBUG_VALUE(sim->entity_count);
-    DEBUG_VALUE(sim->world->_entity_count);
+    DEBUG_VALUE(sim->entity_count, "Sim entity count");
+    DEBUG_VALUE(sim->world->_entity_count, "World entity count");
+    DEBUG_VALUE(sim->world->DEBUG_id_list_entries_allocated, "Unused id list entries");
     
     return sim;
 }

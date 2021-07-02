@@ -24,7 +24,11 @@ void game_update_and_render(Game *game) {
     FRAME_MARKER();
     DEBUG_begin_frame(game->debug_state);
     
-    DEBUG_SWITCH(&game->game_state.show_grid);
+    DEBUG_SWITCH(&game->game_state.show_grid, "Show grid");
+    DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 10, "Frame arena size");
+    DEBUG_VALUE(game->game_state.arena.peak_size >> 10, "Game arena size");
+    DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
+    DEBUG_VALUE(game->assets.arena.peak_size >> 10, "Assets arena size");
     
     Input *os_input = update_input(game->os);
     InputManager input_ = create_input_manager(os_input);

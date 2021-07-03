@@ -174,9 +174,12 @@ struct DebugValue {
     DebugValue *next;
 };  
 
+#define DEBUG_VALUE_BLOCK_MAX_DEPTH 8
+
 struct DebugValueBlock {
     const char *name;
     DebugValue *first_value;
+    DebugValueBlock *first_child;
     DebugValueBlock *next;
 };
 
@@ -194,10 +197,10 @@ struct DebugState {
     
     u64 debug_values_allocated;
     DebugValue *first_free_value;
-    DebugValue *first_value;
+    // DebugValue *first_value;
     u64 value_blocks_allocated;
     DebugValueBlock *first_free_value_block;
-    DebugValueBlock *first_value_block;
+    DebugValueBlock *global_value_block;
     
     u64 total_frame_count;
     

@@ -13,6 +13,9 @@ static DebugValueBlock *get_value_block(DebugState *debug_state) {
         ++debug_state->value_blocks_allocated;
         block = alloc_struct(&debug_state->arena, DebugValueBlock);
     }
+    block->first_child = 0;
+    block->first_value = 0;
+    block->next = 0;
     return block;
 }
 
@@ -30,10 +33,13 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
         
         DebugFrame *collation_frame = debug_state->frames + debug_state->frame_index;
         DebugOpenBlock *current_open_block = 0;
-        DebugValueBlock *current_value_block = 0;
+        DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
+        u32 current_value_block_stack_index = 0;
+        value_block_stack[0] = debug_state->global_value_block = get_value_block(debug_state);
+        value_block_stack[0]->name = "Values";
+        
         for (u32 event_index = 0; event_index < debug_table->event_counts[event_array_index]; ++event_index) {
             DebugEvent *event = debug_table->events[event_array_index] + event_index;
-            
             switch (event->type) {
                 case DEBUG_EVENT_FRAME_MARKER: {
                     collation_frame->end_clock = event->clock;
@@ -109,13 +115,8 @@ case DEBUG_EVENT_VALUE_##_type: {                               \
     value->value_kind = DEBUG_VALUE_##_type;                    \
     value->value_##_type = event->value_##_type;                \
     value->name = event->name;                                  \
-    if (!current_value_block) {                                 \
-        value->next = debug_state->first_value;                 \
-        debug_state->first_value = value;                       \
-    } else {                                                    \
-        value->next = current_value_block->first_value;         \
-        current_value_block->first_value = value;               \
-    }                                                           \
+    value->next = value_block_stack[current_value_block_stack_index]->first_value; \
+    value_block_stack[current_value_block_stack_index]->first_value = value; \
 } break;
 DEBUG_EVENT_VALUE_DEF(u64)
 DEBUG_EVENT_VALUE_DEF(f32)
@@ -133,26 +134,20 @@ DEBUG_EVENT_VALUE_DEF(Vec2i)
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
                     value->value_switch = event->value_switch;               
                     value->name = event->name;                                 
-                    if (!current_value_block) {
-                        value->next = debug_state->first_value;                    
-                        debug_state->first_value = value;                          
-                    } else {
-                        value->next = current_value_block->first_value;
-                        current_value_block->first_value = value;
-                    }
+                    value->next = value_block_stack[current_value_block_stack_index]->first_value;
+                    value_block_stack[current_value_block_stack_index]->first_value = value;
                 } break; 
                 case DEBUG_EVENT_BEGIN_VALUE_BLOCK: {
-                    assert(!current_value_block);
                     DebugValueBlock *block = get_value_block(debug_state);
                     block->name = event->name;
-                    block->next = debug_state->first_value_block;
-                    debug_state->first_value_block = block;
-                    
-                    current_value_block = block;
+                    block->next = value_block_stack[current_value_block_stack_index]->first_child;
+                    value_block_stack[current_value_block_stack_index]->first_child = block;
+                    assert(current_value_block_stack_index + 1 < DEBUG_VALUE_BLOCK_MAX_DEPTH);
+                    value_block_stack[++current_value_block_stack_index] = block;
                 } break;
                 case DEBUG_EVENT_END_VALUE_BLOCK: {
-                    assert(current_value_block);
-                    current_value_block = 0;
+                    assert(current_value_block_stack_index);
+                    --current_value_block_stack_index;
                 } break;
                 INVALID_DEFAULT_CASE;
             }
@@ -167,6 +162,59 @@ static int records_sort(void *ctx, const void *a, const void *b) {
     u32 index_a = *(u32 *)a;
     u32 index_b = *(u32 *)b;
     return frame->records[index_a].total_clocks < frame->records[index_b].total_clocks ? 1 : -1;
+}
+
+static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
+    DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
+    u32 current_value_block_stack_index = 0;
+    value_block_stack[0] = debug_state->global_value_block;
+    for (;;) {
+        while (!value_block_stack[current_value_block_stack_index] && current_value_block_stack_index) {
+            dev_ui_end_section(dev_ui);
+            --current_value_block_stack_index;
+        }
+        if (!current_value_block_stack_index && !value_block_stack[current_value_block_stack_index]) {
+            break;
+        }
+        DebugValueBlock *block = value_block_stack[current_value_block_stack_index];
+        value_block_stack[current_value_block_stack_index] = block->next;
+        
+        if (dev_ui_section(dev_ui, block->name)) {
+            for (DebugValue *value = block->first_value;
+                value;
+                value = value->next) {
+                char buffer[64];
+                switch (value->value_kind) {
+                    case DEBUG_VALUE_f32: {
+                        snprintf(buffer, sizeof(buffer), "%s: %.2f", value->name, value->value_f32);
+                    } break;
+                    case DEBUG_VALUE_u64: {
+                        snprintf(buffer, sizeof(buffer), "%s: %llu", value->name, value->value_u64);
+                    } break;
+                    case DEBUG_VALUE_Vec2: {
+                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f)", value->name, value->value_Vec2.x, value->value_Vec2.y);
+                    } break;
+                    case DEBUG_VALUE_Vec2i: {
+                        snprintf(buffer, sizeof(buffer), "%s: (%d %d)", value->name, value->value_Vec2i.x, value->value_Vec2i.y);
+                    } break;
+                    case DEBUG_VALUE_Vec3: {
+                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f %.2f)",value->name, value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
+                    } break;
+                    case DEBUG_VALUE_SWITCH: {
+                        snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
+                    } break;
+                }
+                
+                if (value->value_kind == DEBUG_VALUE_SWITCH) {
+                    dev_ui_checkbox(dev_ui, buffer, value->value_switch);
+                } else {
+                    dev_ui_labelf(dev_ui, buffer);
+                }
+            }
+        
+            value_block_stack[++current_value_block_stack_index] = block->first_child;
+        }
+    }
 }
 
 void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
@@ -192,86 +240,7 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
         setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     if (debug_state->dev_mode == DEV_MODE_INFO) {
         dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
-        if (dev_ui_section(&dev_ui, "Variables")) {
-            for (DebugValueBlock *block = debug_state->first_value_block;
-                 block;
-                 block = block->next) {
-                if (dev_ui_section(&dev_ui, block->name)) {
-                    for (DebugValue *value = block->first_value;
-                        value;
-                        value = value->next) {
-                        char buffer[64];
-                        switch (value->value_kind) {
-                            case DEBUG_VALUE_f32: {
-                                snprintf(buffer, sizeof(buffer), "%.2f", value->value_f32);
-                            } break;
-                            case DEBUG_VALUE_u64: {
-                                snprintf(buffer, sizeof(buffer), "%llu", value->value_u64);
-                            } break;
-                            case DEBUG_VALUE_Vec2: {
-                                snprintf(buffer, sizeof(buffer), "(%.2f %.2f)", value->value_Vec2.x, value->value_Vec2.y);
-                            } break;
-                            case DEBUG_VALUE_Vec2i: {
-                                snprintf(buffer, sizeof(buffer), "(%d %d)", value->value_Vec2i.x, value->value_Vec2i.y);
-                            } break;
-                            case DEBUG_VALUE_Vec3: {
-                                snprintf(buffer, sizeof(buffer), "(%.2f %.2f %.2f)", value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
-                            } break;
-                            case DEBUG_VALUE_SWITCH: {
-                                snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
-                            } break;
-                        }
-                        
-                        if (value->value_kind == DEBUG_VALUE_SWITCH) {
-                            dev_ui_checkbox(&dev_ui, buffer, value->value_switch);
-                        } else {
-                            dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
-                        }
-                    }
-                    dev_ui_end_section(&dev_ui);
-                }            
-            }
-            for (DebugValue *value = debug_state->first_value;
-                value;
-                value = value->next) {
-                char buffer[64];
-                switch (value->value_kind) {
-                    case DEBUG_VALUE_f32: {
-                        snprintf(buffer, sizeof(buffer), "%.2f", value->value_f32);
-                    } break;
-                    case DEBUG_VALUE_u64: {
-                        snprintf(buffer, sizeof(buffer), "%llu", value->value_u64);
-                    } break;
-                    case DEBUG_VALUE_Vec2: {
-                        snprintf(buffer, sizeof(buffer), "(%.2f %.2f)", value->value_Vec2.x, value->value_Vec2.y);
-                    } break;
-                    case DEBUG_VALUE_Vec2i: {
-                        snprintf(buffer, sizeof(buffer), "(%d %d)", value->value_Vec2i.x, value->value_Vec2i.y);
-                    } break;
-                    case DEBUG_VALUE_Vec3: {
-                        snprintf(buffer, sizeof(buffer), "(%.2f %.2f %.2f)", value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
-                    } break;
-                    case DEBUG_VALUE_SWITCH: {
-                        snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
-                    } break;
-                }
-                
-                if (value->value_kind == DEBUG_VALUE_SWITCH) {
-                    dev_ui_checkbox(&dev_ui, buffer, value->value_switch);
-                } else {
-                    dev_ui_labelf(&dev_ui, "%s: %s", value->name, buffer);
-                }
-            }
-            dev_ui_end_section(&dev_ui);
-        }
-        const char *INPUT_ACCESS_NAMES[] = {
-            "NO_LOCK", 
-            "GAME_INTERFACE",  
-            "GAME_MENU",  
-            "DEV_UI",  
-            "ALL",  
-        };
-        dev_ui_labelf(&dev_ui, "Input lock: %s", INPUT_ACCESS_NAMES[input->access_token]);
+        display_values(&dev_ui, debug_state);
     } else if (debug_state->dev_mode == DEV_MODE_PROFILER) {
         DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
         // DebugFrame *frame = game->debug_state->frames;
@@ -313,45 +282,35 @@ void DEBUG_frame_end(DebugState *debug_state) {
     u32 event_array_index = event_array_index_event_index >> 32;
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
-    
-    for (DebugValue *value = debug_state->first_value;
-         value;
-         ) {
-        if (!value->next) {
-            value->next = debug_state->first_free_value;
-            break; 
-        } else {
-            value = value->next;
+    // Free values and value blocks
+    DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
+    u32 current_value_block_stack_index = 0;
+    value_block_stack[0] = debug_state->global_value_block;
+    for (;;) {
+        while (!value_block_stack[current_value_block_stack_index] && current_value_block_stack_index) {
+            --current_value_block_stack_index;
         }
-    }
-    debug_state->first_free_value = debug_state->first_value;
-    debug_state->first_value = 0;
-    
-    for (DebugValueBlock *block = debug_state->first_value_block;
-         block;
-         ) {
+        if (!current_value_block_stack_index && !value_block_stack[current_value_block_stack_index]) {
+            break;
+        }
+        DebugValueBlock *block = value_block_stack[current_value_block_stack_index];
+        value_block_stack[current_value_block_stack_index] = block->next;
+        block->next = debug_state->first_free_value_block;
+        debug_state->first_free_value_block = block;
+        
         for (DebugValue *value = block->first_value;
             value;
             ) {
-            if (!value->next) {
-                value->next = debug_state->first_free_value;
-                break; 
-            } else {
+            if (value->next) {
                 value = value->next;
+            } else {
+                value->next = debug_state->first_free_value;
+                break;
             }
         }
         debug_state->first_free_value = block->first_value;
-        block->first_value = 0;
-
-        if (!block->next) {
-            block->next = debug_state->first_free_value_block;
-            break; 
-        } else {
-            block = block->next;
-        }
+        value_block_stack[++current_value_block_stack_index] = block->first_child;
     }
-    debug_state->first_free_value_block = debug_state->first_value_block;
-    debug_state->first_value_block = 0;
     
     if (!debug_state->is_paused) {
         debug_collate_events(debug_state, debug_table->current_event_array_index);

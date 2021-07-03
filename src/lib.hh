@@ -209,7 +209,7 @@ T Max(T a, T b) {
 
 template <typename T>
 T Min(T a, T b) {
-    return a > b ? a : b;
+    return a < b ? a : b;
 }
 
 inline f32 rsqrt(f32 a) {
@@ -1167,6 +1167,56 @@ inline bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, 
         return true;
     }
     return false;
+}
+
+struct SortEntry {
+    f32 sort_key;
+    u64 sort_index;
+};
+
+// Turn floating-point key to strictly ascending u32 value
+inline u32 sort_key_to_u32(f32 sort_key) {
+#if 1
+    u32 result = *(u32 *)&sort_key;
+    if (result & 0x80000000) {
+        result = ~result;
+    } else {
+        result |= 0x80000000;
+    }
+#else 
+    u32 result = (u32)sort_key;
+#endif 
+    return result;
+}
+
+void radix_sort(SortEntry *sort_a, SortEntry *sort_b, size_t count) {
+    SortEntry *src = sort_a;
+    SortEntry *dst = sort_b;
+    for (u32 byte_idx = 0; byte_idx < 32; byte_idx += 8) {
+        u32 sort_key_offsets[256] = {};
+        for (u32 i = 0; i < count; ++i) {
+            u32 radix_value = sort_key_to_u32(src[i].sort_key);
+            u32 radix_piece = (radix_value >> byte_idx) & 0xFF;
+            ++sort_key_offsets[radix_piece];
+        }
+        
+        u32 total = 0;
+        for (u32 sort_key_idx = 0; sort_key_idx < ARRAY_SIZE(sort_key_offsets); ++sort_key_idx) {
+            u32 count = sort_key_offsets[sort_key_idx];
+            sort_key_offsets[sort_key_idx] = total;
+            total += count;
+        }
+        
+        for (u32 i = 0; i < count; ++i) {
+            u32 radix_value = sort_key_to_u32(src[i].sort_key);
+            u32 radix_piece = (radix_value >> byte_idx) & 0xFF;
+            dst[sort_key_offsets[radix_piece]++] = src[i];
+        }
+        
+        SortEntry *temp = dst;
+        dst = src;
+        src = temp;
+    }
 }
 
 #define LIB_HH 1

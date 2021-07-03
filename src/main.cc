@@ -3,6 +3,7 @@
 int main() {
     logger_init();
     logprintln("App", "start");
+    
     Game game = {};
     game_init(&game);
     while (game.is_running) {

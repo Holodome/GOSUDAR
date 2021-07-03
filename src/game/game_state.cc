@@ -537,20 +537,21 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     BEGIN_BLOCK("ZSORT");
     TempMemory zsort = temp_memory_begin(&game_state->frame_arena);
     size_t max_drawable_count = sim->entity_count;
-    size_t drawable_entity_storage_index_count = 0;
-    size_t *drawable_entity_storage_indexs = alloc_arr(&game_state->frame_arena, max_drawable_count, size_t);
+    SortEntry *sort_a = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
+    SortEntry *sort_b = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
+    size_t drawable_count = 0;
     for (EntityIterator iter = iterate_all_entities(sim);
          is_valid(&iter);
-         advance(&iter)) {
-        drawable_entity_storage_indexs[drawable_entity_storage_index_count++] = iter.idx;
+         advance(&iter), ++drawable_count) {
+        SimEntity *ent = iter.ptr;
+        sort_a[drawable_count].sort_key = dot(sim->cam_mvp.get_z(), xz(ent->p) - sim->cam_p);
+        sort_a[drawable_count].sort_index = iter.idx;
     }
-    
-    // Sort by distance to camera
-    qsort_s(drawable_entity_storage_indexs, drawable_entity_storage_index_count, sizeof(*drawable_entity_storage_indexs), z_camera_sort, sim);
+    radix_sort(sort_a, sort_b, drawable_count);
     END_BLOCK();
     BEGIN_BLOCK("Render billboards");
-    for (size_t drawable_idx = 0; drawable_idx < drawable_entity_storage_index_count; ++drawable_idx) {
-        SimEntity *entity = &sim->entities[drawable_entity_storage_indexs[drawable_idx]];
+    for (size_t drawable_idx = 0; drawable_idx < drawable_count; ++drawable_idx) {
+        SimEntity *entity = &sim->entities[sort_a[drawable_count - drawable_idx - 1].sort_index];
         AssetID texture_id;
         Vec2 size;
         get_sprite_settings_for_entity(entity, &texture_id, &size);

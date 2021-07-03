@@ -80,7 +80,6 @@ extern DebugTable *debug_table;
 #define BEGIN_BLOCK(name) BEGIN_BLOCK_(DEBUG_NAME(), name)
 #define END_BLOCK_(debug_name, name) RECORD_DEBUG_EVENT(DEBUG_EVENT_END_BLOCK, debug_name, name)
 #define END_BLOCK() END_BLOCK_(DEBUG_NAME(), "#END_BLOCK")
-// @NOTE(hl): Cast to  char * beacuse clang has trobules with implicit cast from const char [] to char *
 #define TIMED_FUNCTION() TIMED_BLOCK((const char *)__FUNCTION__)
 
 #define FRAME_MARKER() RECORD_DEBUG_EVENT(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
@@ -97,8 +96,22 @@ DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
-#define DEBUG_BEGIN_VALUE_BLOCK(_name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_VALUE_BLOCK, DEBUG_NAME(), _name)
+#define DEBUG_BEGIN_VALUE_BLOCK_(_debug_name, _name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_VALUE_BLOCK, _debug_name, _name)
+#define DEBUG_BEGIN_VALUE_BLOCK(_name) DEBUG_BEGIN_VALUE_BLOCK_(DEBUG_NAME(), _name)
 #define DEBUG_END_VALUE_BLOCK()   RECORD_DEBUG_EVENT(DEBUG_EVENT_END_VALUE_BLOCK, DEBUG_NAME(), "#END_VALUE_BLOCK")
+#define DEBUG_VALUE_BLOCK__(_debug_name, _name, _number) DebugValueBlockHelper __value_block__##_number(_debug_name, _name);
+#define DEBUG_VALUE_BLOCK_(_debug_name, _name, _number) DEBUG_VALUE_BLOCK__(_debug_name, _name, _number)
+#define DEBUG_VALUE_BLOCK(_name) DEBUG_VALUE_BLOCK_(DEBUG_NAME(), _name, __LINE__)
+
+struct DebugValueBlockHelper {
+    DebugValueBlockHelper(const char *debug_name, const char *name) {
+        DEBUG_BEGIN_VALUE_BLOCK_(debug_name, name);
+    }
+    
+    ~DebugValueBlockHelper() {
+        DEBUG_END_VALUE_BLOCK();
+    }
+};
 
 // This is a way of wrapping timed block into a struct, so we don't have to create it and destroy manually.
 // when struct is created, construct is called - block is started

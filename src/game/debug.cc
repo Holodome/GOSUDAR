@@ -157,13 +157,6 @@ DEBUG_EVENT_VALUE_DEF(Vec2i)
     debug_state->frames[debug_state->frame_index].collation_clocks = collation_end_clock - collation_start_clock;
 }
 
-static int records_sort(void *ctx, const void *a, const void *b) {
-    DebugFrame *frame = (DebugFrame *)ctx;
-    u32 index_a = *(u32 *)a;
-    u32 index_b = *(u32 *)b;
-    return frame->records[index_a].total_clocks < frame->records[index_b].total_clocks ? 1 : -1;
-}
-
 static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
     DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
     u32 current_value_block_stack_index = 0;
@@ -243,20 +236,20 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
         display_values(&dev_ui, debug_state);
     } else if (debug_state->dev_mode == DEV_MODE_PROFILER) {
         DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
-        // DebugFrame *frame = game->debug_state->frames;
         f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
         u64 record_count = frame->records_count;
         TempMemory records_sort_temp = temp_memory_begin(&debug_state->arena);
-        u32 *records_sorted = alloc_arr(&debug_state->arena, record_count, u32);
+        SortEntry *sort_a = alloc_arr(&debug_state->arena, record_count, SortEntry);
+        SortEntry *sort_b = alloc_arr(&debug_state->arena, record_count, SortEntry);
         for (size_t i = 0; i < record_count; ++i) {
-            records_sorted[i] = i;
+            sort_a[i].sort_key = frame->records[i].total_clocks;
+            sort_a[i].sort_index = i;
         }
-        
-        qsort_s(records_sorted, record_count, sizeof(*records_sorted), records_sort, frame);
+        radix_sort(sort_a, sort_b, record_count);
         dev_ui_labelf(&dev_ui, "Frame %llu", debug_state->total_frame_count);    
         dev_ui_labelf(&dev_ui, "Collation: %.2f%%", (f32)frame->collation_clocks / frame_time * 100);    
         for (size_t i = 0; i < min(frame->records_count, 20); ++i) {
-            DebugRecord *record = frame->records + records_sorted[i];
+            DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
             dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                 record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
         }
@@ -278,11 +271,12 @@ void DEBUG_frame_end(DebugState *debug_state) {
     }
     
     u64 event_array_index_event_index = _InterlockedExchange64((volatile i64 *)&debug_table->event_array_index_event_index,
-                                                             (i64)debug_table->current_event_array_index << 32);
+                                                            (i64)debug_table->current_event_array_index << 32);
     u32 event_array_index = event_array_index_event_index >> 32;
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
-    // Free values and value blocks
+    
+     // Free values and value blocks
     DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
     u32 current_value_block_stack_index = 0;
     value_block_stack[0] = debug_state->global_value_block;
@@ -311,11 +305,11 @@ void DEBUG_frame_end(DebugState *debug_state) {
         debug_state->first_free_value = block->first_value;
         value_block_stack[++current_value_block_stack_index] = block->first_child;
     }
+    debug_state->global_value_block = 0;
     
     if (!debug_state->is_paused) {
         debug_collate_events(debug_state, debug_table->current_event_array_index);
     }
-    
 }
 
 DebugState *DEBUG_init() {

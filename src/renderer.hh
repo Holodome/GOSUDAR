@@ -14,9 +14,6 @@ extern _type _name;
 // and converting from world plane position to renderer position requires setting 3d.z = 2d.y
 // @TODO may be its better to set world up as {0, 0, 1}?
 
-// @TODO clean
-typedef u32 AssetID;
-#define INVALID_ASSET_ID ((AssetID)-1)
 // Just for fun, see if we can use u16 for indices effectively
 #define RENDERER_INDEX_TYPE u16
 #define RENDERER_MAX_INDEX  VARIABLE_MAX_VALUE(RENDERER_INDEX_TYPE)
@@ -43,7 +40,7 @@ struct Texture {
     u16 height;
 };  
 
-static Texture INVALID_TEXTURE = { INVALID_ASSET_ID, 0, 0 };
+static Texture INVALID_TEXTURE = { (u32)-1, 0, 0 };
 
 enum {
     RENDERER_COMMAND_NONE,
@@ -90,6 +87,8 @@ struct RendererCommands {
     RENDERER_INDEX_TYPE *indices;
     
     RenderQuads *last_quads;
+    
+    Texture white_texture;
 };
 
 #define RENDERER_TEXTURE_DIM   512
@@ -120,33 +119,7 @@ struct Renderer {
 void renderer_init(Renderer *renderer);
 RendererCommands * renderer_begin_frame(Renderer *renderer, Vec2 winsize, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
-Texture renderer_create_texture(Renderer *renderer, void *data, Vec2i size);
-
-// Render group is public interface for rendering.
-// It is repsonsible for drawing with making sure renderer gets correct information about 
-// additional settings, like camera transform.
-// So multiple render groups can use different camera transforms, but calls to every one of them is 
-// guaranteed to produce correct result in the end
-struct RenderGroup {
-    RendererCommands *commands;
-    struct Assets *assets;
-    RendererSetup setup;  
-};
-
-RenderGroup render_group_begin(struct RendererCommands *commands, Assets *assets, RendererSetup setup);
-void render_group_end(RenderGroup *group);
-void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-    Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
-    Vec2 uv00 = Vec2(0, 0), Vec2 uv01 = Vec2(0, 1), Vec2 uv10 = Vec2(1, 0), Vec2 uv11 = Vec2(1, 1),
-    Texture texture = INVALID_TEXTURE);
-void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-    Vec4 c = WHITE, AssetID texture_id = INVALID_ASSET_ID);
-void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id);
-void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), AssetID texture_id = INVALID_ASSET_ID);
-void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color = WHITE, f32 thickness = 1.0f);
-void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color = WHITE, f32 thickness = 1.0f);
-void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color = WHITE, f32 thickness = 1.0f);
-void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale);
+Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, Vec2i size);
 
 #define RENDERER_H 1
 #endif

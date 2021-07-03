@@ -2,6 +2,7 @@
 
 #include "lib.hh"
 #include "game/world.hh"
+#include "assets.hh"
 
 enum {
     PLAYER_INTERACTION_KIND_NONE,

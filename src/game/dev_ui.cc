@@ -16,7 +16,7 @@ static DevUIID id_empty() {
     return {};
 }
 
-static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetID tex_id = Asset_White, Rect uv_rect = Rect(0, 0, 1, 1)) {
+static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetID tex_id = INVALID_ASSET_ID, Rect uv_rect = Rect(0, 0, 1, 1)) {
     DevUIDrawQueueEntry entry = {};
     entry.v[0].p = Vec3(rect.top_left());
     entry.v[0].uv = uv_rect.top_left();
@@ -37,12 +37,11 @@ static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetI
 }
 
 static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color = WHITE) {
-    FontData *font = layout->font;
-    f32 line_height = layout->font_info->height;
-	f32 rwidth  = 1.0f / (f32)font->tex_size.x;
-	f32 rheight = 1.0f / (f32)font->tex_size.y;
+    AssetFont *font = assets_get_font(layout->assets, layout->font_id);
+	f32 rwidth  = 1.0f / (f32)font->texture.width;
+	f32 rheight = 1.0f / (f32)font->texture.height;
 	Vec3 offset = Vec3(p, 0);
-	offset.y += line_height;
+	offset.y += 20;
 	for (const char *scan = text; *scan; ++scan) {
 		u8 symbol = *scan;
 		if ((symbol >= font->first_codepoint)) {
@@ -59,28 +58,11 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 			f32 t2 = glyph->max_y * rheight;
 			f32 char_advance = glyph->x_advance;
 			offset.x += char_advance;
-            push_rect(layout, Rect(x1, y1, x2 - x1, y2 - y1), color, font->texture_id, Rect(s1, t1, s2 - s1, t2 - t1));
+            push_rect(layout, Rect(x1, y1, x2 - x1, y2 - y1), color, layout->font_id, Rect(s1, t1, s2 - s1, t2 - t1));
 		}
 	}    
 }
 
-static Vec2 get_text_size(DevUILayout *layout, const char *text) {
-    AssetInfo *info = layout->font_info;
-    FontData *font = layout->font;
-    
-    size_t count = strlen(text);
-    Vec2 result = {};
-    for (u32 i = 0; i < count; ++i) {
-        u8 codepoint = text[i];
-        if (codepoint >= font->first_codepoint) {
-            FontGlyph *glyph = &font->glyphs[codepoint - font->first_codepoint];
-            // FontGlyph *glyph = &glyphs[first_codepoint];
-            result.x += glyph->x_advance;
-        }
-    }
-    result.y = info->height;
-    return result;
-}
 
 static void element_size(DevUILayout *layout, Vec2 size) {
     layout->p.x += size.x + DEV_UI_HORIZ_PADDING;
@@ -151,12 +133,12 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets) {
     DevUILayout layout = {};
     layout.dev_ui = dev_ui;
     layout.active_id = dev_ui->active_id;
-    layout.temp_mem = temp_memory_begin(&dev_ui->arena);
+    layout.temp_mem = begin_temp_memory(&dev_ui->arena);
     layout.max_draw_queue_entry_count = 4096;
     layout.draw_queue = alloc_arr(&dev_ui->arena, layout.max_draw_queue_entry_count, DevUIDrawQueueEntry);
     layout.input = input;
-    layout.font_info = assets->get_info(Asset_Font);
-    layout.font = assets->get_font(Asset_Font);
+    layout.assets = assets;
+    layout.font_id = get_first_of_type(assets, ASSET_TYPE_FONT);
     return layout;
 }
 
@@ -164,7 +146,8 @@ void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args) {
     char buffer[128];
     vsnprintf(buffer, sizeof(buffer), format, args);
     push_text(layout, layout->p, buffer);
-    element_size(layout, get_text_size(layout, buffer));
+    AssetFont *font = assets_get_font(layout->assets, layout->font_id);
+    element_size(layout, get_text_size(font, buffer));
 }
 
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...) {
@@ -175,7 +158,8 @@ void dev_ui_labelf(DevUILayout *layout, const char *format, ...) {
 }
 
 bool dev_ui_button(DevUILayout *layout, const char *label) {
-    Vec2 text_size = get_text_size(layout, label);
+    AssetFont *font = assets_get_font(layout->assets, layout->font_id);
+    Vec2 text_size = get_text_size(font, label);
     Rect button_rect = Rect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     Vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
@@ -185,7 +169,8 @@ bool dev_ui_button(DevUILayout *layout, const char *label) {
 }
 
 bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
-    Vec2 text_size = get_text_size(layout, label);
+    AssetFont *font = assets_get_font(layout->assets, layout->font_id);
+    Vec2 text_size = get_text_size(font, label);
     Rect button_rect = Rect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     if (bstate.is_pressed) {
@@ -227,7 +212,8 @@ static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
 }
 
 bool dev_ui_section(DevUILayout *layout, const char *label) {
-    Vec2 text_size = get_text_size(layout, label);
+    AssetFont *font = assets_get_font(layout->assets, layout->font_id);
+    Vec2 text_size = get_text_size(font, label);
     Rect button_rect = Rect(layout->p, text_size);
     DevUIID id = id_from_cstr(label);
     ButtonState bstate = update_button(layout, button_rect, id);
@@ -253,13 +239,13 @@ void dev_ui_end_section(DevUILayout *layout) {
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
     for (size_t i = 0; i < layout->draw_queue_entry_count; ++i) {
         DevUIDrawQueueEntry *entry = layout->draw_queue + i;
-        Texture tex = render_group->assets->get_tex(entry->texture);
+        Texture tex = *assets_get_texture(render_group->assets, entry->texture);
         push_quad(render_group, entry->v[0].p, entry->v[1].p, entry->v[2].p, entry->v[3].p, 
             entry->v[0].c, entry->v[1].c, entry->v[2].c, entry->v[3].c, 
             entry->v[0].uv, entry->v[1].uv, entry->v[2].uv, entry->v[3].uv,
             tex);
     }
-    temp_memory_end(layout->temp_mem);
+    end_temp_memory(layout->temp_mem);
     layout->dev_ui->active_id = layout->active_id;
     
     if (!layout->is_focused && layout->input->access_token == INPUT_ACCESS_TOKEN_DEV_UI) {
@@ -267,3 +253,9 @@ void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
     }
 }
 
+void dev_ui_begin_sizable(DevUILayout *layout) {
+    
+}
+void dev_ui_end_sizable(DevUILayout *layout) {
+    
+}

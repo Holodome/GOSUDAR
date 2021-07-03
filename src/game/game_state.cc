@@ -426,16 +426,22 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
     }
 }
 
-static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, Vec2 *size_dest) {
+static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, AssetID *id_dest, Vec2 *size_dest) {
     AssetID texture_id = INVALID_ASSET_ID;
     Vec2 size = Vec2(0, 0);
     switch(entity->kind) {
         case ENTITY_KIND_PLAYER: {
-            texture_id = Asset_Dude;
+            texture_id = get_first_of_type(assets, ASSET_TYPE_PLAYER);
             size = Vec2(0.5f);
         } break;
         case ENTITY_KIND_WORLD_OBJECT: {
             size = Vec2(0.5f);
+            AssetTagList tags = {};
+            AssetTagList weights = {};
+            tags.tags[ASSET_TAG_BIOME] = entity->world_object_kind;
+            weights.tags[ASSET_TAG_BIOME] = 1.0f;
+            texture_id = get_closest_asset_match(assets, ASSET_TYPE_TREE, &weights, &tags);
+#if 0
             switch(entity->world_object_kind) {
                 case WORLD_OBJECT_KIND_TREE_FOREST: {
                     texture_id = Asset_TreeForest;
@@ -463,6 +469,7 @@ static void get_sprite_settings_for_entity(SimEntity *entity, AssetID *id_dest, 
                 } break;
                 INVALID_DEFAULT_CASE;
             }
+#endif 
         } break;
         INVALID_DEFAULT_CASE;
     }
@@ -476,7 +483,6 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     SimRegion *sim = frame->sim;
     RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(frame->view, frame->projection));
     // Draw ground
-    BEGIN_BLOCK("Render_ground");
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
         for (i32 chunk_y = sim->min_chunk.y; chunk_y <= sim->max_chunk.y; ++chunk_y) {
             if (chunk_x < game_state->min_chunk.x || chunk_x > game_state->max_chunk.x || 
@@ -488,14 +494,12 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
                     Vec2i tile_pos = (Vec2i(chunk_x, chunk_y) - sim->min_chunk) * TILES_IN_CHUNK + Vec2i(tile_x, tile_y);
                     Vec3 tile_v[4];
                     get_ground_tile_positions(tile_pos, tile_v);
-                    push_quad(&world_render_group, tile_v, Asset_Grass);
+                    push_quad(&world_render_group, tile_v, get_first_of_type(assets, ASSET_TYPE_GRASS));
                 }
             }
         }
     }
-    END_BLOCK();
     // Draw grid near mouse cursor
-    BEGIN_BLOCK("Show grid");
     if (game_state->show_grid) {
         Vec2 mouse_cell_pos = floor_to_cell(frame->mouse_projection);
 #define MOUSE_CELL_RAD 5
@@ -519,7 +523,6 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
             }
         }
     }
-    END_BLOCK();
     // Highlight selected entity    
     if (is_not_null(game_state->interactable)) {
         SimEntity *interactable = get_entity_by_id(sim, game_state->interactable);
@@ -531,11 +534,10 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         v[1] = xz(entity_p + Vec2(-half_size.x, half_size.y),  10 * WORLD_EPSILON);
         v[2] = xz(entity_p + Vec2(half_size.x, -half_size.y),  10 * WORLD_EPSILON);
         v[3] = xz(entity_p + Vec2(half_size.x, half_size.y),   10 * WORLD_EPSILON);
-        push_quad(&world_render_group, v, Asset_SelectCircle);
+        push_quad(&world_render_group, v, get_first_of_type(assets, ASSET_TYPE_ADDITIONAL));
     }
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
-    BEGIN_BLOCK("ZSORT");
-    TempMemory zsort = temp_memory_begin(&game_state->frame_arena);
+    TempMemory zsort = begin_temp_memory(&game_state->frame_arena);
     size_t max_drawable_count = sim->entity_count;
     SortEntry *sort_a = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
     SortEntry *sort_b = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
@@ -548,13 +550,11 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         sort_a[drawable_count].sort_index = iter.idx;
     }
     radix_sort(sort_a, sort_b, drawable_count);
-    END_BLOCK();
-    BEGIN_BLOCK("Render billboards");
     for (size_t drawable_idx = 0; drawable_idx < drawable_count; ++drawable_idx) {
         SimEntity *entity = &sim->entities[sort_a[drawable_count - drawable_idx - 1].sort_index];
         AssetID texture_id;
         Vec2 size;
-        get_sprite_settings_for_entity(entity, &texture_id, &size);
+        get_sprite_settings_for_entity(assets, entity, &texture_id, &size);
         Vec3 billboard[4];
         Vec3 pos = Vec3(entity->p.x, 0, entity->p.y);
         Vec4 color = WHITE;
@@ -562,9 +562,8 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
             color.a = 0.5f;
         }
         get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), size.x, size.y, billboard);
-        push_quad(&world_render_group, billboard, color, texture_id);
+        push_quad(&world_render_group, billboard[0], billboard[1], billboard[2], billboard[3], color, texture_id);
     }
-    END_BLOCK();
     
     render_group_end(&world_render_group); 
 }
@@ -605,7 +604,6 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     DEBUG_VALUE(player->world_pos.offset, "Chunk offset");
     DEBUG_VALUE(player->world_pos.chunk, "Chunk coord");
 }
-
 
 WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object_kind) {
     assert(world_object_kind);

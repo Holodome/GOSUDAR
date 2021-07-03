@@ -8,7 +8,7 @@
 #endif 
 #include <windows.h>
 
-#include "framework/renderer.hh"
+#include "renderer.hh"
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
 

@@ -2,8 +2,8 @@
 
 #include "lib.hh"
 
-#include "framework/renderer.hh"
-#include "framework/assets.hh"
+#include "renderer.hh"
+#include "render_group.hh"
 
 struct DevUIID {
     u32 v;
@@ -31,8 +31,8 @@ struct DevUILayout {
     TempMemory temp_mem;
     DevUI *dev_ui;
     struct InputManager *input;
-    AssetInfo *font_info;
-    FontData *font;
+    struct Assets *assets;
+    AssetID font_id;
     
     size_t max_draw_queue_entry_count;
     size_t draw_queue_entry_count;
@@ -48,7 +48,7 @@ struct DevUILayout {
     Vec2 last_line_p;
 };  
 
-DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input, Assets *assets);
+DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input, struct Assets *assets);
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout, const char *label);
@@ -57,6 +57,8 @@ bool dev_ui_section(DevUILayout *layout, const char *name);
 void dev_ui_end_section(DevUILayout *layout);
 void dev_ui_last_line(DevUILayout *layout);
 void dev_ui_end(DevUILayout *layout, RenderGroup *render_group);
+void dev_ui_begin_sizable(DevUILayout *layout);
+void dev_ui_end_sizable(DevUILayout *layout);
 
 #define DEVUI_HH 1
 #endif

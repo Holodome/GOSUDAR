@@ -126,7 +126,7 @@ struct TempMemory {
     u64 last_data_size;
 };
 
-inline TempMemory temp_memory_begin(MemoryArena *arena) {
+inline TempMemory begin_temp_memory(MemoryArena *arena) {
     ++arena->temp_count;
     TempMemory result;
     result.arena = arena;
@@ -135,7 +135,7 @@ inline TempMemory temp_memory_begin(MemoryArena *arena) {
     return result;
 }
 
-inline void temp_memory_end(TempMemory mem) {
+inline void end_temp_memory(TempMemory mem) {
     assert(mem.arena->temp_count);
     --mem.arena->temp_count;
     mem.arena->data_size = mem.data_size;
@@ -1159,7 +1159,7 @@ inline u32 rgba_pack_4x8_linear1(Vec4 c) {
     return rgba_pack_linear256(ru, gu, bu, au);
 }
 
-inline bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, f32 *t_out) {
+bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, f32 *t_out) {
     f32 denom = dot(plane_normal, d);
     if (fabs(denom) > 0.001f) {
         f32 t = (-plane_d - dot(plane_normal, o)) / denom;
@@ -1218,6 +1218,12 @@ void radix_sort(SortEntry *sort_a, SortEntry *sort_b, size_t count) {
         src = temp;
     }
 }
+
+struct AssetID {
+    u32 value;
+};
+
+#define INVALID_ASSET_ID (AssetID {(u32)-1} )
 
 #define LIB_HH 1
 #endif

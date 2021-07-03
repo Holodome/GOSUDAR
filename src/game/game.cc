@@ -8,16 +8,11 @@ void game_init(Game *game) {
     init_renderer_backend(game->os);
     renderer_init(&game->renderer);
     
-    size_t assets_arena_size = MEGABYTES(256);
-    arena_init(&game->assets.arena, os_alloc(assets_arena_size), assets_arena_size);
-    game->assets.renderer = &game->renderer;
-    game->assets.init();
+    game->assets = assets_init(&game->renderer);
     game_state_init(&game->game_state);
 }
 
 void game_cleanup(Game *game) {
-    logprintln("Game", "Cleanup");
-    game->assets.cleanup();
 }
 
 void game_update_and_render(Game *game) {
@@ -31,11 +26,11 @@ void game_update_and_render(Game *game) {
         DEBUG_VALUE(game->debug_state->debug_values_allocated, "Values allocated");
     }
     {DEBUG_VALUE_BLOCK("Memory")
-        DEBUG_VALUE(game->debug_state->arena.peak_size >> 20, "Debug arena size");
-        DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 20, "Frame arena size");
-        DEBUG_VALUE(game->game_state.arena.peak_size >> 20, "Game arena size");
-        DEBUG_VALUE(game->renderer.arena.peak_size >> 20, "Renderer arena size");
-        DEBUG_VALUE(game->assets.arena.peak_size >> 20, "Assets arena size");
+        DEBUG_VALUE(game->debug_state->arena.peak_size >> 10, "Debug arena size");
+        DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 10, "Frame arena size");
+        DEBUG_VALUE(game->game_state.arena.peak_size >> 10, "Game arena size");
+        DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
+        DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
     }
     
     Input *os_input = update_input(game->os);
@@ -46,8 +41,8 @@ void game_update_and_render(Game *game) {
     }    
     
     RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(input), Vec4(0.2));
-    DEBUG_update(game->debug_state, input, commands, &game->assets);
-    update_and_render(&game->game_state, input, commands, &game->assets);
+    DEBUG_update(game->debug_state, input, commands, game->assets);
+    update_and_render(&game->game_state, input, commands, game->assets);
     renderer_end_frame(&game->renderer);
     update_window(game->os);
     DEBUG_frame_end(game->debug_state);

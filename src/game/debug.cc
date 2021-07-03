@@ -20,7 +20,37 @@ static DebugValueBlock *get_value_block(DebugState *debug_state) {
 }
 
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
-    u64 collation_start_clock = __rdtsc();
+    // Free values and value blocks
+    DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
+    u32 current_value_block_stack_index = 0;
+    value_block_stack[0] = debug_state->global_value_block;
+    for (;;) {
+        while (!value_block_stack[current_value_block_stack_index] && current_value_block_stack_index) {
+            --current_value_block_stack_index;
+        }
+        if (!current_value_block_stack_index && !value_block_stack[current_value_block_stack_index]) {
+            break;
+        }
+        DebugValueBlock *block = value_block_stack[current_value_block_stack_index];
+        value_block_stack[current_value_block_stack_index] = block->next;
+        block->next = debug_state->first_free_value_block;
+        debug_state->first_free_value_block = block;
+        
+        for (DebugValue *value = block->first_value;
+            value;
+            ) {
+            if (value->next) {
+                value = value->next;
+            } else {
+                value->next = debug_state->first_free_value;
+                break;
+            }
+        }
+        debug_state->first_free_value = block->first_value;
+        value_block_stack[++current_value_block_stack_index] = block->first_child;
+    }
+    debug_state->global_value_block = 0;
+    
     for (;; ++debug_state->collation_array_index) {
         if (debug_state->collation_array_index == DEBUG_MAX_EVENT_ARRAY_COUNT) {
             debug_state->collation_array_index = 0;
@@ -32,7 +62,6 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
         }
         
         DebugFrame *collation_frame = debug_state->frames + debug_state->frame_index;
-        DebugOpenBlock *current_open_block = 0;
         DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
         u32 current_value_block_stack_index = 0;
         value_block_stack[0] = debug_state->global_value_block = get_value_block(debug_state);
@@ -48,6 +77,7 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     collation_frame = debug_state->frames + debug_state->frame_index;
                     memset(collation_frame, 0, sizeof(*collation_frame));
                     collation_frame->begin_clock = event->clock;
+                    collation_frame->frame_index = debug_state->total_frame_count;
                 } break;
                 case DEBUG_EVENT_BEGIN_BLOCK: {
                     DebugOpenBlock *debug_block = debug_state->first_free_block;
@@ -60,14 +90,14 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     
                     debug_block->frame_index = debug_state->frame_index;
                     debug_block->opening_event = event;
-                    debug_block->parent = current_open_block;
+                    debug_block->parent = debug_state->current_open_block;
                     debug_block->next_free = 0;
                     
-                    current_open_block = debug_block;
+                    debug_state->current_open_block = debug_block;
                 } break;
                 case DEBUG_EVENT_END_BLOCK: {
-                    assert(current_open_block);
-                    DebugOpenBlock *matching_block = current_open_block;
+                    assert(debug_state->current_open_block);
+                    DebugOpenBlock *matching_block = debug_state->current_open_block;
                     DebugEvent *opening_event = matching_block->opening_event;
                     // Get debug record from frame hash
                     DebugRecord *record = 0;
@@ -101,7 +131,7 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     
                     matching_block->next_free = debug_state->first_free_block;
                     debug_state->first_free_block = matching_block;
-                    current_open_block = matching_block->parent;
+                    debug_state->current_open_block = matching_block->parent;
                 } break;
 #define DEBUG_EVENT_VALUE_DEF(_type)                            \
 case DEBUG_EVENT_VALUE_##_type: {                               \
@@ -153,8 +183,6 @@ DEBUG_EVENT_VALUE_DEF(Vec2i)
             }
         }
     }
-    u64 collation_end_clock = __rdtsc();
-    debug_state->frames[debug_state->frame_index].collation_clocks = collation_end_clock - collation_start_clock;
 }
 
 static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
@@ -212,33 +240,17 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
 
 void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
-    if (is_key_pressed(input, KEY_F1, INPUT_ACCESS_TOKEN_ALL)) {
-        debug_state->dev_mode = DEV_MODE_NONE;
-    }
-    if (is_key_pressed(input, KEY_F2, INPUT_ACCESS_TOKEN_ALL)) {
-        debug_state->dev_mode = DEV_MODE_INFO;
-    }
-    if (is_key_pressed(input, KEY_F3, INPUT_ACCESS_TOKEN_ALL)) {
-        debug_state->dev_mode = DEV_MODE_PROFILER;
-    }
-    if (is_key_pressed(input, KEY_F4, INPUT_ACCESS_TOKEN_ALL)) {
-        debug_state->is_paused = !debug_state->is_paused;
-    } 
-    if (is_key_pressed(input, KEY_F5, INPUT_ACCESS_TOKEN_ALL)) {
-        debug_state->dev_mode = DEV_MODE_MEMORY;
-    }
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets);
     
     RenderGroup interface_render_group = render_group_begin(commands, assets,
         setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
-    if (debug_state->dev_mode == DEV_MODE_INFO) {
-        dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
-        display_values(&dev_ui, debug_state);
-    } else if (debug_state->dev_mode == DEV_MODE_PROFILER) {
+    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
+    display_values(&dev_ui, debug_state);
+    if (dev_ui_section(&dev_ui, "Profiler")) {
         DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
         f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
         u64 record_count = frame->records_count;
-        TempMemory records_sort_temp = temp_memory_begin(&debug_state->arena);
+        TempMemory records_sort_temp = begin_temp_memory(&debug_state->arena);
         SortEntry *sort_a = alloc_arr(&debug_state->arena, record_count, SortEntry);
         SortEntry *sort_b = alloc_arr(&debug_state->arena, record_count, SortEntry);
         for (size_t i = 0; i < record_count; ++i) {
@@ -246,15 +258,17 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
             sort_a[i].sort_index = i;
         }
         radix_sort(sort_a, sort_b, record_count);
-        dev_ui_labelf(&dev_ui, "Frame %llu", debug_state->total_frame_count);    
-        dev_ui_labelf(&dev_ui, "Collation: %.2f%%", (f32)frame->collation_clocks / frame_time * 100);    
+        dev_ui_labelf(&dev_ui, "Frame %llu", frame->frame_index);    
+        dev_ui_checkbox(&dev_ui, "Pause", &debug_state->is_paused);
+        dev_ui_begin_sizable(&dev_ui);
         for (size_t i = 0; i < min(frame->records_count, 20); ++i) {
             DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
             dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                 record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
         }
-        temp_memory_end(records_sort_temp);
-    } else if (debug_state->dev_mode == DEV_MODE_MEMORY) {
+        dev_ui_end_sizable(&dev_ui);
+        end_temp_memory(records_sort_temp);
+        dev_ui_end_section(&dev_ui);
     }
     
     dev_ui_end(&dev_ui, &interface_render_group);
@@ -264,6 +278,7 @@ void DEBUG_begin_frame(DebugState *debug_state) {
 }
 
 void DEBUG_frame_end(DebugState *debug_state) {
+    TIMED_FUNCTION();
     ++debug_state->total_frame_count;
     ++debug_table->current_event_array_index;
     if (debug_table->current_event_array_index >= DEBUG_MAX_EVENT_ARRAY_COUNT) {
@@ -275,37 +290,6 @@ void DEBUG_frame_end(DebugState *debug_state) {
     u32 event_array_index = event_array_index_event_index >> 32;
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
-    
-     // Free values and value blocks
-    DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
-    u32 current_value_block_stack_index = 0;
-    value_block_stack[0] = debug_state->global_value_block;
-    for (;;) {
-        while (!value_block_stack[current_value_block_stack_index] && current_value_block_stack_index) {
-            --current_value_block_stack_index;
-        }
-        if (!current_value_block_stack_index && !value_block_stack[current_value_block_stack_index]) {
-            break;
-        }
-        DebugValueBlock *block = value_block_stack[current_value_block_stack_index];
-        value_block_stack[current_value_block_stack_index] = block->next;
-        block->next = debug_state->first_free_value_block;
-        debug_state->first_free_value_block = block;
-        
-        for (DebugValue *value = block->first_value;
-            value;
-            ) {
-            if (value->next) {
-                value = value->next;
-            } else {
-                value->next = debug_state->first_free_value;
-                break;
-            }
-        }
-        debug_state->first_free_value = block->first_value;
-        value_block_stack[++current_value_block_stack_index] = block->first_child;
-    }
-    debug_state->global_value_block = 0;
     
     if (!debug_state->is_paused) {
         debug_collate_events(debug_state, debug_table->current_event_array_index);

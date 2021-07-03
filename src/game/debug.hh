@@ -6,6 +6,9 @@
 
 #include <intrin.h>
 
+// We need to keep at least two event arrays because our current system can't process blocks that 
+// include frame end, like the function processing events itself
+// But this is really a corner case, so see if we can avoid it?
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
 #define DEBUG_MAX_FRAME_COUNT 4
 #define DEBUG_MAX_EVENT_COUNT 65536
@@ -139,7 +142,7 @@ struct DebugRecordHash {
 };
 
 struct DebugFrame {
-    u64 collation_clocks;
+    u64 frame_index;
     u64 begin_clock;
     u64 end_clock;
     
@@ -153,14 +156,6 @@ struct DebugOpenBlock {
     DebugEvent *opening_event;
     DebugOpenBlock *parent;
     DebugOpenBlock *next_free;
-};
-
-enum {
-    DEV_MODE_NONE,  
-    DEV_MODE_INFO,  
-    DEV_MODE_PROFILER,  
-    DEV_MODE_MEMORY,  
-    DEV_MODE_SENTINEL,  
 };
 
 enum {
@@ -205,6 +200,7 @@ struct DebugState {
     DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
     u64 debug_open_blocks_allocated;
     DebugOpenBlock *first_free_block;
+    DebugOpenBlock *current_open_block;
     u32 collation_array_index;
     bool is_paused;
     
@@ -218,7 +214,6 @@ struct DebugState {
     u64 total_frame_count;
     
     DevUI dev_ui;
-    u32 dev_mode; 
 };
 
 DebugState *DEBUG_init();

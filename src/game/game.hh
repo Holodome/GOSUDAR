@@ -4,8 +4,9 @@
 
 #include "debug.hh"
 #include "os.hh"
-#include "framework/renderer.hh"
-#include "framework/assets.hh"
+#include "renderer.hh"
+#include "assets.hh"
+#include "render_group.hh"
 
 #include "game/game_state.hh"
 
@@ -16,7 +17,7 @@
 struct Game {
     OS *os;
     Renderer renderer;
-    Assets assets;
+    Assets *assets;
     DebugState *debug_state;
     
     bool is_running;

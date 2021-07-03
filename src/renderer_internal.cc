@@ -1,5 +1,3 @@
-#include "framework/renderer.hh"
-
 static void APIENTRY
 opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                       const GLchar* message, const void *_) {

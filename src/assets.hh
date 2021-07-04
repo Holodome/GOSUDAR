@@ -25,6 +25,7 @@ enum AssetType {
     ASSET_TYPE_FONT,    
     ASSET_TYPE_GRASS,    
     ASSET_TYPE_ADDITIONAL,
+    ASSET_TYPE_SOUND,
     ASSET_TYPE_SENTINEL,  
 };
 // For example, when program wants to get some assetfor tree,
@@ -47,6 +48,7 @@ enum {
     ASSET_KIND_NONE,
     ASSET_KIND_TEXTURE,
     ASSET_KIND_FONT,
+    ASSET_KIND_SOUND,
 };
 
 struct FontGlyph {
@@ -70,6 +72,13 @@ struct AssetFont {
     u32 codepoint_count;
 };
 
+struct AssetSound {
+    u32 channels;
+    u32 sample_rate;
+    i16 *samples;
+    u32 sample_count;  
+};  
+
 struct AssetInfo {
     u32 kind;
     u32 state;
@@ -78,8 +87,9 @@ struct AssetInfo {
     u32 first_tag_idx;
     u32 tag_count;
     union {
-        Texture   *texture;
-        AssetFont *font;
+        Texture    *texture;
+        AssetFont  *font;
+        AssetSound *sound;
     };
 };
 
@@ -109,6 +119,7 @@ AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *we
 AssetID get_first_of_type(Assets *assets, AssetType type);
 Texture *assets_get_texture(Assets *assets, AssetID id);
 AssetFont *assets_get_font(Assets *assets, AssetID id);
+AssetSound *assets_get_sound(Assets *assets, AssetID id);
 
 Vec2 get_text_size(AssetFont *font, const char *text);
 

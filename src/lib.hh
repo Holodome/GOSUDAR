@@ -1225,5 +1225,8 @@ struct AssetID {
 
 #define INVALID_ASSET_ID (AssetID {(u32)-1} )
 
+#define PACK_4U8_TO_U32_(_a, _b, _c, _d) (((_a) << 0) | ((_b) << 8) | ((_c) << 16) | ((_d) << 24))
+#define PACK_4U8_TO_U32(_a, _b, _c, _d) PACK_4U8_TO_U32_((u32)(_a), (u32)(_b), (u32)(_c), (u32)(_d))
+
 #define LIB_HH 1
 #endif

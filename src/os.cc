@@ -482,12 +482,9 @@ Input *update_input(OS *os) {
             sound_sample_count_to_output = os->sound_latency_frame_count;
         }
     }
-    static f32 sin_t = 0.0f;
-    for (size_t i = 0; i < os->sound_buffer_frame_count; ++i) {
-        input->sound_samples[i] = 0;
-    }
-    
+    memset(input->sound_samples, 0, os->sound_buffer_frame_count * sizeof(i16));
     input->sample_count_to_output = sound_sample_count_to_output;
+    input->samples_per_second = os->sound_samples_per_sec;
     
     return input;
 }

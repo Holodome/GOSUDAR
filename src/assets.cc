@@ -3,6 +3,8 @@
 #include "os.hh"
 #include "mips.hh"
 
+#include "wave.hh"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
 
@@ -78,6 +80,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
             size_t file_size = get_file_size(file);
             void *file_contents = arena_alloc(&assets->arena, file_size);
             read_file(file, 0, file_size, file_contents);
+            close_file(file);
             
             int w, h;
             void *pixels = stbi_load_from_memory((const u8 *)file_contents, file_size,
@@ -111,6 +114,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         size_t file_size = get_file_size(file);
         void *file_contents = arena_alloc(&assets->arena, file_size);
         read_file(file, 0, file_size, file_contents);
+        close_file(file);
 #define FONT_HEIGHT 16    
 #define FONT_ATLAS_WIDTH  512
 #define FONT_ATLAS_HEIGHT 512
@@ -152,6 +156,80 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         
         end_temp_memory(load_temp);
         asset->font = result;
+        asset->state = ASSET_STATE_LOADED;
+    }
+    return result;
+}
+
+AssetSound *assets_get_sound(Assets *assets, AssetID id) {
+    AssetSound *result = 0;
+    AssetInfo *asset = assets->asset_infos + id.value;
+    assert(asset->kind == ASSET_KIND_SOUND);
+    if (asset->state == ASSET_STATE_LOADED) {
+        result = asset->sound;
+    } else {
+        FileHandle file = open_file(asset->filename);
+        assert(file_handle_valid(file));
+        // For now loading is done not in the most optimal way.
+        // First we parse the header to get all information needed,
+        // and then load sample data
+        // This is kinda janky because due to RIFF format specification we can't really know
+        // where info headers end and data start, so we load first kilobyte of data hoping that
+        // everything weill be fine. And it is, but nevertheless it would be better not to use some magick number for loading
+        u32 nchannels = 0;
+        u32 sample_rate = 0;
+        u32 sample_count = 0;
+        u32 bits_per_sample = 0;
+        u64 sample_data_offset = 0;
+        u64 sample_data_size = 0;
+        // Load file info
+        {
+            TempMemory load_temp = begin_temp_memory(&assets->arena);
+#define WAV_HEADERS_REGION_SIZE 1024
+            void *file_contents = arena_alloc(&assets->arena, WAV_HEADERS_REGION_SIZE);
+            read_file(file, 0, WAV_HEADERS_REGION_SIZE, file_contents);
+            
+            RIFFHeader *header = (RIFFHeader *)file_contents;
+            assert(header->chunk_id == RIFF_HEADER_CHUNK_ID);
+            assert(header->format == RIFF_WAV_FORMAT);
+            for (RIFFChunkIter iter = iterate_riff_chunks(header + 1, (u8 *)file_contents + WAV_HEADERS_REGION_SIZE);
+                is_valid(&iter);
+                advance(&iter)) {
+                switch (iter.chunk->id) {
+                    case RIFF_FMT_CHUNK_ID: {
+                        RIFFFMTChunk *fmt = (RIFFFMTChunk *)(iter.chunk + 1);
+                        assert(fmt->audio_format == PCM_FORMAT);
+                        assert(fmt->num_channels == 2 || fmt->num_channels == 1);
+                        nchannels = fmt->num_channels;
+                        sample_rate = fmt->sample_rate;
+                        assert(fmt->bits_per_sample == 16);
+                        bits_per_sample = fmt->bits_per_sample;
+                    } break;
+                    case RIFF_DATA_CHUNK_ID: {
+                        sample_count = 8 * iter.chunk->size / (nchannels * bits_per_sample);     
+                        sample_data_size = iter.chunk->size;       
+                        sample_data_offset = (u8 *)(i16 *)(iter.chunk + 1) - (u8 *)file_contents;
+                    } break;
+                }        
+            }
+            end_temp_memory(load_temp);
+        }
+        assert(nchannels && sample_count);
+        result = alloc_struct(&assets->arena, AssetSound);
+        result->channels = nchannels;
+        result->sample_rate = sample_rate;
+        result->sample_count = sample_count * nchannels;
+        // Note that resulting data size and source data size is the same, we just have to reoreder source data to use
+        result->samples = (i16 *)arena_alloc(&assets->arena, sample_data_size);
+        {
+            TempMemory load_temp = begin_temp_memory(&assets->arena);
+            i16 *source_samples = (i16 *)arena_alloc(&assets->arena, sample_data_size);
+            read_file(file, sample_data_offset, sample_data_size, source_samples);
+            memcpy(result->samples, source_samples, sample_data_size);
+            end_temp_memory(load_temp);
+        }
+        close_file(file);
+        asset->sound = result;
         asset->state = ASSET_STATE_LOADED;
     }
     return result;
@@ -213,6 +291,13 @@ void add_font_asset(AssetBuilder *builder, const char *filename) {
     info->kind = ASSET_KIND_FONT;
 }
 
+void add_sound_asset(AssetBuilder *builder, const char *filename) {
+    assert(builder->current_asset_type);
+    AssetInfo *info = add_asset_internal(builder);
+    info->filename = filename;
+    info->kind = ASSET_KIND_SOUND;
+}
+
 void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
     assert(builder->current_asset_type);
     AssetInfo *current_info = builder->assets->asset_infos + builder->current_info_idx;
@@ -266,6 +351,10 @@ Assets *assets_init(Renderer *renderer) {
     
     begin_asset_type(&builder, ASSET_TYPE_ADDITIONAL);
     add_texture_asset(&builder, "select.png");
+    end_asset_type(&builder);
+    
+    begin_asset_type(&builder, ASSET_TYPE_SOUND);
+    add_sound_asset(&builder, "music.wav");
     end_asset_type(&builder);
     
     return assets;

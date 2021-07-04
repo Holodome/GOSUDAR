@@ -68,6 +68,7 @@ struct Input {
     // Since now all actual input goes through InputManager
     i16 *sound_samples;
     u64 sample_count_to_output;
+    u64 samples_per_second;
 };
 
 enum {

@@ -219,7 +219,8 @@ int main() {
     add_texture_asset(builder, "jungle.png");
     add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_JUNGLE);
     add_texture_asset(builder, "building.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING2);
+    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING1);
+    add_tag(builder, ASSET_TAG_BUILDING_IS_BUILT, 0.0f);
     add_texture_asset(builder, "building1.png");
     add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING1);
     add_tag(builder, ASSET_TAG_BUILDING_IS_BUILT, 1.0f);
@@ -277,7 +278,6 @@ int main() {
         dst->data_size = src->data_size;
         fwrite(src->data, src->data_size, 1, out);
         data_offset += src->data_size;
-        printf("%llu Data size added: %llu\n", i, src->data_size);
     }
     fseek(out, tags_offset, SEEK_SET);
     fwrite(builder->tags, sizeof(AssetTag), builder->tags_count, out);
@@ -285,9 +285,9 @@ int main() {
     fwrite(builder->file_infos, sizeof(AssetFileAssetInfo), builder->info_count, out);
     fseek(out, asset_type_infos_offset, SEEK_SET);
     fwrite(builder->type_infos, sizeof(AssetTypeInfo), ASSET_TYPE_SENTINEL, out);
-    // Write tags and infos
     fclose(out);
-    
+    printf("Total assets file size: %llu\n", data_offset);
+    printf("Assets written: %u\n", builder->info_count);
     printf("End\n");
     return 0;
 }

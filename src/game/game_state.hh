@@ -3,6 +3,8 @@
 #include "lib.hh"
 #include "game/world.hh"
 #include "assets.hh"
+#include "input.hh"
+#include "game/interface.hh"
 
 enum {
     PLAYER_INTERACTION_KIND_NONE,
@@ -40,14 +42,12 @@ struct WorldObjectSettings {
     u32 flags;
 };  
 
-#include "game/interface.hh"
-
 // All game-related data is stored here. Like player resources, debug thigs etc.
 struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
-    GameStateInterface interface;
+    GameStateInterface inter;
     WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
     
     SimCamera cam;

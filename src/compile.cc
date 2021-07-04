@@ -1,7 +1,6 @@
 #include "game/debug.cc"
 #include "framework/logger.cc"
 #include "mips.cc"
-#include "os.cc"
 #include "renderer.cc"
 #include "render_group.cc"
 #include "assets.cc"
@@ -11,3 +10,4 @@
 #include "game/game_state.cc"
 #include "game/world.cc"
 #include "main.cc"
+#include "os.cc"

@@ -41,7 +41,7 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 	f32 rwidth  = 1.0f / (f32)font->texture.width;
 	f32 rheight = 1.0f / (f32)font->texture.height;
 	Vec3 offset = Vec3(p, 0);
-	offset.y += 20;
+	offset.y += font->height;
 	for (const char *scan = text; *scan; ++scan) {
 		u8 symbol = *scan;
 		if ((symbol >= font->first_codepoint)) {

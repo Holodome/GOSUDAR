@@ -37,7 +37,7 @@ struct Interface {
 };
 
 struct GameStateInterface {
-    Interface interface;
+    Interface inter;
     InterfaceElement *text_for_wood_count;
     InterfaceElement *text_for_gold_count;
     InterfaceElement *button_camera_controls;
@@ -47,9 +47,9 @@ struct GameStateInterface {
     InterfaceElement *button_selected_building2;
 };  
 
-void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *interface, Vec2 winsize);
-InterfaceStats interface_update(Interface *interface, InputManager *input);
-void interface_render(Interface *interface, RenderGroup *render_group);
+void init_interface_for_game_state(MemoryArena *arena, GameStateInterface *inter, Vec2 winsize);
+InterfaceStats interface_update(Interface *inter, InputManager *input);
+void interface_render(Interface *inter, RenderGroup *render_group);
 
 
 #define INTERFACE_HH 1

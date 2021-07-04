@@ -9,6 +9,8 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "thirdparty/stb_truetype.h"
 
+#include "entity_kinds.hh"
+
 AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches) {
     TIMED_FUNCTION();
     assert(type && type <= ASSET_TYPE_SENTINEL);
@@ -109,7 +111,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         size_t file_size = get_file_size(file);
         void *file_contents = arena_alloc(&assets->arena, file_size);
         read_file(file, 0, file_size, file_contents);
-        
+#define FONT_HEIGHT 16    
 #define FONT_ATLAS_WIDTH  512
 #define FONT_ATLAS_HEIGHT 512
 #define FONT_FIRST_CODEPOINT 32
@@ -119,7 +121,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         stbtt_pack_context pack_context = {};
         stbtt_PackBegin(&pack_context, font_atlas_single_channel, FONT_ATLAS_WIDTH, FONT_ATLAS_HEIGHT, 0, 1, 0);
         stbtt_PackSetOversampling(&pack_context, 2, 2);
-        stbtt_PackFontRange(&pack_context, (u8 *)file_contents, 0, 20, FONT_FIRST_CODEPOINT, FONT_CODEPOINT_COUNT,
+        stbtt_PackFontRange(&pack_context, (u8 *)file_contents, 0, FONT_HEIGHT, FONT_FIRST_CODEPOINT, FONT_CODEPOINT_COUNT,
             glyphs);
         stbtt_PackEnd(&pack_context);
         
@@ -134,6 +136,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         result->texture = texture;
         result->first_codepoint = FONT_FIRST_CODEPOINT;
         result->codepoint_count = FONT_CODEPOINT_COUNT;
+        result->height = FONT_HEIGHT;
         for (u32 i = 0; i < FONT_CODEPOINT_COUNT; ++i) {
             result->glyphs[i].utf32 = FONT_FIRST_CODEPOINT + i;
             result->glyphs[i].min_x = glyphs[i].x0;
@@ -165,7 +168,7 @@ Vec2 get_text_size(AssetFont *font, const char *text) {
             result.x += glyph->x_advance;
         }
     }
-    result.y = 20;
+    result.y = font->height;
     return result;
 }
 
@@ -235,23 +238,22 @@ Assets *assets_init(Renderer *renderer) {
     add_texture_asset(&builder, "dude.png");
     end_asset_type(&builder);
     
-    begin_asset_type(&builder, ASSET_TYPE_TREE);
+    begin_asset_type(&builder, ASSET_TYPE_WORLD_OBJECT);
     add_texture_asset(&builder, "tree.png");
-    add_tag(&builder, ASSET_TAG_BIOME, 1.0f);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_FOREST);
     add_texture_asset(&builder, "cactus.png");
-    add_tag(&builder, ASSET_TAG_BIOME, 2.0f);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_DESERT);
     add_texture_asset(&builder, "jungle.png");
-    add_tag(&builder, ASSET_TAG_BIOME, 3.0f);
-    end_asset_type(&builder);
-    
-    begin_asset_type(&builder, ASSET_TYPE_BUIDING);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_JUNGLE);
     add_texture_asset(&builder, "building.png");
-    add_tag(&builder, ASSET_TAG_BUILDING_KIND, 1.0f);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING2);
     add_texture_asset(&builder, "building1.png");
-    add_tag(&builder, ASSET_TAG_BUILDING_KIND, 1.0f);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING1);
     add_tag(&builder, ASSET_TAG_BUILDING_IS_BUILT, 1.0f);
     add_texture_asset(&builder, "building1.png");
-    add_tag(&builder, ASSET_TAG_BUILDING_KIND, 2.0f);
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING2);
+    add_texture_asset(&builder, "gold.png");
+    add_tag(&builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_GOLD_DEPOSIT);
     end_asset_type(&builder);
     
     begin_asset_type(&builder, ASSET_TYPE_FONT);

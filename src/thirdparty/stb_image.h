@@ -263,7 +263,7 @@ RECENT REVISION HISTORY:
 //
 //    float *data = stbi_loadf(filename, &x, &y, &n, 0);
 //
-// If you load LDR images through this interface, those images will
+// If you load LDR images through this inter, those images will
 // be promoted to floating point values, run through the inverse of
 // constants corresponding to the above:
 //

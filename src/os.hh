@@ -3,6 +3,7 @@
 #include "lib.hh"
 
 #include "input.hh"
+#include "sound.hh"
 
 struct RealWorldTime {
     u32 year;

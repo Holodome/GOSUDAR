@@ -7,10 +7,21 @@
 #define NOMINMAX
 #endif 
 #include <windows.h>
+// wasapi
+#include <initguid.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <audiopolicy.h>
 
-#include "renderer.hh"
 #include "thirdparty/wgl.h"
 #include "thirdparty/wglext.h"
+
+#include "renderer.hh"
+
+#define CO_CREATE_INSTANCE(name) HRESULT name(REFCLSID rclsid, LPUNKNOWN *pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv)
+typedef CO_CREATE_INSTANCE(CoCreateInstance_);
+#define CO_INITIALIZE_EX(name) HRESULT name(LPVOID pvReserved, DWORD dwCoInit)
+typedef CO_INITIALIZE_EX(CoInitializeEx_);
 
 struct OS {
     MemoryArena arena;
@@ -35,12 +46,93 @@ struct OS {
 	PFNWGLMAKECONTEXTCURRENTARBPROC   wglMakeContextCurrentARB;
 	PFNWGLSWAPINTERVALEXTPROC         wglSwapIntervalEXT;
 	PFNWGLGETSWAPINTERVALEXTPROC      wglGetSwapIntervalEXT;
+    
+    CoCreateInstance_ *CoCreateInstance;
+    CoInitializeEx_ *CoInitializeEx;
+    IMMDeviceEnumerator *sound_device_enum;
+    IMMDevice *sound_device;
+    IAudioClient *audio_client;
+    IAudioRenderClient *audio_render_client;
+    REFERENCE_TIME sound_buffer_duration;
+    u64 sound_channels;
+    u32 sound_buffer_frame_count;
+    u64 sound_samples_per_sec;
+    u64 sound_latency_frame_count;
 };
-
 static bool window_close_requested;
 
-static void 
-set_pixel_format(OS *os, HDC hdc) {
+static void init_wasapi(OS *os) {
+    HRESULT result;
+    
+    HMODULE wasapi_dll = LoadLibraryA("ole32.dll");
+    assert(wasapi_dll);
+    os->CoCreateInstance = (CoCreateInstance_ *)GetProcAddress(wasapi_dll, "CoCreateInstance");
+    os->CoInitializeEx = (CoInitializeEx_ *)GetProcAddress(wasapi_dll, "CoInitializeEx");
+    assert(os->CoCreateInstance);
+    assert(os->CoInitializeEx);
+    
+    result = os->CoInitializeEx(0, COINIT_SPEED_OVER_MEMORY);
+    assert(result == S_OK);
+#define REFTIMES_PER_SEC 10000000
+    REFERENCE_TIME requested_sound_duration = REFTIMES_PER_SEC * 2;
+    static GUID CLSID_MMDeviceEnumerator = {0xBCDE0395, 0xE52F, 0x467C, 0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E};
+    static GUID IID_IMMDeviceEnumerator = {0xA95664D2, 0x9614, 0x4F35, 0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6};
+    result = os->CoCreateInstance(CLSID_MMDeviceEnumerator, 0, CLSCTX_ALL, IID_IMMDeviceEnumerator, (LPVOID *)&os->sound_device_enum);
+    assert(result == S_OK);
+    result = os->sound_device_enum->GetDefaultAudioEndpoint(eRender, eConsole, &os->sound_device);
+    assert(result == S_OK);
+    static GUID IID_IAudioClient = {0x1CB9AD4C, 0xDBFA, 0x4c32, 0xB1, 0x78, 0xC2, 0xF5, 0x68, 0xA7, 0x03, 0xB2};
+    result = os->sound_device->Activate(IID_IAudioClient, CLSCTX_ALL, 0, (void **)&os->audio_client);
+    assert(result == S_OK);
+    
+    WORD bits_per_sample = sizeof(i16) * 8;
+    WORD block_align = (os->sound_channels * bits_per_sample) / 8;
+    DWORD average_bytes_per_second = block_align * os->sound_samples_per_sec;
+    WAVEFORMATEX wave_format = {};
+    wave_format.wFormatTag = WAVE_FORMAT_PCM;
+    wave_format.nChannels = os->sound_channels;
+    wave_format.nSamplesPerSec = os->sound_samples_per_sec;
+    wave_format.nAvgBytesPerSec = average_bytes_per_second;
+    wave_format.nBlockAlign = block_align;
+    wave_format.wBitsPerSample = bits_per_sample;
+    
+    result = os->audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 
+        AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+        requested_sound_duration,
+        0, &wave_format, 0);
+    assert(result == S_OK);
+    
+    static GUID IID_IAudioRenderClient = {0xF294ACFC, 0x3146, 0x4483, 0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2};
+    result = os->audio_client->GetService(IID_IAudioRenderClient, (void **)&os->audio_render_client);
+    assert(result == S_OK);
+    
+    result = os->audio_client->GetBufferSize(&os->sound_buffer_frame_count);
+    assert(result == S_OK);
+    os->sound_buffer_duration = (REFERENCE_TIME)((f64)REFTIMES_PER_SEC * os->sound_buffer_frame_count / os->sound_samples_per_sec);
+    result = os->audio_client->Start();
+    assert(result == S_OK);
+}
+
+static void fill_sound_buffer(OS *os, i16 *samples, u64 samples_to_write) {
+    if (!samples_to_write) {
+        return;
+    }
+    
+    BYTE *data = 0;
+    HRESULT result = os->audio_render_client->GetBuffer(samples_to_write, &data);
+    assert(result == S_OK);
+    if (data) {
+        i16 *dst = (i16 *)data;
+        i16 *src = samples;
+        for (size_t i = 0; i < samples_to_write; ++i) {
+            *dst++ = *src++;
+            *dst++ = *src++;
+        }
+    }
+    os->audio_render_client->ReleaseBuffer(samples_to_write, 0);
+}
+
+static void set_pixel_format(OS *os, HDC hdc) {
     i32 suggested_pixel_format_index = 0;
     u32 extended_pick = 0;
 
@@ -133,6 +225,12 @@ OS *os_init() {
     LARGE_INTEGER time;
     QueryPerformanceCounter(&time);
     os->last_frame_time = os->game_start_time = time;
+    
+    os->sound_channels = 2;
+    os->sound_samples_per_sec = 44100;
+    os->sound_latency_frame_count = os->sound_samples_per_sec / 15;
+    init_wasapi(os);
+    
     logprintln("OS", "Init end");
     return os;
 }
@@ -209,6 +307,7 @@ void init_renderer_backend(OS *os) {
 }
 
 Input *update_input(OS *os) {
+    TIMED_FUNCTION();
     Input *input = &os->input;
     input->mwheel = 0;
         
@@ -373,6 +472,26 @@ Input *update_input(OS *os) {
     input->dt = delta_time;
     
     input->is_quit_requested = window_close_requested;
+    
+    static i16 samples[1 << 20] = {};
+    u64 sound_sample_count_to_output = 0;
+    u32 sound_padding_size;
+    if (SUCCEEDED(os->audio_client->GetCurrentPadding(&sound_padding_size))) {
+        sound_sample_count_to_output = (u64)(os->sound_latency_frame_count - sound_padding_size);
+        if (sound_sample_count_to_output > os->sound_latency_frame_count) {
+            sound_sample_count_to_output = os->sound_latency_frame_count;
+        }
+    }
+    static f32 sin_t = 0.0f;
+    for (size_t i = 0; i < sound_sample_count_to_output; ++i) {
+        i16 value = (i16)(sinf(sin_t) * 3000);
+        samples[i * 2]     = value;
+        samples[i * 2 + 1] = value;
+        sin_t += TWO_PI * (1.0f / (os->sound_samples_per_sec / 256));
+    }
+    
+    fill_sound_buffer(os, samples, sound_sample_count_to_output);
+    
     return input;
 }
 

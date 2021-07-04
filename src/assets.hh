@@ -12,7 +12,7 @@ enum {
     // Tress
     ASSET_TAG_BIOME = 0,  
     // Building
-    ASSET_TAG_BUILDING_KIND = 0,
+    ASSET_TAG_WORLD_OBJECT_KIND = 0,
     ASSET_TAG_BUILDING_IS_BUILT = 1,
     // Player 
     // Font
@@ -20,11 +20,10 @@ enum {
 
 enum AssetType {
     ASSET_TYPE_NONE,
-    ASSET_TYPE_TREE,    // Tags: biome(kind), subkind(bush/tree), health, height, 
-    ASSET_TYPE_BUIDING, // Tags: kind, build progress, health
-    ASSET_TYPE_PLAYER,  // Tags: facing direction, health 
-    ASSET_TYPE_FONT,    // Tags: height
-    ASSET_TYPE_GRASS,
+    ASSET_TYPE_WORLD_OBJECT,
+    ASSET_TYPE_PLAYER,  
+    ASSET_TYPE_FONT,    
+    ASSET_TYPE_GRASS,    
     ASSET_TYPE_ADDITIONAL,
     ASSET_TYPE_SENTINEL,  
 };
@@ -64,6 +63,7 @@ struct FontGlyph {
 };
 
 struct AssetFont {
+    f32 height;
     Texture texture;
     FontGlyph glyphs[256];
     u32 first_codepoint;

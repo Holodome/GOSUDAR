@@ -41,8 +41,8 @@ void game_update_and_render(Game *game) {
     }    
     
     RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(input), Vec4(0.2));
-    DEBUG_update(game->debug_state, input, commands, game->assets);
     update_and_render(&game->game_state, input, commands, game->assets);
+    DEBUG_update(game->debug_state, input, commands, game->assets);
     renderer_end_frame(&game->renderer);
     update_window(game->os);
     DEBUG_frame_end(game->debug_state);

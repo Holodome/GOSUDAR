@@ -136,7 +136,7 @@ void game_state_init(GameState *game_state) {
     world_init(game_state->world);
     world_gen(game_state);
     
-    init_interface_for_game_state(&game_state->arena, &game_state->interface, Vec2(1264, 681));
+    init_interface_for_game_state(&game_state->arena, &game_state->inter, Vec2(1264, 681));
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -327,9 +327,9 @@ static void update_interface(GameState *game_state, FrameData *frame) {
     //     game_state->show_grid = !game_state->show_grid;
     // }
     
-    InterfaceStats stats = interface_update(&game_state->interface.interface, input);
-    game_state->allow_camera_controls = game_state->interface.button_camera_controls->is_button_pressed;
-    game_state->is_in_building_mode = game_state->interface.button_build_mode->is_button_pressed;
+    InterfaceStats stats = interface_update(&game_state->inter.inter, input);
+    game_state->allow_camera_controls = game_state->inter.button_camera_controls->is_button_pressed;
+    game_state->is_in_building_mode = game_state->inter.button_build_mode->is_button_pressed;
     
     // Update camera input
     if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
@@ -417,7 +417,7 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
             building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1 + game_state->selected_building;
             if (is_key_held(input, KEY_MOUSE_RIGHT, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                 game_state->is_in_building_mode = false;
-                game_state->interface.button_build_mode->is_button_pressed = false;
+                game_state->inter.button_build_mode->is_button_pressed = false;
             } else {
                 building->flags |= ENTITY_FLAG_SINGLE_FRAME_LIFESPAN;
                 building->world_object_flags |= WORLD_OBJECT_FLAG_IS_BLUEPRINT;
@@ -438,38 +438,11 @@ static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, As
             size = Vec2(0.5f);
             AssetTagList tags = {};
             AssetTagList weights = {};
-            tags.tags[ASSET_TAG_BIOME] = entity->world_object_kind;
-            weights.tags[ASSET_TAG_BIOME] = 1.0f;
-            texture_id = get_closest_asset_match(assets, ASSET_TYPE_TREE, &weights, &tags);
-#if 0
-            switch(entity->world_object_kind) {
-                case WORLD_OBJECT_KIND_TREE_FOREST: {
-                    texture_id = Asset_TreeForest;
-                } break;
-                case WORLD_OBJECT_KIND_TREE_JUNGLE: {
-                    size = Vec2(0.6f);
-                    texture_id = Asset_TreeJungle;
-                } break;
-                case WORLD_OBJECT_KIND_TREE_DESERT: {
-                    size = Vec2(0.4f);
-                    texture_id = Asset_TreeDesert;
-                } break;
-                case WORLD_OBJECT_KIND_GOLD_DEPOSIT: {
-                    texture_id = Asset_GoldVein;
-                } break;
-                case WORLD_OBJECT_KIND_BUILDING1: {
-                    if (entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILT) {
-                        texture_id = Asset_Building;
-                    } else {
-                        texture_id = Asset_Building1;
-                    }
-                } break;
-                case WORLD_OBJECT_KIND_BUILDING2: {
-                    texture_id = Asset_Building;
-                } break;
-                INVALID_DEFAULT_CASE;
-            }
-#endif 
+            tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = entity->world_object_kind;
+            weights.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1000.0f;
+            tags.tags[ASSET_TAG_BUILDING_IS_BUILT] = (bool)(entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILT);
+            weights.tags[ASSET_TAG_BUILDING_IS_BUILT] = 1.0f;
+            texture_id = get_closest_asset_match(assets, ASSET_TYPE_WORLD_OBJECT, &weights, &tags);
         } break;
         INVALID_DEFAULT_CASE;
     }
@@ -571,13 +544,13 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
 static void render_interface(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "Wood: %u", game_state->wood_count);
-    game_state->interface.text_for_wood_count->text = alloc_string(&game_state->frame_arena, buffer);
+    game_state->inter.text_for_wood_count->text = alloc_string(&game_state->frame_arena, buffer);
     snprintf(buffer, sizeof(buffer), "Gold: %u", game_state->gold_count);
-    game_state->interface.text_for_gold_count->text = alloc_string(&game_state->frame_arena, buffer);
+    game_state->inter.text_for_gold_count->text = alloc_string(&game_state->frame_arena, buffer);
     
     RenderGroup interface_render_group = render_group_begin(commands, assets,
         setup_2d(Mat4x4::ortographic_2d(0, window_size(frame->input).x, window_size(frame->input).y, 0)));
-    interface_render(&game_state->interface.interface, &interface_render_group);
+    interface_render(&game_state->inter.inter, &interface_render_group);
     render_group_end(&interface_render_group);
 }
 

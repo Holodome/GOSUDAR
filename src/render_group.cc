@@ -130,7 +130,7 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
     }
     
     AssetFont *font = assets_get_font(render_group->assets, font_id);
-    f32 font_height = 20;
+    f32 font_height = font->height;
     f32 line_height = font_height * scale;
     AssetID texture_id = font_id;
 

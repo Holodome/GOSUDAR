@@ -8,6 +8,8 @@
 #include "assets.hh"
 #include "render_group.hh"
 
+#include "sound.hh"
+
 #include "game/game_state.hh"
 
 // Game is a object that decribes program as one element 
@@ -19,6 +21,7 @@ struct Game {
     Renderer renderer;
     Assets *assets;
     DebugState *debug_state;
+    Audio audio;
     
     bool is_running;
     

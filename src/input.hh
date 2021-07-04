@@ -61,6 +61,13 @@ struct Input {
     bool is_quit_requested;
     
     u32 utf32;
+    
+    // @CLEANUP this shouldn't be here! But now input is only way of communcating with platform layer,
+    // so it's really issue of platform API design
+    // Or we can remove input as concept, and switch to having Platform instead
+    // Since now all actual input goes through InputManager
+    i16 *sound_samples;
+    u64 sample_count_to_output;
 };
 
 enum {

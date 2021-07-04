@@ -22,15 +22,19 @@ struct Audio {
     AudioSource sources[AUDIO_SOURCES_MAX_COUNT];
 };
 
-void update_audio(Audio *audio, i16 *sample_out, u64 sample_count_to_output) {
+
+Sound sound_load(const char *filename);
+void update_audio(Audio *audio, i16 *sample_out_init, u64 sample_count_to_output) {
     for (size_t i = 0; i < audio->sources_count; ++i) {
         AudioSource *source = audio->sources + i;
         Sound *sound = &source->sound;
           
+        i16 *sample_out = sample_out_init;
+          
         for (size_t write_sample = 0; write_sample < sample_count_to_output; ++write_sample) {
             f64 start_play_position = source->play_position;
             
-            f64 target_play_position = start_play_position + (f64)sound->channels * (f64)sound->sample_rate;
+            f64 target_play_position = start_play_position + (f64)sound->channels;
             if (target_play_position >= sound->sample_count) {
                 target_play_position -= sound->sample_count;
             }
@@ -65,13 +69,13 @@ void update_audio(Audio *audio, i16 *sample_out, u64 sample_count_to_output) {
                 i16 second_left_sample = sound->samples[left_idx + sound->channels];
                 i16 second_right_sample = sound->samples[right_idx + sound->channels];
                 target_left_sample = (i16)(first_left_sample + (second_left_sample - first_left_sample) * 
-                    (start_play_position / sound->channels - (u64)(start_play_position / sound->channels)));
+                    (target_play_position / sound->channels - (u64)(target_play_position / sound->channels)));
                 target_right_sample = (i16)(first_right_sample + (second_right_sample - first_right_sample) * 
-                    (start_play_position / sound->channels - (u64)(start_play_position / sound->channels)));
+                    (target_play_position / sound->channels - (u64)(target_play_position / sound->channels)));
             }
             // Get write sample
-            i16 left_sample = (i16)(((i64)start_left_sample + (i16)target_left_sample) / 2);
-            i16 right_sample = (i16)(((i64)start_right_sample + (i16)target_right_sample) / 2);
+            i16 left_sample = (i16)(((i64)start_left_sample + (i64)target_left_sample) / 2);
+            i16 right_sample = (i16)(((i64)start_right_sample + (i64)target_right_sample) / 2);
             // Write sound
             *sample_out++ += left_sample;
             *sample_out++ += right_sample;

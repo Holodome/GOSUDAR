@@ -229,6 +229,7 @@ OS *os_init() {
     os->sound_channels = 2;
     os->sound_samples_per_sec = 44100;
     os->sound_latency_frame_count = os->sound_samples_per_sec / 15;
+    os->input.sound_samples = alloc_arr(&os->arena, os->sound_samples_per_sec * 2, i16);
     init_wasapi(os);
     
     logprintln("OS", "Init end");
@@ -473,7 +474,6 @@ Input *update_input(OS *os) {
     
     input->is_quit_requested = window_close_requested;
     
-    static i16 samples[1 << 20] = {};
     u64 sound_sample_count_to_output = 0;
     u32 sound_padding_size;
     if (SUCCEEDED(os->audio_client->GetCurrentPadding(&sound_padding_size))) {
@@ -483,20 +483,18 @@ Input *update_input(OS *os) {
         }
     }
     static f32 sin_t = 0.0f;
-    for (size_t i = 0; i < sound_sample_count_to_output; ++i) {
-        i16 value = (i16)(sinf(sin_t) * 3000);
-        samples[i * 2]     = value;
-        samples[i * 2 + 1] = value;
-        sin_t += TWO_PI * (1.0f / (os->sound_samples_per_sec / 256));
+    for (size_t i = 0; i < os->sound_buffer_frame_count; ++i) {
+        input->sound_samples[i] = 0;
     }
     
-    fill_sound_buffer(os, samples, sound_sample_count_to_output);
+    input->sample_count_to_output = sound_sample_count_to_output;
     
     return input;
 }
 
 void update_window(OS *os) {
     TIMED_FUNCTION();
+    fill_sound_buffer(os, os->input.sound_samples, os->input.sample_count_to_output);
     os->wglSwapLayerBuffers(os->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
 }
 

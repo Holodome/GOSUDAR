@@ -104,7 +104,7 @@ struct Assets {
     AssetTypeInfo type_infos[ASSET_TYPE_SENTINEL];
 };  
 
-Assets *assets_init();
+Assets *assets_init(Renderer *renderer);
 AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches);
 AssetID get_first_of_type(Assets *assets, AssetType type);
 Texture *assets_get_texture(Assets *assets, AssetID id);

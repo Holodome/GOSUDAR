@@ -1211,6 +1211,17 @@ void radix_sort(SortEntry *sort_a, SortEntry *sort_b, size_t count) {
     }
 }
 
+// Abstracted texture
+struct Texture {
+    // Index in texture array
+    u32 index;
+    // Size, needed to recompute uvs from image space to texture array space
+    u16 width;
+    u16 height;
+};  
+
+static Texture INVALID_TEXTURE = { (u32)-1, 0, 0 };
+
 struct AssetID {
     u32 value;
 };

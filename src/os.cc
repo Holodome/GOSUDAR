@@ -588,6 +588,7 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
         }
         else 
         {
+			printf("%u\n", GetLastError());
             assert(false);
         }
     }

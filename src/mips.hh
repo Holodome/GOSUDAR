@@ -1,4 +1,7 @@
-#if !defined(MIMS_HH)
+//
+// This file describes mimmap interface
+//
+#if !defined(MIPS_HH)
 
 #include "lib.hh"
 
@@ -20,5 +23,5 @@ void advance(MipIterator *iter);
 void generate_sequential_mips(u32 width, u32 height, void *data);
 size_t get_total_size_for_mips(u32 width, u32 height);
 
-#define MIMS_HH 1
+#define MIPS_HH 1
 #endif

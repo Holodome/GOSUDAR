@@ -135,8 +135,6 @@ void game_state_init(GameState *game_state) {
     // Initialize world
     world_init(game_state->world);
     world_gen(game_state);
-    
-    init_interface_for_game_state(&game_state->arena, &game_state->inter, Vec2(1264, 681));
 }
 
 static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
@@ -317,19 +315,15 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
 
 static void update_interface(GameState *game_state, FrameData *frame) {
     InputManager *input = frame->input;
-    // if (is_key_pressed(input, Key::Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
-    //     game_state->allow_camera_controls = !game_state->allow_camera_controls;
-    // }
-    // if (is_key_pressed(input, Key::B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
-    //     game_state->is_in_building_mode = !game_state->is_in_building_mode;
-    // }
-    // if (is_key_pressed(input, Key::X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
-    //     game_state->show_grid = !game_state->show_grid;
-    // }
-    
-    InterfaceStats stats = interface_update(&game_state->inter.inter, input);
-    game_state->allow_camera_controls = game_state->inter.button_camera_controls->is_button_pressed;
-    game_state->is_in_building_mode = game_state->inter.button_build_mode->is_button_pressed;
+    if (is_key_pressed(input, KEY_Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        game_state->allow_camera_controls = !game_state->allow_camera_controls;
+    }
+    if (is_key_pressed(input, KEY_B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        game_state->is_in_building_mode = !game_state->is_in_building_mode;
+    }
+    if (is_key_pressed(input, KEY_X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        game_state->show_grid = !game_state->show_grid;
+    }
     
     // Update camera input
     if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
@@ -417,7 +411,6 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
             building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1 + game_state->selected_building;
             if (is_key_held(input, KEY_MOUSE_RIGHT, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                 game_state->is_in_building_mode = false;
-                game_state->inter.button_build_mode->is_button_pressed = false;
             } else {
                 building->flags |= ENTITY_FLAG_SINGLE_FRAME_LIFESPAN;
                 building->world_object_flags |= WORLD_OBJECT_FLAG_IS_BLUEPRINT;
@@ -541,19 +534,6 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
     render_group_end(&world_render_group); 
 }
 
-static void render_interface(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "Wood: %u", game_state->wood_count);
-    game_state->inter.text_for_wood_count->text = alloc_string(&game_state->frame_arena, buffer);
-    snprintf(buffer, sizeof(buffer), "Gold: %u", game_state->gold_count);
-    game_state->inter.text_for_gold_count->text = alloc_string(&game_state->frame_arena, buffer);
-    
-    RenderGroup interface_render_group = render_group_begin(commands, assets,
-        setup_2d(Mat4x4::ortographic_2d(0, window_size(frame->input).x, window_size(frame->input).y, 0)));
-    interface_render(&game_state->inter.inter, &interface_render_group);
-    render_group_end(&interface_render_group);
-}
-
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     arena_clear(&game_state->frame_arena);
@@ -568,7 +548,6 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     update_interface(game_state, &frame);
     update_world_simulation(game_state, &frame);
     render_world(game_state, &frame, commands, assets);
-    render_interface(game_state, &frame, commands, assets);
     end_sim(frame.sim);
     
     Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);

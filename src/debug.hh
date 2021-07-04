@@ -206,7 +206,6 @@ struct DebugState {
     
     u64 debug_values_allocated;
     DebugValue *first_free_value;
-    // DebugValue *first_value;
     u64 value_blocks_allocated;
     DebugValueBlock *first_free_value_block;
     DebugValueBlock *global_value_block;

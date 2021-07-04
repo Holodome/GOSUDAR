@@ -31,17 +31,6 @@ struct Shader {
     GLuint id;
 };
 
-// Abstracted texture
-struct Texture {
-    // Index in texture array
-    u32 index;
-    // Size, needed to recompute uvs from image space to texture array space
-    u16 width;
-    u16 height;
-};  
-
-static Texture INVALID_TEXTURE = { (u32)-1, 0, 0 };
-
 enum {
     RENDERER_COMMAND_NONE,
     RENDERER_COMMAND_QUADS,
@@ -119,7 +108,7 @@ struct Renderer {
 void renderer_init(Renderer *renderer);
 RendererCommands * renderer_begin_frame(Renderer *renderer, Vec2 winsize, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
-Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, Vec2i size);
+Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 
 #define RENDERER_H 1
 #endif

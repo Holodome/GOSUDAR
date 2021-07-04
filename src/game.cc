@@ -71,13 +71,6 @@ void game_init(Game *game) {
 
     game->assets = assets_init(&game->renderer);
     game_state_init(&game->game_state);
-
-    AssetSound *sound = assets_get_sound(game->assets, get_first_of_type(game->assets, ASSET_TYPE_SOUND));  
-    AudioSource source;
-    source.is_playing = true;
-    source.sound = sound;
-    source.play_cursor = 0.0f;
-    game->audio.sources[game->audio.sources_count++] = source;
 }
 
 void game_cleanup(Game *game) {
@@ -111,7 +104,6 @@ void game_update_and_render(Game *game) {
     RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(input), Vec4(0.2));
     update_and_render(&game->game_state, input, commands, game->assets);
     DEBUG_update(game->debug_state, input, commands, game->assets);
-    update_audio(&game->audio, os_input);
     renderer_end_frame(&game->renderer);
     update_window(game->os);
     DEBUG_frame_end(game->debug_state);

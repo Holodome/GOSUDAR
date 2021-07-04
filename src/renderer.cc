@@ -285,7 +285,7 @@ void main()
     size_t white_data_size = get_total_size_for_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     void *white_data = malloc(white_data_size);
     memset(white_data, 0xFF, white_data_size);
-    renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, Vec2i(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM));
+    renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     free(white_data);
 }
 
@@ -348,16 +348,16 @@ void renderer_end_frame(Renderer *renderer) {
     }
 }
 
-Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, Vec2i size) {
-    assert(size.x <= RENDERER_TEXTURE_DIM && size.y <= RENDERER_TEXTURE_DIM);
+Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height) {
+    assert(width <= RENDERER_TEXTURE_DIM && height <= RENDERER_TEXTURE_DIM);
     Texture tex;
     assert(renderer->texture_count + 1 < renderer->max_texture_count);
     tex.index = (u32)renderer->texture_count++;
-    tex.width  = (u16)size.x;
-    tex.height = (u16)size.y;
-    assert(tex.width == size.x && tex.height == size.y);
+    tex.width  = (u16)width;
+    tex.height = (u16)height;
+    assert(tex.width == width && tex.height == height);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(size.x, size.y);
+    for (MipIterator iter = iterate_mips(width, height);
          is_valid(&iter);
          advance(&iter)) { 
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, iter.level, 0, 0,

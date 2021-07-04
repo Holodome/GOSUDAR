@@ -47,7 +47,6 @@ struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
-    GameStateInterface inter;
     WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
     
     SimCamera cam;

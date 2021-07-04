@@ -7,8 +7,8 @@
 static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
     RenderQuads *quads = 0;
     if (commands->vertex_count + 4 > commands->max_vertex_count || commands->index_count + 6 > commands->max_index_count) {
-        logprintln("Renderer", "Commands buffer overflow. I is %llu/%llu, V is %llu/%llu", 
-            commands->index_count, commands->max_index_count, commands->vertex_count, commands->max_vertex_count);
+        // logprintln("Renderer", "Commands buffer overflow. I is %llu/%llu, V is %llu/%llu", 
+        //     commands->index_count, commands->max_index_count, commands->vertex_count, commands->max_vertex_count);
     } else {
         if (commands->last_quads && memcmp(&commands->last_quads->setup, &setup, sizeof(setup)) == 0) {
             // Check that index type can fit more indices without overflowing
@@ -21,8 +21,8 @@ static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
         
         if (!quads) {
             if (commands->quads_count + 1 > commands->max_quads_count) {
-                logprintln("Renderer", "Commands buffer overflow. Quads is %llu/%llu", 
-                    commands->quads_count, commands->max_quads_count);
+                // logprintln("Renderer", "Commands buffer overflow. Quads is %llu/%llu", 
+                //     commands->quads_count, commands->max_quads_count);
             } else {
                 quads = commands->quads + commands->quads_count++;
                 quads->index_array_offset = commands->index_count;

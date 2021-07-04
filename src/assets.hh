@@ -67,7 +67,7 @@ struct FontGlyph {
 struct AssetFont {
     f32 height;
     Texture texture;
-    FontGlyph glyphs[256];
+    FontGlyph *glyphs;
     u32 first_codepoint;
     u32 codepoint_count;
 };
@@ -75,7 +75,11 @@ struct AssetFont {
 struct AssetSound {
     u32 channels;
     u32 sample_rate;
+    // Samples in format [ 1: [l, r], 2: [l, r], ...]
+    // Channel samples are stored next to each other for each individual sample
+    // It may be benefitial to switch to having arrays of samples for each channel to simplify sound play arithmetic
     i16 *samples;
+    // Number of individual samples, with separate for each channel
     u32 sample_count;  
 };  
 

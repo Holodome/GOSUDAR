@@ -2,7 +2,7 @@
 
 #include "lib.hh"
 
-#include "game/dev_ui.hh"
+#include "dev_ui.hh"
 
 #include <intrin.h>
 

@@ -1,6 +1,6 @@
-#include "game/dev_ui.hh"
+#include "dev_ui.hh"
 
-#include "game/game.hh"
+#include "game.hh"
 
 #define DEV_UI_SECTION_OFFSET 20.0f
 #define DEV_UI_VERT_PADDING 2.0f

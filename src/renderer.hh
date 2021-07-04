@@ -2,11 +2,11 @@
 
 #include "lib.hh"
 
-#include "thirdparty/glcorearb.h"
+#include "glcorearb.h"
 
 #define GLPROC(_name, _type) \
 extern _type _name;
-#include "framework/gl_procs.inc"
+#include "gl_procs.inc"
 #undef GLPROC
 
 // Renderer is built the way, so up vector is {0, 1, 0}

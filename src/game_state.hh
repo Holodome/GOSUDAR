@@ -1,10 +1,10 @@
 #if !defined(GAME_WORLD_HH)
 
 #include "lib.hh"
-#include "game/world.hh"
+#include "world.hh"
 #include "assets.hh"
 #include "input.hh"
-#include "game/interface.hh"
+#include "interface.hh"
 
 enum {
     PLAYER_INTERACTION_KIND_NONE,

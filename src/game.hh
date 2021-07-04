@@ -10,7 +10,7 @@
 
 #include "sound.hh"
 
-#include "game/game_state.hh"
+#include "game_state.hh"
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state

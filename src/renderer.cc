@@ -1,11 +1,11 @@
 #include "renderer.hh"
-#include "game/game.hh"
+#include "game.hh"
 
 #include "mips.hh"
 
 #define GLPROC(_name, _type) \
 _type _name;
-#include "framework/gl_procs.inc"
+#include "gl_procs.inc"
 #undef GLPROC
 
 #include "renderer_internal.cc"
@@ -73,7 +73,6 @@ static GLuint create_shader(const char *source) {
     }    
     
     assert(!shader_failed);
-    logprintln("Renderer", "Shader compiled");
     return id;
 }
 

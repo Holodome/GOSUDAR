@@ -1,7 +1,7 @@
-#include "game/debug.hh"
+#include "debug.hh"
 
 #include "os.hh"
-#include "game/game_state.hh"
+#include "game_state.hh"
 
 DebugTable *debug_table;
 

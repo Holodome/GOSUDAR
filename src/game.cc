@@ -1,4 +1,4 @@
-#include "game/game.hh"
+#include "game.hh"
 
 void update_audio(Audio *audio, Input *input) {
     TIMED_FUNCTION();
@@ -63,7 +63,6 @@ void update_audio(Audio *audio, Input *input) {
 }
 
 void game_init(Game *game) {
-    logprintln("Game", "Init start");
     game->is_running = true;   
     game->debug_state = DEBUG_init();
     game->os = os_init();

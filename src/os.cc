@@ -13,8 +13,8 @@
 #include <audioclient.h>
 #include <audiopolicy.h>
 
-#include "thirdparty/wgl.h"
-#include "thirdparty/wglext.h"
+#include "wgl.h"
+#include "wglext.h"
 
 #include "renderer.hh"
 
@@ -195,7 +195,6 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
 }
 
 OS *os_init() {
-    logprintln("OS", "Init start");
     OS *os = bootstrap_alloc_struct(OS, arena);
     
     // Create window
@@ -231,8 +230,6 @@ OS *os_init() {
     os->sound_latency_frame_count = os->sound_samples_per_sec / 15;
     os->input.sound_samples = alloc_arr(&os->arena, os->sound_samples_per_sec * 2, i16);
     init_wasapi(os);
-    
-    logprintln("OS", "Init end");
     return os;
 }
 
@@ -300,8 +297,8 @@ void init_renderer_backend(OS *os) {
 #define GLPROC(_name, _type)                                                   \
     *(void **)&_name = (void *)os->wglGetProcAddress(#_name);                  \
     if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
-    if (!_name) logprintln("OpenGL", "Failed to load " #_name " OGL procedure.");
-#include "framework/gl_procs.inc"
+    if (!_name) assert(!"Failed to load " #_name " OGL procedure.");
+#include "gl_procs.inc"
 #undef GLPROC
     
     os->wglSwapIntervalEXT(1);

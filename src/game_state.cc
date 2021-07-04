@@ -1,4 +1,4 @@
-#include "game/game_state.hh"
+#include "game_state.hh"
 
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);

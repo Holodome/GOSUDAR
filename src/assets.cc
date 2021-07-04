@@ -6,10 +6,10 @@
 #include "wave.hh"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "thirdparty/stb_image.h"
+#include "stb_image.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "thirdparty/stb_truetype.h"
+#include "stb_truetype.h"
 
 #include "entity_kinds.hh"
 
@@ -86,6 +86,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
             void *pixels = stbi_load_from_memory((const u8 *)file_contents, file_size,
                 &w, &h, 0, 4);
             void *mipmaps = generate_mipmaps_from_texture_data(assets, pixels, w, h);
+            free(pixels);
             
             Texture texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, Vec2i(w, h));
             *result = texture;
@@ -106,7 +107,13 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
     if (asset->state == ASSET_STATE_LOADED) {
         result = asset->font;
     } else {
+    #define FONT_HEIGHT 16    
+#define FONT_ATLAS_WIDTH  512
+#define FONT_ATLAS_HEIGHT 512
+#define FONT_FIRST_CODEPOINT 32
+#define FONT_CODEPOINT_COUNT 95
         result = alloc_struct(&assets->arena, AssetFont);
+        result->glyphs = alloc_arr(&assets->arena, FONT_CODEPOINT_COUNT, FontGlyph);
         
         TempMemory load_temp = begin_temp_memory(&assets->arena);
         FileHandle file = open_file(asset->filename);
@@ -115,11 +122,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         void *file_contents = arena_alloc(&assets->arena, file_size);
         read_file(file, 0, file_size, file_contents);
         close_file(file);
-#define FONT_HEIGHT 16    
-#define FONT_ATLAS_WIDTH  512
-#define FONT_ATLAS_HEIGHT 512
-#define FONT_FIRST_CODEPOINT 32
-#define FONT_CODEPOINT_COUNT 95
+
         stbtt_packedchar *glyphs = alloc_arr(&assets->arena, FONT_CODEPOINT_COUNT, stbtt_packedchar);
         u8 *font_atlas_single_channel = alloc_arr(&assets->arena, FONT_ATLAS_WIDTH * FONT_ATLAS_HEIGHT, u8);
         stbtt_pack_context pack_context = {};
@@ -175,7 +178,9 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
         // and then load sample data
         // This is kinda janky because due to RIFF format specification we can't really know
         // where info headers end and data start, so we load first kilobyte of data hoping that
-        // everything weill be fine. And it is, but nevertheless it would be better not to use some magick number for loading
+        // everything weill be fine. And it is, but nevertheless it would be better not to use some magic number for loading
+        // This is all will not be a problem once we switch to having asset files, where we could store this data and
+        // don't need additional lookups
         u32 nchannels = 0;
         u32 sample_rate = 0;
         u32 sample_count = 0;

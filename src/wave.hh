@@ -1,3 +1,6 @@
+//
+// File describing wave file format (WAV)
+//
 #if !defined(WAVE_HH)
 
 #include "lib.hh"

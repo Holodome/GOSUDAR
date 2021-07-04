@@ -1,5 +1,5 @@
-#include "game/world.hh"
-#include "game/game.hh"
+#include "world.hh"
+#include "game.hh"
 
 // @TODO do we want to introduce threshold here to avoid pointlessly moving entities when they are at chunk edge
 static bool is_canonical(f32 chunk_rel) {

@@ -1078,14 +1078,6 @@ inline Vec2 floor(Vec2 v) {
     return Vec2(floorf(v.x), floorf(v.y));
 }
 
-void logger_init();
-void logger_cleanup();
-
-void logprintv(const char *tag, const char *format, va_list args);
-void logprint(const char *tag, const char *format, ...);
-void print(const char *format, ...);
-void logprintln(const char *tag, const char *format, ...);
-
 inline u32 utf8_encode(u32 utf32, u8 *dst) {
     u32 len = 0;
     if (utf32 <= 0x0000007F) {

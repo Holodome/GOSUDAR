@@ -1,6 +1,6 @@
-#include "game/interface.hh"
+#include "interface.hh"
 
-#include "game/game_state.hh"
+#include "game_state.hh"
 
 static InterfaceElement *add_element(MemoryArena *arena, Interface *inter, u32 kind) {
     InterfaceElement *element = alloc_struct(arena, InterfaceElement);

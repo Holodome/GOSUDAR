@@ -91,7 +91,6 @@ RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection) {
     RendererSetup result;
     result.view = view;
     result.projection = projection;
-    result.has_depth = true;
     result.mvp = projection * view;
     result.framebuffer = framebuffer;
     return result;
@@ -101,7 +100,6 @@ RendererSetup setup_2d(u32 framebuffer, Mat4x4 projection) {
     RendererSetup result;
     result.projection = projection;
     result.view = Mat4x4::identity();
-    result.has_depth = false;
     result.mvp = projection;
     result.framebuffer = framebuffer;
     return result;
@@ -359,11 +357,23 @@ void main() {
     renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(win_size, true);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(win_size, false);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(win_size, false);
+    renderer->settings.display_size = win_size;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Vec4 clear_color) {
-    renderer->display_size = display_size;
+RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings, Vec4 clear_color) {
+    if (memcmp(&settings, &renderer->settings, sizeof(settings)) != 0) {
+        glDeleteTextures(1, &renderer->framebuffers[0].texture_id);
+        glDeleteTextures(1, &renderer->framebuffers[1].texture_id);
+        glDeleteFramebuffers(1, &renderer->framebuffers[0].id);
+        glDeleteFramebuffers(1, &renderer->framebuffers[1].id);
+        glDeleteFramebuffers(1, &renderer->framebuffers[2].id);
+        renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(settings.display_size, true);
+        renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(settings.display_size, false);
+        renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(settings.display_size, false);
+        renderer->settings = settings;
+    }
+    
     renderer->clear_color = clear_color;
     RendererCommands *commands = &renderer->commands;
     commands->quads_count = 0;
@@ -424,7 +434,7 @@ void renderer_end_frame(Renderer *renderer) {
     
     // Render all framebuffers to default one
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
+    glViewport(0, 0, (GLsizei)renderer->settings.display_size.x, (GLsizei)renderer->settings.display_size.y);
     glClearColor(renderer->clear_color.r, renderer->clear_color.g,
                  renderer->clear_color.b, renderer->clear_color.a);
     glClear(GL_COLOR_BUFFER_BIT);

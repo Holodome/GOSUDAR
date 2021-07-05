@@ -49,10 +49,14 @@ enum {
 // Set of settings that defines RenderQuads command.
 // So it is per-draw call opengl settings data
 struct RendererSetup {
-    bool has_depth;
     Mat4x4 view;
     Mat4x4 projection;
     Mat4x4 mvp;
+    // This should be named render target.
+    // Different parts of the game require different post processing,
+    // which makes impossible to draw on one framebuffer.
+    // For now each different render target has separate framebuffer, but we may want to 
+    // switch to soring draw calls instead
     u32 framebuffer;
 };
 
@@ -90,6 +94,10 @@ struct RendererCommands {
     Texture white_texture;
 };
 
+struct RendererSettings {
+    Vec2 display_size;  
+};
+
 #define RENDERER_TEXTURE_DIM   512
 #define RENDERER_TEXTURE_SIZE Vec2(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM)
 #define RENDERER_RECIPROCAL_TEXTURE_SIZE Vec2(1.0f / RENDERER_TEXTURE_DIM, 1.0f / RENDERER_TEXTURE_DIM)
@@ -103,6 +111,8 @@ struct RendererFramebuffer {
 
 struct Renderer {
     MemoryArena arena;
+    
+    RendererSettings settings;
     
     GLuint standard_shader;
     GLuint view_location;
@@ -123,12 +133,11 @@ struct Renderer {
     GLuint texture_array;
     RendererFramebuffer framebuffers[RENDERER_FRAMEBUFFER_SENTINEL];
     // Per-frame data
-    Vec2 display_size;
     Vec4 clear_color;
 };
 
 void renderer_init(Renderer *renderer, Vec2 win_size);
-RendererCommands * renderer_begin_frame(Renderer *renderer, Vec2 winsize, Vec4 clear_color);
+RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 

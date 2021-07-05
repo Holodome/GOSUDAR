@@ -46,7 +46,9 @@ void game_update_and_render(Game *game) {
         DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
     }
     
-    RendererCommands *commands = renderer_begin_frame(&game->renderer, window_size(input), Vec4(0.2));
+    RendererSettings renderer_settings = {};
+    renderer_settings.display_size = window_size(input);
+    RendererCommands *commands = renderer_begin_frame(&game->renderer, renderer_settings, Vec4(0.2));
     update_and_render(&game->game_state, input, commands, game->assets);
     DEBUG_update(game->debug_state, input, commands, game->assets);
     renderer_end_frame(&game->renderer);

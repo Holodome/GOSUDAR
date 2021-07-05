@@ -18,7 +18,7 @@ struct AssetBuilder {
     u32 tags_count;
     AssetTag tags[1024];
     u32 info_count;
-    AssetFileAssetInfo file_infos[1024];
+    AssetInfo file_infos[1024];
     AssetFileBuilderAssetInfo infos[1024];
     AssetTypeInfo type_infos[ASSET_TYPE_SENTINEL];
     
@@ -50,7 +50,7 @@ u32 add_asset_internal(AssetBuilder *builder) {
 
 void add_texture_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
-    AssetFileAssetInfo *info = builder->file_infos + info_idx;
+    AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
     info->kind = ASSET_KIND_TEXTURE;
     
@@ -65,7 +65,7 @@ void add_texture_asset(AssetBuilder *builder, const char *filename) {
 
 void add_font_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
-    AssetFileAssetInfo *info = builder->file_infos + info_idx;
+    AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
     info->kind = ASSET_KIND_FONT;
     
@@ -126,7 +126,7 @@ void add_font_asset(AssetBuilder *builder, const char *filename) {
 
 void add_sound_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
-    AssetFileAssetInfo *info = builder->file_infos + info_idx;
+    AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
     info->kind = ASSET_KIND_SOUND;
     
@@ -194,7 +194,7 @@ void add_sound_asset(AssetBuilder *builder, const char *filename) {
 
 void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
     assert(builder->current_asset_type);
-    AssetFileAssetInfo *current_info = builder->file_infos + builder->current_info_idx;
+    AssetInfo *current_info = builder->file_infos + builder->current_info_idx;
     u32 tag_idx = current_info->first_tag_idx + current_info->tag_count++;
     AssetTag *tag = builder->tags + builder->tags_count++;
     tag->id = tag_id;
@@ -255,7 +255,7 @@ int main() {
     header.tags_count = builder->tags_count;
     header.tags_size = header.tags_count * sizeof(AssetTag);
     header.asset_infos_count = builder->info_count;
-    header.asset_infos_size = header.asset_infos_count * sizeof(AssetFileAssetInfo);
+    header.asset_infos_size = header.asset_infos_count * sizeof(AssetInfo);
     header.asset_type_infos_count = ASSET_TYPE_SENTINEL;
     header.asset_type_infos_size = header.asset_type_infos_count * sizeof(AssetTypeInfo);
     
@@ -273,7 +273,7 @@ int main() {
     u64 data_offset = data_base_offset;
     for (size_t i = 0; i < builder->info_count; ++i) {
         AssetFileBuilderAssetInfo *src = builder->infos + i;
-        AssetFileAssetInfo *dst = builder->file_infos + i;
+        AssetInfo *dst = builder->file_infos + i;
         dst->data_offset = data_offset;
         dst->data_size = src->data_size;
         fwrite(src->data, src->data_size, 1, out);
@@ -282,7 +282,7 @@ int main() {
     fseek(out, tags_offset, SEEK_SET);
     fwrite(builder->tags, sizeof(AssetTag), builder->tags_count, out);
     fseek(out, asset_infos_offset, SEEK_SET);
-    fwrite(builder->file_infos, sizeof(AssetFileAssetInfo), builder->info_count, out);
+    fwrite(builder->file_infos, sizeof(AssetInfo), builder->info_count, out);
     fseek(out, asset_type_infos_offset, SEEK_SET);
     fwrite(builder->type_infos, sizeof(AssetTypeInfo), ASSET_TYPE_SENTINEL, out);
     fclose(out);

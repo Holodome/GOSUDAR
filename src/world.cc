@@ -104,7 +104,7 @@ void world_init(World *world) {
     world->free_id_list = 0;
     world->_entity_count = 1; // !!!
     world->max_entity_count = 16384;
-    world->entities = (Entity *)arena_alloc(world->world_arena, 
+    world->entities = (Entity *)alloc(world->world_arena, 
 											sizeof(Entity) * world->max_entity_count);
     memset(world->chunk_hash, 0, sizeof(world->chunk_hash));
     for (size_t i = 0; i < ARRAY_SIZE(world->chunk_hash); ++i) {
@@ -172,7 +172,7 @@ Chunk *get_world_chunk(World *world, Vec2i coord) {
         }
         if (!chunk->next_in_hash) {
             ++world->DEBUG_external_chunks_allocated;
-            chunk->next_in_hash = (Chunk *)arena_alloc(world->world_arena, sizeof(Chunk));
+            chunk->next_in_hash = (Chunk *)alloc(world->world_arena, sizeof(Chunk));
         }
         if (chunk->next_in_hash) {
             chunk = chunk->next_in_hash;
@@ -234,7 +234,7 @@ void add_entity_to_chunk(World *world, Chunk *chunk, EntityID id) {
         if (new_block) {
             world->first_free_entity_block = world->first_free_entity_block->next;
         } else {        
-            new_block = (EntityBlock *)arena_alloc(world->world_arena, sizeof(EntityBlock));
+            new_block = (EntityBlock *)alloc(world->world_arena, sizeof(EntityBlock));
         }
         *new_block = *entity_block;
         entity_block->next = new_block;

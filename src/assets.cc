@@ -7,7 +7,7 @@
 
 #include "entity_kinds.hh"
 
-AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches) {
+AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches) {
     TIMED_FUNCTION();
     assert(type && type <= ASSET_TYPE_SENTINEL);
     AssetID result = INVALID_ASSET_ID;
@@ -19,7 +19,7 @@ AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *we
     for (size_t info_idx = info->first_info_idx, i = 0;
          i < info->asset_count;
          ++info_idx, ++i) {
-        AssetInfo *info = assets->asset_infos + info_idx;
+        Asset *info = assets->asset_infos + info_idx;
         f32 total_weigted_diff = 0;
         for (size_t tag_idx = info->file_info.first_tag_idx, j = 0;
              j < info->file_info.tag_count;
@@ -40,7 +40,7 @@ AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *we
     return result;
 }
 
-AssetID get_first_of_type(Assets *assets, AssetType type) {
+AssetID assets_get_first_of_type(Assets *assets, AssetType type) {
     assert(type && type <= ASSET_TYPE_SENTINEL);
     AssetID result = INVALID_ASSET_ID;
     AssetTypeInfo *info = assets->type_infos + type;
@@ -50,20 +50,20 @@ AssetID get_first_of_type(Assets *assets, AssetType type) {
 }
 
 static void *generate_mipmaps_from_texture_data(Assets *assets, void *pixels, u32 w, u32 h) {
-    void *mips_data = arena_alloc(&assets->arena, get_total_size_for_mips(w, h));
+    void *mips_data = alloc(&assets->arena, get_total_size_for_mips(w, h));
     memcpy(mips_data, pixels, w * h * 4);
     generate_sequential_mips(w, h, mips_data);
     return mips_data;
 }
 
-AssetFileAssetInfo *assets_get_info(Assets *assets, AssetID id) {
-    AssetInfo *asset = assets->asset_infos + id.value;
+AssetInfo *assets_get_info(Assets *assets, AssetID id) {
+    Asset *asset = assets->asset_infos + id.value;
     return &asset->file_info;
 }
 
 Texture *assets_get_texture(Assets *assets, AssetID id) {
     Texture *result = 0;
-    AssetInfo *asset = assets->asset_infos + id.value;
+    Asset *asset = assets->asset_infos + id.value;
     // @TODO this is kinda stupid whatever
     if (asset->file_info.kind == ASSET_KIND_FONT) {
         AssetFont *font = assets_get_font(assets, id);
@@ -75,7 +75,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
             result = alloc_struct(&assets->arena, Texture);
             TempMemory load_temp = begin_temp_memory(&assets->arena);
             
-            void *pixels = arena_alloc(&assets->arena, asset->file_info.data_size);
+            void *pixels = alloc(&assets->arena, asset->file_info.data_size);
             read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, pixels);
             void *mipmaps = generate_mipmaps_from_texture_data(assets, pixels, asset->file_info.width, asset->file_info.height);
             
@@ -93,7 +93,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
 AssetFont *assets_get_font(Assets *assets, AssetID id) {
     AssetFont *result = 0;
     
-    AssetInfo *asset = assets->asset_infos + id.value;
+    Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_FONT);    
     if (asset->state == ASSET_STATE_LOADED) {
         result = asset->font;
@@ -103,7 +103,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         
         TempMemory load_temp = begin_temp_memory(&assets->arena);
         
-        void *data = arena_alloc(&assets->arena, asset->file_info.data_size);
+        void *data = alloc(&assets->arena, asset->file_info.data_size);
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, data);
         memcpy(result->glyphs, data, asset->file_info.codepoint_count * sizeof(FontGlyph));
         void *pixels = (u8 *)data + asset->file_info.codepoint_count * sizeof(FontGlyph);
@@ -120,13 +120,13 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
 
 AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     AssetSound *result = 0;
-    AssetInfo *asset = assets->asset_infos + id.value;
+    Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_SOUND);
     if (asset->state == ASSET_STATE_LOADED) {
         result = asset->sound;
     } else {
         result = alloc_struct(&assets->arena, AssetSound);
-        result->samples = (i16 *)arena_alloc(&assets->arena, asset->file_info.data_size);
+        result->samples = (i16 *)alloc(&assets->arena, asset->file_info.data_size);
         
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, result->samples);
         
@@ -136,8 +136,8 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     return result;
 }
 
-Vec2 get_text_size(Assets *assets, AssetID id, const char *text) {
-    AssetFileAssetInfo *info = assets_get_info(assets, id);
+Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
+    AssetInfo *info = assets_get_info(assets, id);
     AssetFont *font = assets_get_font(assets, id);
     assert(info->kind == ASSET_KIND_FONT);
     size_t count = strlen(text);
@@ -186,18 +186,18 @@ Assets *assets_init(Renderer *renderer) {
     assets->tags_count = header.tags_count;
     assets->tags = alloc_arr(&assets->arena, assets->tags_count, AssetTag);
     assets->asset_info_count = header.asset_infos_count;
-    assets->asset_infos = alloc_arr(&assets->arena, assets->asset_info_count, AssetInfo);
+    assets->asset_infos = alloc_arr(&assets->arena, assets->asset_info_count, Asset);
     assets->type_info_count = header.asset_type_infos_count;
     assets->type_infos = alloc_arr(&assets->arena, assets->type_info_count, AssetTypeInfo);
     
     read_file(file, header.tags_offset, header.tags_size, assets->tags);
     read_file(file, header.asset_type_infos_offset, header.asset_type_infos_size, assets->type_infos);
     TempMemory info_temp = begin_temp_memory(&assets->arena);
-    AssetFileAssetInfo *src_infos = alloc_arr(&assets->arena, header.asset_infos_count, AssetFileAssetInfo);
+    AssetInfo *src_infos = alloc_arr(&assets->arena, header.asset_infos_count, AssetInfo);
     read_file(file, header.asset_infos_offset, header.asset_infos_size, src_infos);
     for (size_t i = 0; i < header.asset_infos_count; ++i) {
-        AssetFileAssetInfo *src = src_infos + i;
-        AssetFileAssetInfo *dst = &assets->asset_infos[i].file_info;
+        AssetInfo *src = src_infos + i;
+        AssetInfo *dst = &assets->asset_infos[i].file_info;
         *dst = *src;
     }
     end_temp_memory(info_temp);

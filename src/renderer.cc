@@ -87,21 +87,23 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 			source_str, type_str, severity_str, id, message);
 }
 
-RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection) {
+RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection) {
     RendererSetup result;
     result.view = view;
     result.projection = projection;
     result.has_depth = true;
     result.mvp = projection * view;
+    result.framebuffer = framebuffer;
     return result;
 }
 
-RendererSetup setup_2d(Mat4x4 projection) {
+RendererSetup setup_2d(u32 framebuffer, Mat4x4 projection) {
     RendererSetup result;
     result.projection = projection;
     result.view = Mat4x4::identity();
     result.has_depth = false;
     result.mvp = projection;
+    result.framebuffer = framebuffer;
     return result;
 }
 
@@ -153,23 +155,45 @@ static GLuint create_shader(const char *source) {
     return id;
 }
 
-void renderer_init(Renderer *renderer) {
+static RendererFramebuffer create_framebuffer(Vec2 size, bool has_depth) {
+    RendererFramebuffer result;
+    result.has_depth = has_depth;
+    
+    GLuint id;
+    glGenFramebuffers(1, &id);
+    glBindFramebuffer(GL_FRAMEBUFFER, id);
+    GLuint texture_attachment;
+    glGenTextures(1, &texture_attachment);
+    glBindTexture(GL_TEXTURE_2D, texture_attachment);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_attachment, 0);
+    if (has_depth) {
+        GLuint render_buffer;
+        glGenRenderbuffers(1, &render_buffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, render_buffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size.x, size.y);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, render_buffer);
+    }
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    result.id = id;
+    result.texture_id = texture_attachment;
+    return result;
+}
+
+void renderer_init(Renderer *renderer, Vec2 win_size) {
 #define RENDERER_ARENA_SIZE MEGABYTES(256)
     arena_init(&renderer->arena, os_alloc(RENDERER_ARENA_SIZE), RENDERER_ARENA_SIZE);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
     glCullFace(GL_BACK);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_SCISSOR_TEST);
     glDepthMask(GL_TRUE);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthFunc(GL_LEQUAL);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
 #define MAX_QUADS_COUNT 1024
 #define MAX_VERTEX_COUNT (1 << 16)
@@ -225,9 +249,9 @@ void main()
 {      
     vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
     vec4 texture_sample = texture(tex, array_uv);      
-    if (texture_sample.a == 0) {
-        discard;
-    } 
+    // if (texture_sample.a == 0) {
+    //     discard;
+    // } 
     
     out_color = texture_sample * rect_color;       
 // #define FOG_COLOR vec4(0.5, 0.5, 0.5, 1)
@@ -241,6 +265,50 @@ void main()
     assert(renderer->tex_location != (GLuint)-1);
     renderer->view_location = glGetUniformLocation(renderer->standard_shader, "view_matrix");
     assert(renderer->view_location != (GLuint)-1);
+    const char *render_framebuffer_shader_code = R"FOO(#ifdef VERTEX_SHADER
+layout(location = 0) in vec2 position;
+layout(location = 1) in vec2 uv;
+
+out vec2 frag_uv;
+
+void main() {
+    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+    frag_uv = uv;
+}
+#else     
+
+in vec2 frag_uv;
+out vec4 out_color;
+
+uniform sampler2D tex;
+
+void main() {
+    out_color = texture(tex, frag_uv);
+}
+
+#endif)FOO";
+    renderer->render_framebuffer_shader = create_shader(render_framebuffer_shader_code);
+    renderer->render_framebuffer_tex_location = glGetUniformLocation(renderer->render_framebuffer_shader, "tex");
+    assert(renderer->render_framebuffer_tex_location != (GLuint)-1);
+    glGenVertexArrays(1, &renderer->render_framebuffer_vao);
+    glBindVertexArray(renderer->render_framebuffer_vao);
+    GLuint renderer_framebuffer_vbo;
+    f32 render_framebuffer_data[] = {
+        -1.0f, -1.0f, 0.0f, 0.0f,  
+        -1.0f, 1.0f, 0.0f, 1.0f,  
+        1.0f, -1.0f, 1.0f, 0.0f,  
+        1.0f, 1.0f, 1.0f, 1.0f,  
+    };
+    glGenBuffers(1, &renderer_framebuffer_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, renderer_framebuffer_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(render_framebuffer_data), render_framebuffer_data, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, (void *)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, (void *)8);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
     // Generate vertex arrays
     glGenVertexArrays(1, &renderer->vertex_array);
     glBindVertexArray(renderer->vertex_array);
@@ -287,6 +355,11 @@ void main()
     memset(white_data, 0xFF, white_data_size);
     renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     free(white_data);
+    // Framebuffers
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(win_size, true);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(win_size, false);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(win_size, false);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Vec4 clear_color) {
@@ -302,30 +375,37 @@ RendererCommands *renderer_begin_frame(Renderer *renderer, Vec2 display_size, Ve
 
 void renderer_end_frame(Renderer *renderer) {
     TIMED_FUNCTION();
-    glViewport(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
-    glScissor(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
-    // Upload data from vertex array to OpenGL buffer
+    // Upload data from vertex array to OpenGL buffers
     glBindVertexArray(renderer->vertex_array);
-    glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
     glBufferSubData(GL_ARRAY_BUFFER, 0, renderer->commands.vertex_count * sizeof(Vertex), renderer->commands.vertices);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
     glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, renderer->commands.index_count * sizeof(RENDERER_INDEX_TYPE), renderer->commands.indices);
-
-    glClearColor(renderer->clear_color.r, renderer->clear_color.g,
-                 renderer->clear_color.b, renderer->clear_color.a);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(renderer->standard_shader);
+    glBindVertexArray(0);
+    
+    // Prepare framebuffers
+    for (size_t i = 0; i < ARRAY_SIZE(renderer->framebuffers); ++i) {
+        GLuint id = renderer->framebuffers[i].id;
+        glBindFramebuffer(GL_FRAMEBUFFER, id);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        u32 flags = GL_COLOR_BUFFER_BIT;
+        if (renderer->framebuffers[i].has_depth) {
+            flags |= GL_DEPTH_BUFFER_BIT;
+        }
+        glClear(flags);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    // Do renderer commands
     u64 DEBUG_draw_call_count = 0;
     u64 DEBUG_quads_dispatched = 0;
     for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
         RenderQuads *quads = renderer->commands.quads + i;
-        
-        if (quads->setup.has_depth) {
-            glEnable(GL_DEPTH_TEST);
-        } else {
-            glDisable(GL_DEPTH_TEST);
-        }
+        RendererFramebuffer *framebuffer = renderer->framebuffers + quads->setup.framebuffer;
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->id);
+        glBindVertexArray(renderer->vertex_array);
+        glUseProgram(renderer->standard_shader);
         glUniformMatrix4fv(renderer->view_location, 1, false, quads->setup.view.value_ptr());
         glUniformMatrix4fv(renderer->projection_location, 1, false, quads->setup.projection.value_ptr());
         glUniform1i(renderer->tex_location, 0); 
@@ -334,10 +414,33 @@ void renderer_end_frame(Renderer *renderer) {
         glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
             (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
             (GLint)quads->vertex_array_offset);
-            
+        glUseProgram(0);
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
         ++DEBUG_draw_call_count;
         DEBUG_quads_dispatched += quads->quad_count;       
     }
+    
+    // Render all framebuffers to default one
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, (GLsizei)renderer->display_size.x, (GLsizei)renderer->display_size.y);
+    glClearColor(renderer->clear_color.r, renderer->clear_color.g,
+                 renderer->clear_color.b, renderer->clear_color.a);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(renderer->render_framebuffer_shader);
+    glDisable(GL_DEPTH_TEST);
+    glBindVertexArray(renderer->render_framebuffer_vao);
+    glActiveTexture(GL_TEXTURE0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    for (size_t i = 0; i < ARRAY_SIZE(renderer->framebuffers); ++i) {
+        RendererFramebuffer *framebuffer = renderer->framebuffers + i;
+        glBindTexture(GL_TEXTURE_2D, framebuffer->texture_id);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+    glBindVertexArray(0);
+    glUseProgram(0);
     
     {DEBUG_VALUE_BLOCK("Renderer")
         DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");

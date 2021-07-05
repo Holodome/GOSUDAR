@@ -241,7 +241,7 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets);
     
     RenderGroup interface_render_group = render_group_begin(commands, assets,
-        setup_2d(Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
+        setup_2d(RENDERER_FRAMEBUFFER_DEBUG, Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
     display_values(&dev_ui, debug_state);
     if (dev_ui_section(&dev_ui, "Profiler")) {

@@ -61,8 +61,8 @@ struct AssetSound {
     i16 *samples;
 };  
 
-struct AssetInfo {
-    AssetFileAssetInfo file_info;
+struct Asset {
+    AssetInfo file_info;
     u32 state;
     union {
         AssetFont  *font;
@@ -83,7 +83,7 @@ struct Assets {
     FileHandle asset_file;
     
     u32 asset_info_count;
-    AssetInfo *asset_infos;
+    Asset *asset_infos;
     
     u32 tags_count;
     AssetTag *tags;
@@ -93,14 +93,17 @@ struct Assets {
 };  
 
 Assets *assets_init(Renderer *renderer);
-AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches);
-AssetID get_first_of_type(Assets *assets, AssetType type);
-AssetFileAssetInfo *assets_get_info(Assets *assets, AssetID id);
+AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches);
+AssetID assets_get_first_of_type(Assets *assets, AssetType type);
+AssetInfo *assets_get_info(Assets *assets, AssetID id);
 Texture *assets_get_texture(Assets *assets, AssetID id);
 AssetFont *assets_get_font(Assets *assets, AssetID id);
 AssetSound *assets_get_sound(Assets *assets, AssetID id);
-
-Vec2 get_text_size(AssetInfo *font, const char *text);
+// This is not related to the assets api, but rather to assets usage code.
+// Currently it is used in the dev ui, but more sophisticated ui system probably will
+// not render use this, as it may want to do dynamic wrapping or something
+// And furthermore, this function is not related to assets sytem in any way
+Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text);
 
 #define ASSETS_HH 1
 #endif

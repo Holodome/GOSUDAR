@@ -109,7 +109,7 @@ static void set_pixel_format(OS *os, HDC hdc) {
 			WGL_STENCIL_BITS_ARB,				8,
 			WGL_ALPHA_BITS_ARB,					8,
 			WGL_SAMPLE_BUFFERS_ARB,				GL_TRUE,
-			WGL_SAMPLES_ARB,					4,
+			// WGL_SAMPLES_ARB,					4,
 			0
         };
         os->wglChoosePixelFormatARB(hdc, attributes, 0, 1,
@@ -154,7 +154,7 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     return result;
 }
 
-OS *os_init() {
+OS *os_init(Vec2 *win_size) {
     OS *os = bootstrap_alloc_struct(OS, arena);
     
     // Set working directory
@@ -192,6 +192,10 @@ OS *os_init() {
         WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
     ShowWindow(os->hwnd, SW_SHOW);
     UpdateWindow(os->hwnd);
+    
+    RECT wr;
+    GetClientRect(os->hwnd, &wr);
+    *win_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     
     LARGE_INTEGER pf;
     QueryPerformanceFrequency(&pf);

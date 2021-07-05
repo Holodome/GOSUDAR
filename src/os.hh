@@ -21,7 +21,7 @@ struct FileHandle {
 
 struct OS;
 
-OS *os_init();
+OS *os_init(Vec2 *win_size);
 
 void init_renderer_backend(OS *os);
 Platform *os_begin_frame(OS *os);

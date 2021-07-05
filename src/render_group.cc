@@ -129,7 +129,7 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
         return;
     }
     
-    AssetFileAssetInfo *info = assets_get_info(render_group->assets, font_id);
+    AssetInfo *info = assets_get_info(render_group->assets, font_id);
     AssetFont *font = assets_get_font(render_group->assets, font_id);
     f32 font_height = info->size;
     f32 line_height = font_height * scale;

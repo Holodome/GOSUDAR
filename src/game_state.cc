@@ -186,7 +186,7 @@ static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
 }
 
 static void get_sim_region_bounds(WorldPosition camera_coord, Vec2i *min, Vec2i *max) {
-#define REGION_CHUNK_RADIUS 10
+#define REGION_CHUNK_RADIUS 3
     *min = Vec2i(camera_coord.chunk.x - REGION_CHUNK_RADIUS, camera_coord.chunk.y - REGION_CHUNK_RADIUS);
     *max = Vec2i(camera_coord.chunk.x + REGION_CHUNK_RADIUS, camera_coord.chunk.y + REGION_CHUNK_RADIUS);
 }
@@ -256,7 +256,7 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
                             if (ent->resource_interactions_left == 0) {
                                 ent->flags |= ENTITY_FLAG_IS_DELETED;
                                 game_state->interactable = null_id();
-                                play_sound(game_state, get_first_of_type(frame->assets, ASSET_TYPE_SOUND));
+                                play_sound(game_state, assets_get_first_of_type(frame->assets, ASSET_TYPE_SOUND));
                             }
                         } break;
                         case PLAYER_INTERACTION_KIND_BUILD: {
@@ -426,7 +426,7 @@ static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, As
     Vec2 size = Vec2(0, 0);
     switch(entity->kind) {
         case ENTITY_KIND_PLAYER: {
-            texture_id = get_first_of_type(assets, ASSET_TYPE_PLAYER);
+            texture_id = assets_get_first_of_type(assets, ASSET_TYPE_PLAYER);
             size = Vec2(0.5f);
         } break;
         case ENTITY_KIND_WORLD_OBJECT: {
@@ -437,7 +437,7 @@ static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, As
             weights.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1000.0f;
             tags.tags[ASSET_TAG_BUILDING_IS_BUILT] = (bool)(entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILT);
             weights.tags[ASSET_TAG_BUILDING_IS_BUILT] = 1.0f;
-            texture_id = get_closest_asset_match(assets, ASSET_TYPE_WORLD_OBJECT, &weights, &tags);
+            texture_id = assets_get_closest_match(assets, ASSET_TYPE_WORLD_OBJECT, &weights, &tags);
         } break;
         INVALID_DEFAULT_CASE;
     }
@@ -449,7 +449,8 @@ static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, As
 static void render_world(GameState *game_state, FrameData *frame, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     SimRegion *sim = frame->sim;
-    RenderGroup world_render_group = render_group_begin(commands, assets, setup_3d(frame->view, frame->projection));
+    RenderGroup world_render_group = render_group_begin(commands, assets,
+        setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, frame->view, frame->projection));
     // Draw ground
     for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
         for (i32 chunk_y = sim->min_chunk.y; chunk_y <= sim->max_chunk.y; ++chunk_y) {
@@ -462,7 +463,7 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
                     Vec2i tile_pos = (Vec2i(chunk_x, chunk_y) - sim->min_chunk) * TILES_IN_CHUNK + Vec2i(tile_x, tile_y);
                     Vec3 tile_v[4];
                     get_ground_tile_positions(tile_pos, tile_v);
-                    push_quad(&world_render_group, tile_v, get_first_of_type(assets, ASSET_TYPE_GRASS));
+                    push_quad(&world_render_group, tile_v, assets_get_first_of_type(assets, ASSET_TYPE_GRASS));
                 }
             }
         }
@@ -502,7 +503,7 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         v[1] = xz(entity_p + Vec2(-half_size.x, half_size.y),  10 * WORLD_EPSILON);
         v[2] = xz(entity_p + Vec2(half_size.x, -half_size.y),  10 * WORLD_EPSILON);
         v[3] = xz(entity_p + Vec2(half_size.x, half_size.y),   10 * WORLD_EPSILON);
-        push_quad(&world_render_group, v, get_first_of_type(assets, ASSET_TYPE_ADDITIONAL));
+        push_quad(&world_render_group, v, assets_get_first_of_type(assets, ASSET_TYPE_ADDITIONAL));
     }
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
     TempMemory zsort = begin_temp_memory(&game_state->frame_arena);
@@ -573,7 +574,7 @@ WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object
 void play_sound(GameState *game_state, AssetID sound_id) {
     PlayingSound *playing_sound = game_state->first_free_playing_sound;
     if (playing_sound) {
-        game_state->first_free_playing_sound = playing_sound->next;
+        LIST_POP(game_state->first_free_playing_sound);
     } else {
         ++game_state->playing_sounds_allocated;
         playing_sound = alloc_struct(&game_state->arena, PlayingSound);
@@ -588,7 +589,7 @@ void play_sound(GameState *game_state, AssetID sound_id) {
 void update_sound(GameState *game_state, Assets *assets, Platform *platform) {
     LIST_ITER(game_state->first_playing_sound, playing_sound) {
         assert(!playing_sound->is_finished);
-        AssetFileAssetInfo *info = assets_get_info(assets, playing_sound->sound_id);
+        AssetInfo *info = assets_get_info(assets, playing_sound->sound_id);
         AssetSound *sound = assets_get_sound(assets, playing_sound->sound_id);
             
         i16 *sample_out = platform->sound_samples;
@@ -652,10 +653,12 @@ void update_sound(GameState *game_state, Assets *assets, Platform *platform) {
     
     // Place all sounds that finished playing to the free list
     // First, remove played sounds from list head
-    while (game_state->first_playing_sound && game_state->first_playing_sound->is_finished) {
-        PlayingSound *next = game_state->first_playing_sound->next;
-        LIST_ADD(game_state->first_free_playing_sound, game_state->first_playing_sound);
-        game_state->first_playing_sound = next;
+    while (game_state->first_playing_sound && 
+        game_state->first_playing_sound->is_finished) {
+        PlayingSound *sound = game_state->first_playing_sound;
+        LIST_POP(game_state->first_playing_sound);
+        LIST_ADD(game_state->first_free_playing_sound, sound);
     }
+    // @TODO remove from other parts of list too
 }
 

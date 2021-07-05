@@ -3,8 +3,9 @@
 void game_init(Game *game) {
     game->is_running = true;   
     game->debug_state = DEBUG_init();
-    game->os = os_init();
-    renderer_init(&game->renderer);
+    Vec2 win_size;
+    game->os = os_init(&win_size);
+    renderer_init(&game->renderer, win_size);
 
     game->assets = assets_init(&game->renderer);
     game_state_init(&game->game_state);

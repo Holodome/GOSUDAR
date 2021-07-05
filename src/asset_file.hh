@@ -18,7 +18,7 @@ struct FontGlyph {
 };
 
 #pragma pack(push, 1)
-struct AssetFileAssetInfo {
+struct AssetInfo {
     u32 kind;
     u32 first_tag_idx;
     u32 tag_count;
@@ -54,14 +54,14 @@ struct AssetFileHeader {
     
     u32 asset_infos_count;
     u64 asset_infos_offset;
-    u64 asset_infos_size; // asset_infos_count * sizeof(AssetFileAssetInfo)
+    u64 asset_infos_size; // asset_infos_count * sizeof(AssetInfo)
     
     u32 asset_type_infos_count;
     u64 asset_type_infos_offset;
     u64 asset_type_infos_size; // asset_type_infos_count * sizeof(AssetTypeInfo)
     
     // AssetTag           [tags_count]
-    // AssetFileAssetInfo [asset_infos_count]
+    // AssetInfo [asset_infos_count]
     // AssetTypeInfo      [asset_type_infos_count]
     // Data block - offsets in asset infos are used
 };

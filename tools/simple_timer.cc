@@ -9,6 +9,14 @@ enum {
     PROGRAM_MODE_END,
 };
 
+double system_time_diff(SYSTEMTIME *a, SYSTEMTIME *b) {
+    double diff = ((double)a->wHour - (double)b->wHour) * 3600.0 + 
+                  ((double)a->wMinute - (double)b->wMinute) * 60.0 + 
+                  ((double)a->wSecond - (double)b->wSecond) + 
+                  ((double)a->wMilliseconds - (double)b->wMilliseconds) / 1000.0;
+    return diff;
+}
+
 int main(int argc, char **argv) {
     unsigned mode = PROGRAM_MODE_START;
     const char *filename = "timer.timer";
@@ -34,7 +42,7 @@ int main(int argc, char **argv) {
         GetSystemTime(&cur_time);
         SYSTEMTIME old_time;
         fread(&old_time, sizeof(old_time), 1, file);
-        double diff = ((double)cur_time.wSecond - (double)old_time.wSecond) + ((double)cur_time.wMilliseconds - (double)old_time.wMilliseconds) / 1000.0;
+        double diff = system_time_diff(&cur_time, &old_time);
         printf("Timer: %.3f Seconds elapsed\n", diff);
     } else {
         assert(false);

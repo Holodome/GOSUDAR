@@ -62,10 +62,10 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
     arena->data_capacity = buffer_size;
 }
 
-#define alloc_struct(_arena, _type) (_type *)arena_alloc(_arena, sizeof(_type))
-#define alloc_arr(_arena, _count, _type) (_type *)arena_alloc(_arena, _count * sizeof(_type))
+#define alloc_struct(_arena, _type) (_type *)alloc(_arena, sizeof(_type))
+#define alloc_arr(_arena, _count, _type) (_type *)alloc(_arena, _count * sizeof(_type))
 #define alloc_string(_arena, _string) (const char *)arena_copy(_arena, strlen(_string) + 1, _string)
-void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
+void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
     void *result = 0;
 
     if (size) {
@@ -95,7 +95,7 @@ void *arena_alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNM
 }
 
 void *arena_copy(MemoryArena *arena, size_t size, void *src) {
-    void *result = arena_alloc(arena, size);
+    void *result = alloc(arena, size);
     memcpy(result, src, size);
     return result;
 }
@@ -104,14 +104,14 @@ void *arena_copy(MemoryArena *arena, size_t size, void *src) {
 inline void *bootstrap_alloc_size(size_t size, size_t arena_offset, size_t minimal_block_size = MEGABYTES(4)) {
     MemoryArena bootstrap;
     arena_init(&bootstrap, os_alloc(minimal_block_size), minimal_block_size);
-    void *struct_ptr = arena_alloc(&bootstrap, size);
+    void *struct_ptr = alloc(&bootstrap, size);
     *(MemoryArena *)((u8 *)struct_ptr + arena_offset) = bootstrap;
     return struct_ptr;
 }
 
 MemoryArena subarena(MemoryArena *arena, size_t capacity) {
     MemoryArena result;
-    arena_init(&result, arena_alloc(arena, capacity), capacity);
+    arena_init(&result, alloc(arena, capacity), capacity);
     return result;
 }
 
@@ -1232,7 +1232,8 @@ struct AssetID {
 #define PACK_4U8_TO_U32(_a, _b, _c, _d) PACK_4U8_TO_U32_((u32)(_a), (u32)(_b), (u32)(_c), (u32)(_d))
 
 #define LIST_ITER(_list, _name) for (auto _name = _list; _name; _name = _name->next)
-#define LIST_ADD(_list, _node) { _node->next = _list; _list = _node; }
+#define LIST_ADD(_list, _node) do { _node->next = _list; _list = _node; } while (0);
+#define LIST_POP(_list) do { _list = _list->next; } while(0);
 
 #define LIB_HH 1
 #endif

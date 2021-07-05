@@ -27,8 +27,17 @@ struct Vertex {
     u16 tex;
 };
 
-struct Shader {
-    GLuint id;
+enum {
+    // In case we want to apply some post processing to the world render
+    RENDERER_FRAMEBUFFER_GAME_WORLD,  
+    // Other parts of game, that don't need to be postprocessed with world
+    // Actually, this can be rendered to default framebuffer, but it introduces some complexity in draw order
+    // This probably should bother, but we'll see
+    RENDERER_FRAMEBUFFER_GAME_INTERFACE,  
+    // Just dump it here so we don't care about draw order...
+    // Of course this is slower - but who cares for debug code, while it doesn't make computer explode
+    RENDERER_FRAMEBUFFER_DEBUG,  
+    RENDERER_FRAMEBUFFER_SENTINEL,  
 };
 
 enum {
@@ -44,10 +53,11 @@ struct RendererSetup {
     Mat4x4 view;
     Mat4x4 projection;
     Mat4x4 mvp;
+    u32 framebuffer;
 };
 
-inline RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection);
-inline RendererSetup setup_2d(Mat4x4 projection);
+inline RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection);
+inline RendererSetup setup_2d(u32 framebuffer, Mat4x4 projection);
 
 // Joined draw quads command.
 // Each RenderQuads can have as many quads in it as index type can fit indices of
@@ -84,6 +94,13 @@ struct RendererCommands {
 #define RENDERER_TEXTURE_SIZE Vec2(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM)
 #define RENDERER_RECIPROCAL_TEXTURE_SIZE Vec2(1.0f / RENDERER_TEXTURE_DIM, 1.0f / RENDERER_TEXTURE_DIM)
 
+struct RendererFramebuffer {
+    GLuint id;
+    GLuint texture_id;  
+    
+    bool has_depth;
+};
+
 struct Renderer {
     MemoryArena arena;
     
@@ -91,6 +108,10 @@ struct Renderer {
     GLuint view_location;
     GLuint projection_location;
     GLuint tex_location;
+    
+    GLuint render_framebuffer_shader;
+    GLuint render_framebuffer_tex_location;
+    GLuint render_framebuffer_vao;
     
     RendererCommands commands;
     
@@ -100,12 +121,13 @@ struct Renderer {
     size_t max_texture_count;
     size_t texture_count;
     GLuint texture_array;
-    
+    RendererFramebuffer framebuffers[RENDERER_FRAMEBUFFER_SENTINEL];
+    // Per-frame data
     Vec2 display_size;
     Vec4 clear_color;
 };
 
-void renderer_init(Renderer *renderer);
+void renderer_init(Renderer *renderer, Vec2 win_size);
 RendererCommands * renderer_begin_frame(Renderer *renderer, Vec2 winsize, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);

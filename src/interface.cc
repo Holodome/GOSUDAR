@@ -129,7 +129,7 @@ void interface_render(Interface *inter, RenderGroup *render_group) {
             case INTERFACE_ELEMENT_BUTTON: {
                 // Vec4 color = element->is_button_pressed ? element->color_button_active : element->color_button_inactive;
                 // push_rect(render_group, element->rect, color);
-                // Vec2 text_size = render_group->assets->get_text_size(Asset_Font, element->text);
+                // Vec2 text_size = render_group->assets->DEBUG_get_text_size(Asset_Font, element->text);
                 // Vec2 text_p = element->rect.top_left() + (element->rect.size() - text_size) * 0.5f;
                 // push_text(render_group, text_p, Vec4(1), element->text, Asset_Font, 1.0f);
             } break;

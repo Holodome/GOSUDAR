@@ -129,9 +129,9 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
         return;
     }
     
-    AssetInfo *info = assets_get_info(render_group->assets, font_id);
+    AssetFileAssetInfo *info = assets_get_info(render_group->assets, font_id);
     AssetFont *font = assets_get_font(render_group->assets, font_id);
-    f32 font_height = info->file_info.size;
+    f32 font_height = info->size;
     f32 line_height = font_height * scale;
     AssetID texture_id = font_id;
 
@@ -143,8 +143,8 @@ void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, 
     
 	for (const char *scan = text; *scan; ++scan) {
 		u8 symbol = *scan;
-		if ((symbol >= info->file_info.first_codepoint)) {
-			FontGlyph *glyph = &font->glyphs[symbol - info->file_info.first_codepoint];
+		if ((symbol >= info->first_codepoint)) {
+			FontGlyph *glyph = &font->glyphs[symbol - info->first_codepoint];
 
 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
 			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;

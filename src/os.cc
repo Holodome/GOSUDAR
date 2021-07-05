@@ -12,10 +12,11 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <audiopolicy.h>
-
+// xinput
+#include <xinput.h>
+// opengl
 #include "wgl.h"
 #include "wglext.h"
-
 #include "renderer.hh"
 
 #define CO_CREATE_INSTANCE(name) HRESULT name(REFCLSID rclsid, LPUNKNOWN *pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv)
@@ -23,10 +24,18 @@ typedef CO_CREATE_INSTANCE(CoCreateInstance_);
 #define CO_INITIALIZE_EX(name) HRESULT name(LPVOID pvReserved, DWORD dwCoInit)
 typedef CO_INITIALIZE_EX(CoInitializeEx_);
 
+#define XINPUT_GET_STATE(_name) DWORD WINAPI _name(DWORD, XINPUT_STATE *)
+#define XINPUT_SET_STATE(_name) DWORD WINAPI _name(DWORD, XINPUT_VIBRATION *)
+typedef XINPUT_GET_STATE(XInputGetState_);
+typedef XINPUT_SET_STATE(XInputSetState_);
+
 struct OS {
     MemoryArena arena;
     
-    Input input;
+    bool old_fullscreen;
+    bool old_vsync;    
+        
+    Platform platform;
     HINSTANCE instance;
     HWND hwnd;
     
@@ -58,60 +67,11 @@ struct OS {
     u32 sound_buffer_frame_count;
     u64 sound_samples_per_sec;
     u64 sound_latency_frame_count;
+    
+    XInputGetState_ *XInputGetState;
+    XInputSetState_ *XInputSetState;
 };
 static bool window_close_requested;
-
-static void init_wasapi(OS *os) {
-    HRESULT result;
-    
-    HMODULE wasapi_dll = LoadLibraryA("ole32.dll");
-    assert(wasapi_dll);
-    os->CoCreateInstance = (CoCreateInstance_ *)GetProcAddress(wasapi_dll, "CoCreateInstance");
-    os->CoInitializeEx = (CoInitializeEx_ *)GetProcAddress(wasapi_dll, "CoInitializeEx");
-    assert(os->CoCreateInstance);
-    assert(os->CoInitializeEx);
-    
-    result = os->CoInitializeEx(0, COINIT_SPEED_OVER_MEMORY);
-    assert(result == S_OK);
-#define REFTIMES_PER_SEC 10000000
-    REFERENCE_TIME requested_sound_duration = REFTIMES_PER_SEC * 2;
-    static GUID CLSID_MMDeviceEnumerator = {0xBCDE0395, 0xE52F, 0x467C, 0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E};
-    static GUID IID_IMMDeviceEnumerator = {0xA95664D2, 0x9614, 0x4F35, 0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6};
-    result = os->CoCreateInstance(CLSID_MMDeviceEnumerator, 0, CLSCTX_ALL, IID_IMMDeviceEnumerator, (LPVOID *)&os->sound_device_enum);
-    assert(result == S_OK);
-    result = os->sound_device_enum->GetDefaultAudioEndpoint(eRender, eConsole, &os->sound_device);
-    assert(result == S_OK);
-    static GUID IID_IAudioClient = {0x1CB9AD4C, 0xDBFA, 0x4c32, 0xB1, 0x78, 0xC2, 0xF5, 0x68, 0xA7, 0x03, 0xB2};
-    result = os->sound_device->Activate(IID_IAudioClient, CLSCTX_ALL, 0, (void **)&os->audio_client);
-    assert(result == S_OK);
-    
-    WORD bits_per_sample = sizeof(i16) * 8;
-    WORD block_align = (os->sound_channels * bits_per_sample) / 8;
-    DWORD average_bytes_per_second = block_align * os->sound_samples_per_sec;
-    WAVEFORMATEX wave_format = {};
-    wave_format.wFormatTag = WAVE_FORMAT_PCM;
-    wave_format.nChannels = os->sound_channels;
-    wave_format.nSamplesPerSec = os->sound_samples_per_sec;
-    wave_format.nAvgBytesPerSec = average_bytes_per_second;
-    wave_format.nBlockAlign = block_align;
-    wave_format.wBitsPerSample = bits_per_sample;
-    
-    result = os->audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 
-        AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
-        requested_sound_duration,
-        0, &wave_format, 0);
-    assert(result == S_OK);
-    
-    static GUID IID_IAudioRenderClient = {0xF294ACFC, 0x3146, 0x4483, 0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2};
-    result = os->audio_client->GetService(IID_IAudioRenderClient, (void **)&os->audio_render_client);
-    assert(result == S_OK);
-    
-    result = os->audio_client->GetBufferSize(&os->sound_buffer_frame_count);
-    assert(result == S_OK);
-    os->sound_buffer_duration = (REFERENCE_TIME)((f64)REFTIMES_PER_SEC * os->sound_buffer_frame_count / os->sound_samples_per_sec);
-    result = os->audio_client->Start();
-    assert(result == S_OK);
-}
 
 static void fill_sound_buffer(OS *os, i16 *samples, u64 samples_to_write) {
     if (!samples_to_write) {
@@ -197,7 +157,23 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
 OS *os_init() {
     OS *os = bootstrap_alloc_struct(OS, arena);
     
+    // Set working directory
+    char executable_directory[MAX_PATH];
+    GetModuleFileNameA(0, executable_directory, sizeof(executable_directory));
+    char *last_slash_location = 0;
+    char *cursor = executable_directory;
+    while (*cursor) {
+        if (*cursor == '\\') {
+            last_slash_location = cursor;
+        }
+        ++cursor;
+    }
+    memset(last_slash_location, 0, sizeof(executable_directory) - (last_slash_location - executable_directory));
+    SetCurrentDirectoryA(executable_directory);
+    
+    //
     // Create window
+    //
     os->instance = GetModuleHandle(0);
     WNDCLASSA wndclss = {};
     wndclss.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
@@ -224,16 +200,9 @@ OS *os_init() {
     LARGE_INTEGER time;
     QueryPerformanceCounter(&time);
     os->last_frame_time = os->game_start_time = time;
-    
-    os->sound_channels = 2;
-    os->sound_samples_per_sec = 44100;
-    os->sound_latency_frame_count = os->sound_samples_per_sec / 15;
-    os->input.sound_samples = alloc_arr(&os->arena, os->sound_samples_per_sec * 2, i16);
-    init_wasapi(os);
-    return os;
-}
-
-void init_renderer_backend(OS *os) {
+    //
+    // Opengl
+    //
     HMODULE opengl_dll = LoadLibraryA("opengl32.dll");
     assert(opengl_dll);
     
@@ -300,20 +269,90 @@ void init_renderer_backend(OS *os) {
     if (!_name) assert(!"Failed to load " #_name " OGL procedure.");
 #include "gl_procs.inc"
 #undef GLPROC
+
+#define DEFAULT_VSYNC true 
+    os->platform.vsync = DEFAULT_VSYNC;
+    os->wglSwapIntervalEXT(DEFAULT_VSYNC);
+    // Sound
+    os->sound_channels = 2;
+    os->sound_samples_per_sec = 44100;
+    os->sound_latency_frame_count = os->sound_samples_per_sec / 15;
+    os->platform.sound_samples = alloc_arr(&os->arena, os->sound_samples_per_sec * 2, i16);
+    HRESULT result;
     
-    os->wglSwapIntervalEXT(1);
+    HMODULE wasapi_dll = LoadLibraryA("ole32.dll");
+    assert(wasapi_dll);
+    os->CoCreateInstance = (CoCreateInstance_ *)GetProcAddress(wasapi_dll, "CoCreateInstance");
+    os->CoInitializeEx = (CoInitializeEx_ *)GetProcAddress(wasapi_dll, "CoInitializeEx");
+    assert(os->CoCreateInstance);
+    assert(os->CoInitializeEx);
+    
+    result = os->CoInitializeEx(0, COINIT_SPEED_OVER_MEMORY);
+    assert(result == S_OK);
+#define REFTIMES_PER_SEC 10000000
+    REFERENCE_TIME requested_sound_duration = REFTIMES_PER_SEC * 2;
+    static GUID CLSID_MMDeviceEnumerator = {0xBCDE0395, 0xE52F, 0x467C, 0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E};
+    static GUID IID_IMMDeviceEnumerator = {0xA95664D2, 0x9614, 0x4F35, 0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6};
+    result = os->CoCreateInstance(CLSID_MMDeviceEnumerator, 0, CLSCTX_ALL, IID_IMMDeviceEnumerator, (LPVOID *)&os->sound_device_enum);
+    assert(result == S_OK);
+    result = os->sound_device_enum->GetDefaultAudioEndpoint(eRender, eConsole, &os->sound_device);
+    assert(result == S_OK);
+    static GUID IID_IAudioClient = {0x1CB9AD4C, 0xDBFA, 0x4c32, 0xB1, 0x78, 0xC2, 0xF5, 0x68, 0xA7, 0x03, 0xB2};
+    result = os->sound_device->Activate(IID_IAudioClient, CLSCTX_ALL, 0, (void **)&os->audio_client);
+    assert(result == S_OK);
+    
+    WORD bits_per_sample = sizeof(i16) * 8;
+    WORD block_align = (os->sound_channels * bits_per_sample) / 8;
+    DWORD average_bytes_per_second = block_align * os->sound_samples_per_sec;
+    WAVEFORMATEX wave_format = {};
+    wave_format.wFormatTag = WAVE_FORMAT_PCM;
+    wave_format.nChannels = os->sound_channels;
+    wave_format.nSamplesPerSec = os->sound_samples_per_sec;
+    wave_format.nAvgBytesPerSec = average_bytes_per_second;
+    wave_format.nBlockAlign = block_align;
+    wave_format.wBitsPerSample = bits_per_sample;
+    
+    result = os->audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 
+        AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+        requested_sound_duration,
+        0, &wave_format, 0);
+    assert(result == S_OK);
+    
+    static GUID IID_IAudioRenderClient = {0xF294ACFC, 0x3146, 0x4483, 0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2};
+    result = os->audio_client->GetService(IID_IAudioRenderClient, (void **)&os->audio_render_client);
+    assert(result == S_OK);
+    
+    result = os->audio_client->GetBufferSize(&os->sound_buffer_frame_count);
+    assert(result == S_OK);
+    os->sound_buffer_duration = (REFERENCE_TIME)((f64)REFTIMES_PER_SEC * os->sound_buffer_frame_count / os->sound_samples_per_sec);
+    result = os->audio_client->Start();
+    assert(result == S_OK);
+    //
+    // XInput
+    //
+    HMODULE xinput_dll = LoadLibraryA("xinput1_4.dll");
+    if (!xinput_dll) {
+        xinput_dll = LoadLibraryA("xinput9_1_0.dll");
+    }
+    if (!xinput_dll) {
+        xinput_dll = LoadLibraryA("xinput1_3.dll");
+    }
+    assert(xinput_dll);
+    os->XInputGetState = (XInputGetState_ *)GetProcAddress(xinput_dll, "XInputGetState");
+    os->XInputSetState = (XInputSetState_ *)GetProcAddress(xinput_dll, "XInputSetState");
+    assert(os->XInputGetState);
+    assert(os->XInputSetState);
+    // @TODO actual controller stuff
+    
+    return os;
 }
 
-Input *update_input(OS *os) {
+Platform *os_begin_frame(OS *os) {
     TIMED_FUNCTION();
-    Input *input = &os->input;
+    Platform *input = &os->platform;
     input->mwheel = 0;
         
-    for (u32 key_index = 0;
-        key_index < KEY_COUNT;
-        ++key_index) {
-        (input->keys + key_index)->transition_count = 0;        
-    }
+    memset(input->keys_transition_count, 0, sizeof(input->keys_transition_count));
     input->utf32 = 0;
     
     MSG msg;
@@ -440,7 +479,7 @@ Input *update_input(OS *os) {
                 }
 
                 if ((u32)key) {
-                    input->keys[(u32)key].update(is_down);
+                    update_key_state(input, key, is_down);
                 }
                 
                 TranslateMessage(&msg);
@@ -448,8 +487,8 @@ Input *update_input(OS *os) {
         }
     }
     
-    input->keys[KEY_MOUSE_LEFT].update(GetKeyState(VK_LBUTTON) & (1 << 31));
-    input->keys[KEY_MOUSE_RIGHT].update(GetKeyState(VK_RBUTTON) & (1 << 31));
+    update_key_state(input, KEY_MOUSE_LEFT,  GetKeyState(VK_LBUTTON) & (1 << 31));
+    update_key_state(input, KEY_MOUSE_RIGHT, GetKeyState(VK_RBUTTON) & (1 << 31));
     
     POINT mp;
     GetCursorPos(&mp);
@@ -467,7 +506,7 @@ Input *update_input(OS *os) {
     QueryPerformanceCounter(&current_time);
     f32 delta_time = (f32)(current_time.QuadPart - os->last_frame_time.QuadPart) / (f32)os->perf_count_frequency;
     os->last_frame_time = current_time;
-    input->dt = delta_time;
+    input->frame_dt = delta_time;
     
     input->is_quit_requested = window_close_requested;
     
@@ -483,13 +522,10 @@ Input *update_input(OS *os) {
     input->sample_count_to_output = sound_sample_count_to_output;
     input->samples_per_second = os->sound_samples_per_sec;
     
+    os->old_vsync = input->vsync;
+    os->old_fullscreen = input->fullscreen;
+    
     return input;
-}
-
-void update_window(OS *os) {
-    TIMED_FUNCTION();
-    fill_sound_buffer(os, os->input.sound_samples, os->input.sample_count_to_output);
-    os->wglSwapLayerBuffers(os->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
 }
 
 void go_fullscreen(OS *os, bool fullscreen) {
@@ -497,29 +533,39 @@ void go_fullscreen(OS *os, bool fullscreen) {
 
     DWORD WindowStyle = GetWindowLong(os->hwnd, GWL_STYLE);
     // Set fullscreen (actually this is windowed fullscreen!)
-    if (fullscreen)
-    {
+    if (fullscreen) {
         MONITORINFO MonitorInfo = {sizeof(MONITORINFO)};
         if (GetWindowPlacement(os->hwnd, &LastWindowPlacement) &&
             GetMonitorInfo(MonitorFromWindow(os->hwnd, MONITOR_DEFAULTTOPRIMARY),
-                           &MonitorInfo))
-        {
+                           &MonitorInfo)) {
             SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
 
             SetWindowPos(os->hwnd, HWND_TOP,
-                         MonitorInfo.rcMonitor.left,
-                         MonitorInfo.rcMonitor.top,
-                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                MonitorInfo.rcMonitor.left,
+                MonitorInfo.rcMonitor.top,
+                MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         }
-    }
-    else
-    {
+    } else {
         SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
         SetWindowPlacement(os->hwnd, &LastWindowPlacement);
         SetWindowPos(os->hwnd, 0, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
+void os_end_frame(OS *os) {
+    TIMED_FUNCTION();
+    fill_sound_buffer(os, os->platform.sound_samples, os->platform.sample_count_to_output);
+    
+    if (os->old_vsync != os->platform.vsync) {
+        os->wglSwapIntervalEXT(os->platform.vsync);
+    }
+    os->wglSwapLayerBuffers(os->wglGetCurrentDC(), WGL_SWAP_MAIN_PLANE);
+    
+    if (os->old_fullscreen != os->platform.fullscreen) {
+        go_fullscreen(os, os->platform.fullscreen);
     }
 }
 
@@ -537,11 +583,9 @@ RealWorldTime get_real_world_time() {
     return result;
 }
 
-
 void mkdir(const char *name) {
     HRESULT result = CreateDirectoryA(name, 0);
     UNREFERENCED_VARIABLE(result);
-    // assert(result);
     // @TODO errors
 }
 
@@ -554,13 +598,13 @@ FileHandle open_file(const char *name, bool read) {
     } else {
         handle = CreateFileA(name, GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, 0, 0);
     }
-    result.errors = (handle == INVALID_HANDLE_VALUE);
+    result.no_errors = (handle != INVALID_HANDLE_VALUE);
     memcpy(result.storage, &handle, sizeof(handle));
     return result;
 }
 
 bool file_handle_valid(FileHandle handle) {
-    return !handle.errors;
+    return handle.no_errors;
 }
 
 size_t get_file_size(FileHandle handle) {
@@ -569,9 +613,7 @@ size_t get_file_size(FileHandle handle) {
 }
 
 void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
-    assert(dest);
-    if (!handle.errors)
-    {
+    if (handle.no_errors) {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
         overlapped.Offset     = (u32)((offset >> 0)  & 0xFFFFFFFF);
@@ -588,15 +630,13 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
         }
         else 
         {
-			printf("%u\n", GetLastError());
             assert(false);
         }
     }
 }
 
 void write_file(FileHandle handle, size_t offset, size_t size, const void *source) {
-    assert(source);
-    if (!handle.errors) {
+    if (handle.no_errors) {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
         overlapped.Offset     = (u32)((offset >> 0)  & 0xFFFFFFFF);

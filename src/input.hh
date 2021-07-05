@@ -39,37 +39,34 @@ enum {
     KEY_COUNT
 };  
 
-struct KeyState {
-    bool is_down = false;
-    int transition_count = 0;  
-
-    void update(bool new_down) {
-        if (this->is_down != new_down) {
-            this->is_down = new_down;
-            ++transition_count;
-        }
-    }
-};
-
-struct Input {
+// A way of platform layer communcating with game.
+// In the begging of the frame platform layer supplies gaem with all information about user input 
+// it needs, during the frame game can modify some values in this struct to make commands to the 
+// platform layer, like go fullscreen or switch vsync
+// The idea of this structure is not to provide api, but simply pass data between modules
+struct Platform {
     Vec2 winsize;
     Vec2 mpos;
     Vec2 mdelta;
     f32 mwheel; 
-    KeyState keys[KEY_COUNT];
-    f32 dt;
+    bool is_keys_down[KEY_COUNT];
+    u8 keys_transition_count[KEY_COUNT];
+    f32 frame_dt;
+    u32 utf32;
     bool is_quit_requested;
     
-    u32 utf32;
-    
-    // @CLEANUP this shouldn't be here! But now input is only way of communcating with platform layer,
-    // so it's really issue of platform API design
-    // Or we can remove input as concept, and switch to having Platform instead
-    // Since now all actual input goes through InputManager
     i16 *sound_samples;
     u64 sample_count_to_output;
     u64 samples_per_second;
+    // Settings that can be changed
+    bool vsync;
+    bool fullscreen;
 };
+
+inline void update_key_state(Platform *input, u32 key, bool new_down) {
+    input->keys_transition_count[key] += (bool)(input->is_keys_down[key] != new_down);
+    input->is_keys_down[key] = new_down;
+}
 
 enum {
     INPUT_ACCESS_TOKEN_NO_LOCK, 
@@ -89,11 +86,11 @@ enum {
 // this delay does not occure in game circumstances, and can be easilly avoided in other cases, 
 // for example setting lock in the begging of the frame
 struct InputManager {
-    Input *input;
+    Platform *input;
     u32 access_token;
 };
 
-inline InputManager create_input_manager(Input *input) {
+inline InputManager create_input_manager(Platform *input) {
     InputManager result;
     result.input = input;
     result.access_token = INPUT_ACCESS_TOKEN_NO_LOCK;
@@ -113,7 +110,7 @@ void unlock_input(InputManager *manager) {
 bool is_key_pressed(InputManager *manager, u32 key, u32 access_token) {
     bool result = false;
     if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = manager->input->keys[key].is_down && manager->input->keys[key].transition_count;
+        result = manager->input->is_keys_down[key] && manager->input->keys_transition_count[key];
     }
     return result;
 }
@@ -121,7 +118,7 @@ bool is_key_pressed(InputManager *manager, u32 key, u32 access_token) {
 bool is_key_released(InputManager *manager, u32 key, u32 access_token) {
     bool result = false;
     if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = !manager->input->keys[key].is_down && manager->input->keys[key].transition_count;
+        result = !manager->input->is_keys_down[key] && manager->input->keys_transition_count[key];
     }
     return result;
 }
@@ -129,7 +126,7 @@ bool is_key_released(InputManager *manager, u32 key, u32 access_token) {
 bool is_key_held(InputManager *manager, u32 key, u32 access_token) {
     bool result = false;
     if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = manager->input->keys[key].is_down;
+        result = manager->input->is_keys_down[key];
     }
     return result;
 }
@@ -151,7 +148,7 @@ Vec2 window_size(InputManager *manager) {
 }
 
 f32 get_dt(InputManager *manager) {
-    return manager->input->dt;
+    return manager->input->frame_dt;
 }
 
 #define INPUT_HH 1

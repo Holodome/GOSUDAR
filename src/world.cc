@@ -130,21 +130,18 @@ EntityID get_new_id(World *world) {
 }
 
 void free_id(World *world, EntityID id) {
-    IDListEntry *new_entry;
-    if (world->free_id_list_free_entry) {
-        new_entry = world->free_id_list_free_entry;
+    IDListEntry *new_entry = world->free_id_list_free_entry;
+    if (new_entry) {
         world->free_id_list_free_entry = world->free_id_list_free_entry->next;
     } else {
         ++world->DEBUG_id_list_entries_allocated;
         new_entry = alloc_struct(world->world_arena, IDListEntry);
     }
     new_entry->id = id;
-    new_entry->next = world->free_id_list;
-    world->free_id_list = new_entry;
+    LIST_ADD(world->free_id_list, new_entry);
 }
 
 Entity *get_world_entity(World *world, EntityID id) {
-    // @TODO clean, make 0 id invalid
     assert(id.value);
     assert(id.value < world->_entity_count);
     return world->entities + id.value;    

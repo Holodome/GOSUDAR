@@ -129,6 +129,7 @@ void game_state_init(GameState *game_state) {
     game_state->interactable = null_id();
     game_state->interaction_kind = PLAYER_INTERACTION_KIND_NONE;
     game_state->allow_camera_controls = false;
+    game_state->global_volume = 1.0f;
     // Initialize world struct
     game_state->world = alloc_struct(&game_state->arena, World);
     game_state->world->world_arena = &game_state->arena;
@@ -255,6 +256,7 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
                             if (ent->resource_interactions_left == 0) {
                                 ent->flags |= ENTITY_FLAG_IS_DELETED;
                                 game_state->interactable = null_id();
+                                play_sound(game_state, get_first_of_type(frame->assets, ASSET_TYPE_SOUND));
                             }
                         } break;
                         case PLAYER_INTERACTION_KIND_BUILD: {
@@ -539,6 +541,7 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     arena_clear(&game_state->frame_arena);
     FrameData frame = {};
     frame.input = input;
+    frame.assets = assets;
     // Since camera follows some entity and is never too far from it, we can assume that camera position is
     // the position of followed entity
     WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
@@ -549,17 +552,110 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     update_world_simulation(game_state, &frame);
     render_world(game_state, &frame, commands, assets);
     end_sim(frame.sim);
+    update_sound(game_state, frame.assets, input->input);
     
     Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
     Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
-    DEBUG_VALUE(player_pos, "Player pos");
-    DEBUG_VALUE(player->world_pos.offset, "Chunk offset");
-    DEBUG_VALUE(player->world_pos.chunk, "Chunk coord");
+    {DEBUG_VALUE_BLOCK("GameState")
+        DEBUG_VALUE(game_state->playing_sounds_allocated, "Playing sounds allocated");
+        DEBUG_VALUE(player_pos, "Player pos");
+        DEBUG_VALUE(player->world_pos.offset, "Chunk offset");
+        DEBUG_VALUE(player->world_pos.chunk, "Chunk coord");
+    }
 }
 
 WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object_kind) {
     assert(world_object_kind);
     assert(world_object_kind < ARRAY_SIZE(game_state->world_object_settings));
     return game_state->world_object_settings + world_object_kind;
+}
+
+void play_sound(GameState *game_state, AssetID sound_id) {
+    PlayingSound *playing_sound = game_state->first_free_playing_sound;
+    if (playing_sound) {
+        game_state->first_free_playing_sound = playing_sound->next;
+    } else {
+        ++game_state->playing_sounds_allocated;
+        playing_sound = alloc_struct(&game_state->arena, PlayingSound);
+    }
+    LIST_ADD(game_state->first_playing_sound, playing_sound);
+    
+    playing_sound->play_cursor = 0.0f;
+    playing_sound->is_finished = false;
+    playing_sound->sound_id = sound_id;
+}
+
+void update_sound(GameState *game_state, Assets *assets, Platform *platform) {
+    LIST_ITER(game_state->first_playing_sound, playing_sound) {
+        assert(!playing_sound->is_finished);
+        AssetFileAssetInfo *info = assets_get_info(assets, playing_sound->sound_id);
+        AssetSound *sound = assets_get_sound(assets, playing_sound->sound_id);
+            
+        i16 *sample_out = platform->sound_samples;
+        f64 sound_pitch = ((f64)info->sample_rate / (f64)platform->samples_per_second);
+        f64 sound_volume = game_state->global_volume;
+        for (size_t write_sample = 0; write_sample < platform->sample_count_to_output; ++write_sample) {
+            f64 start_play_cursor = playing_sound->play_cursor;
+            
+            f64 target_play_cursor = start_play_cursor + (f64)info->channels * sound_pitch;
+            if (target_play_cursor >= info->sample_count) {
+                target_play_cursor -= info->sample_count;
+            }
+            // Get source samples
+            i16 start_left_sample, start_right_sample;
+            {
+                u64 left_idx = (u64)start_play_cursor;
+                if (info->channels == 2) {
+                    left_idx = left_idx ^ (left_idx & 0x1);
+                }
+                u64 right_idx = left_idx + (info->channels - 1);
+                
+                i16 first_left_sample = sound->samples[left_idx];
+                i16 first_right_sample = sound->samples[right_idx];
+                i16 second_left_sample = sound->samples[left_idx + info->channels];
+                i16 second_right_sample = sound->samples[right_idx + info->channels];
+                start_left_sample = (i16)(first_left_sample + (second_left_sample - first_left_sample) * 
+                    (start_play_cursor / info->channels - (u64)(start_play_cursor / info->channels)));
+                start_right_sample = (i16)(first_right_sample + (second_right_sample - first_right_sample) * 
+                    (start_play_cursor / info->channels - (u64)(start_play_cursor / info->channels)));
+            }
+            i16 target_left_sample, target_right_sample;
+            {
+                u64 left_idx = (u64)target_play_cursor;
+                if (info->channels == 2) {
+                    left_idx = left_idx ^ (left_idx & 0x1);
+                }
+                u64 right_idx = left_idx + (info->channels - 1);
+                
+                i16 first_left_sample = sound->samples[left_idx];
+                i16 first_right_sample = sound->samples[right_idx];
+                i16 second_left_sample = sound->samples[left_idx + info->channels];
+                i16 second_right_sample = sound->samples[right_idx + info->channels];
+                target_left_sample = (i16)(first_left_sample + (second_left_sample - first_left_sample) * 
+                    (target_play_cursor / info->channels - (u64)(target_play_cursor / info->channels)));
+                target_right_sample = (i16)(first_right_sample + (second_right_sample - first_right_sample) * 
+                    (target_play_cursor / info->channels - (u64)(target_play_cursor / info->channels)));
+            }
+            // Get write sample
+            i16 left_sample = (i16)(((i64)start_left_sample + (i64)target_left_sample) / 2 * sound_volume);
+            i16 right_sample = (i16)(((i64)start_right_sample + (i64)target_right_sample) / 2 * sound_volume);
+            // Write sound
+            *sample_out++ += left_sample;
+            *sample_out++ += right_sample;
+            
+            playing_sound->play_cursor = target_play_cursor;
+            if (playing_sound->play_cursor >= info->sample_count - info->channels - 1) {
+                playing_sound->is_finished = true;
+            }
+        }
+    }
+    
+    // Place all sounds that finished playing to the free list
+    // First, remove played sounds from list head
+    while (game_state->first_playing_sound && game_state->first_playing_sound->is_finished) {
+        PlayingSound *next = game_state->first_playing_sound->next;
+        LIST_ADD(game_state->first_free_playing_sound, game_state->first_playing_sound);
+        game_state->first_playing_sound = next;
+    }
 }
 

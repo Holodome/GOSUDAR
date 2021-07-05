@@ -3,7 +3,6 @@
 #include "lib.hh"
 
 #include "input.hh"
-#include "sound.hh"
 
 struct RealWorldTime {
     u32 year;
@@ -16,23 +15,19 @@ struct RealWorldTime {
 };
 
 struct FileHandle {
-    bool errors;
+    bool no_errors;
     u8 storage[8];
 };
 
 struct OS;
 
 OS *os_init();
-void os_init_renderer_backend(OS *os);
 
 void init_renderer_backend(OS *os);
-Input *update_input(OS *os);
-void update_window(OS *os);
-
-void go_fullscreen(bool fullscreen);
+Platform *os_begin_frame(OS *os);
+void os_end_frame(OS *os);
 
 RealWorldTime get_real_world_time();
-
 // Virtual memory management
 void *os_alloc(size_t size);
 void os_free(void *ptr);

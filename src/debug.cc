@@ -201,9 +201,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
         value_block_stack[current_value_block_stack_index] = block->next;
         
         if (dev_ui_section(dev_ui, block->name)) {
-            for (DebugValue *value = block->first_value;
-                value;
-                value = value->next) {
+            LIST_ITER(block->first_value, value) {
                 char buffer[64];
                 switch (value->value_kind) {
                     case DEBUG_VALUE_f32: {

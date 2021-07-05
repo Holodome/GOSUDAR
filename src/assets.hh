@@ -55,14 +55,10 @@ struct AssetFont {
 };
 
 struct AssetSound {
-    u32 channels;
-    u32 sample_rate;
     // Samples in format [ 1: [l, r], 2: [l, r], ...]
     // Channel samples are stored next to each other for each individual sample
     // It may be benefitial to switch to having arrays of samples for each channel to simplify sound play arithmetic
     i16 *samples;
-    // Number of individual samples, with separate for each channel
-    u32 sample_count;  
 };  
 
 struct AssetInfo {
@@ -99,7 +95,7 @@ struct Assets {
 Assets *assets_init(Renderer *renderer);
 AssetID get_closest_asset_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches);
 AssetID get_first_of_type(Assets *assets, AssetType type);
-AssetInfo *assets_get_info(Assets *assets, AssetID id);
+AssetFileAssetInfo *assets_get_info(Assets *assets, AssetID id);
 Texture *assets_get_texture(Assets *assets, AssetID id);
 AssetFont *assets_get_font(Assets *assets, AssetID id);
 AssetSound *assets_get_sound(Assets *assets, AssetID id);

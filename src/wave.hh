@@ -4,7 +4,6 @@
 #if !defined(WAVE_HH)
 
 #include "lib.hh"
-#include "sound.hh"
 
 #pragma pack(push, 1)
 struct RIFFHeader {

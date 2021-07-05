@@ -56,14 +56,14 @@ static void *generate_mipmaps_from_texture_data(Assets *assets, void *pixels, u3
     return mips_data;
 }
 
-AssetInfo *assets_get_info(Assets *assets, AssetID id) {
+AssetFileAssetInfo *assets_get_info(Assets *assets, AssetID id) {
     AssetInfo *asset = assets->asset_infos + id.value;
-    return asset;
+    return &asset->file_info;
 }
 
 Texture *assets_get_texture(Assets *assets, AssetID id) {
     Texture *result = 0;
-    AssetInfo *asset = assets_get_info(assets, id);
+    AssetInfo *asset = assets->asset_infos + id.value;
     // @TODO this is kinda stupid whatever
     if (asset->file_info.kind == ASSET_KIND_FONT) {
         AssetFont *font = assets_get_font(assets, id);
@@ -93,7 +93,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
 AssetFont *assets_get_font(Assets *assets, AssetID id) {
     AssetFont *result = 0;
     
-    AssetInfo *asset = assets_get_info(assets, id);
+    AssetInfo *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_FONT);    
     if (asset->state == ASSET_STATE_LOADED) {
         result = asset->font;
@@ -120,7 +120,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
 
 AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     AssetSound *result = 0;
-    AssetInfo *asset = assets_get_info(assets, id);
+    AssetInfo *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_SOUND);
     if (asset->state == ASSET_STATE_LOADED) {
         result = asset->sound;
@@ -128,9 +128,7 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
         result = alloc_struct(&assets->arena, AssetSound);
         result->samples = (i16 *)arena_alloc(&assets->arena, asset->file_info.data_size);
         
-        TempMemory load_temp = begin_temp_memory(&assets->arena);
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, result->samples);
-        end_temp_memory(load_temp);
         
         asset->sound = result;
         asset->state = ASSET_STATE_LOADED;
@@ -138,18 +136,20 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     return result;
 }
 
-Vec2 get_text_size(AssetInfo *asset, const char *text) {
-    assert(asset->file_info.kind == ASSET_KIND_FONT);
+Vec2 get_text_size(Assets *assets, AssetID id, const char *text) {
+    AssetFileAssetInfo *info = assets_get_info(assets, id);
+    AssetFont *font = assets_get_font(assets, id);
+    assert(info->kind == ASSET_KIND_FONT);
     size_t count = strlen(text);
     Vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         u8 codepoint = text[i];
-        if (codepoint >= asset->file_info.first_codepoint) {
-            FontGlyph *glyph = &asset->font->glyphs[codepoint - asset->file_info.first_codepoint];
+        if (codepoint >= info->first_codepoint) {
+            FontGlyph *glyph = &font->glyphs[codepoint - info->first_codepoint];
             result.x += glyph->x_advance;
         }
     }
-    result.y = asset->file_info.size;
+    result.y = info->size;
     return result;
 }
 

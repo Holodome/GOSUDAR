@@ -15,6 +15,7 @@ enum {
 };
 
 struct FrameData {
+    Assets *assets;
     Vec2 mouse_projection;
     SimEntity *camera_followed_entity;
     SimRegion *sim;
@@ -42,11 +43,23 @@ struct WorldObjectSettings {
     u32 flags;
 };  
 
+struct PlayingSound {
+    AssetID sound_id;
+    f64 play_cursor;
+    bool is_finished;
+    PlayingSound *next;
+};
+
 // All game-related data is stored here. Like player resources, debug thigs etc.
 struct GameState {
     MemoryArena arena;
     MemoryArena frame_arena;
     
+    u64 playing_sounds_allocated;
+    f32 global_volume;
+    PlayingSound *first_playing_sound;
+    PlayingSound *first_free_playing_sound;
+        
     WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
     
     SimCamera cam;
@@ -74,6 +87,9 @@ WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object
 
 void game_state_init(GameState *game_state);
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets);
+
+void play_sound(GameState *game_state, AssetID sound_id);
+void update_sound(GameState *game_state, Assets *assets, Platform *platform);
 
 #define GAME_WORLD_HH 1
 #endif

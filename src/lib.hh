@@ -1231,5 +1231,8 @@ struct AssetID {
 #define PACK_4U8_TO_U32_(_a, _b, _c, _d) (((_a) << 0) | ((_b) << 8) | ((_c) << 16) | ((_d) << 24))
 #define PACK_4U8_TO_U32(_a, _b, _c, _d) PACK_4U8_TO_U32_((u32)(_a), (u32)(_b), (u32)(_c), (u32)(_d))
 
+#define LIST_ITER(_list, _name) for (auto _name = _list; _name; _name = _name->next)
+#define LIST_ADD(_list, _node) { _node->next = _list; _list = _node; }
+
 #define LIB_HH 1
 #endif

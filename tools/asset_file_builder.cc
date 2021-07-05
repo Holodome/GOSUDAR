@@ -243,7 +243,7 @@ int main() {
     end_asset_type(builder);
     
     begin_asset_type(builder, ASSET_TYPE_SOUND);
-    add_sound_asset(builder, "music.wav");
+    add_sound_asset(builder, "wood.wav");
     end_asset_type(builder);
     
 #define OUT_FILENAME "assets.assets"

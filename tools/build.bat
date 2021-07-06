@@ -15,7 +15,12 @@ set "build_options=-nologo -DEBUG -fp:fast -Od -Oi -Zi -FC -MTd -wd4201 -WX -I".
 
 simple_timer -start
 cl %build_options% ../src/compile.cc -link -opt:ref gdi32.lib user32.lib kernel32.lib -out:game.exe
+set "compile_status=%ERRORLEVEL%"
 copy game.exe ..\game\
 simple_timer -end
 
 popd 
+
+if %compile_status%==0 (
+    game\game
+)

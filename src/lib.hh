@@ -64,7 +64,7 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
 
 #define alloc_struct(_arena, _type) (_type *)alloc(_arena, sizeof(_type))
 #define alloc_arr(_arena, _count, _type) (_type *)alloc(_arena, _count * sizeof(_type))
-#define alloc_string(_arena, _string) (const char *)arena_copy(_arena, strlen(_string) + 1, _string)
+#define alloc_string(_arena, _string) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1)
 void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
     void *result = 0;
 
@@ -94,7 +94,7 @@ void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
     return result;
 }
 
-void *arena_copy(MemoryArena *arena, size_t size, void *src) {
+void *alloc_copy(MemoryArena *arena, const void *src, size_t size) {
     void *result = alloc(arena, size);
     memcpy(result, src, size);
     return result;

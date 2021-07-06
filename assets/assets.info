@@ -1,0 +1,39 @@
+[ASSET_TYPE_PLAYER]
+texture "dude.png"
+
+[ASSET_TYPE_WORLD_OBJECT]
+texture "tree.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_TREE_FOREST
+}
+texture "cactus.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_TREE_DESERT
+}
+texture "jungle.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_TREE_JUNGLE
+}
+texture "building.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_BUILDING1
+    ASSET_TAG_BUILDING_IS_BUILT 0.0
+}
+texture "building1.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_BUILDING1
+    ASSET_TAG_BUILDING_IS_BUILT 1.0
+}
+texture "building1.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_BUILDING2
+}
+texture "gold.png" {
+    ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_GOLD_DEPOSIT
+}
+
+[ASSET_TYPE_GRASS]
+texture "grass.png"
+
+[ASSET_TYPE_ADDITIONAL]
+texture "select.png"
+
+[ASSET_TYPE_FONT]
+font "c:/windows/fonts/consola.ttf"
+
+[ASSET_TYPE_SOUND]
+sound "wood.wav"

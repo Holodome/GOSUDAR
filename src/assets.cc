@@ -5,8 +5,6 @@
 
 #include "wave.hh"
 
-#include "entity_kinds.hh"
-
 AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches) {
     TIMED_FUNCTION();
     assert(type && type <= ASSET_TYPE_SENTINEL);

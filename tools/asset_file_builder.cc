@@ -1,6 +1,6 @@
 #include "assets.hh"
 
-#include "entity_kinds.hh"
+#include "game_enums.hh"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -8,6 +8,21 @@
 #include "stb_truetype.h"
 
 #include "wave.hh"
+
+#include "lexer.hh"
+#include "lexer.cc"
+
+static bool asset_tag_id_lookup(const char *test, u32 *dst) {
+    return DEBUG_enum_string_lookup(AssetTagID_strings, test, dst);
+}
+
+static bool asset_type_lookup(const char *test, u32 *dst) {
+    return DEBUG_enum_string_lookup(AssetType_strings, test, dst);
+}
+
+static bool entity_kind_lookup(const char *test, u32 *dst) {
+    return DEBUG_enum_string_lookup(EntityKind_strings, test, dst);
+}
 
 struct AssetFileBuilderAssetInfo {
     void *data;
@@ -26,19 +41,19 @@ struct AssetBuilder {
     u32 current_info_idx;  
 };
 
-void begin_asset_type(AssetBuilder *builder, u32 type) {
-    assert(!builder->current_asset_type);
+static void begin_asset_type(AssetBuilder *builder, u32 type) {
+    // assert(!builder->current_asset_type);
     builder->current_asset_type = type;
     AssetTypeInfo *type_info = builder->type_infos + type;
     type_info->first_info_idx = builder->info_count;
 }
 
-void end_asset_type(AssetBuilder *builder) {
-    assert(builder->current_asset_type);
-    builder->current_asset_type = 0;
-}
+// static void end_asset_type(AssetBuilder *builder) {
+//     assert(builder->current_asset_type);
+//     builder->current_asset_type = 0;
+// }
 
-u32 add_asset_internal(AssetBuilder *builder) {
+static u32 add_asset_internal(AssetBuilder *builder) {
     assert(builder->current_asset_type);
     AssetTypeInfo *type_info = builder->type_infos + builder->current_asset_type;
     builder->current_info_idx = type_info->first_info_idx + type_info->asset_count++;
@@ -48,7 +63,7 @@ u32 add_asset_internal(AssetBuilder *builder) {
     return result;
 }
 
-void add_texture_asset(AssetBuilder *builder, const char *filename) {
+static void add_texture_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
     AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
@@ -63,12 +78,11 @@ void add_texture_asset(AssetBuilder *builder, const char *filename) {
     builder_data->data_size = w * h * 4;
 }
 
-void add_font_asset(AssetBuilder *builder, const char *filename) {
+static void add_font_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
     AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
     info->kind = ASSET_KIND_FONT;
-    
 #define FONT_HEIGHT 16    
 #define FONT_ATLAS_WIDTH  512
 #define FONT_ATLAS_HEIGHT 512
@@ -124,7 +138,7 @@ void add_font_asset(AssetBuilder *builder, const char *filename) {
     }
 }
 
-void add_sound_asset(AssetBuilder *builder, const char *filename) {
+static void add_sound_asset(AssetBuilder *builder, const char *filename) {
     u32 info_idx = add_asset_internal(builder);
     AssetInfo *info = builder->file_infos + info_idx;
     AssetFileBuilderAssetInfo *builder_data = builder->infos + info_idx;
@@ -192,7 +206,7 @@ void add_sound_asset(AssetBuilder *builder, const char *filename) {
     fclose(file);
 }
 
-void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
+static void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
     assert(builder->current_asset_type);
     AssetInfo *current_info = builder->file_infos + builder->current_info_idx;
     u32 tag_idx = current_info->first_tag_idx + current_info->tag_count++;
@@ -201,54 +215,156 @@ void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
     tag->value = value;
 }
 
-int main() {
+#define peek lexer_peek
+static void expect_token(Lexer *lexer, u32 expected) {
+    if (peek(lexer)->token != expected) {
+        printf("Unexpected token %u (expected %u)\n", peek(lexer)->token, expected);
+        assert(false);
+    }
+}
+
+static void parse_asset_file_description(AssetBuilder *builder, Lexer *lexer) {
+// whatever..
+    while (peek(lexer)->token != TOKEN_EOS) {
+        // Parse asset type declaration
+        if (peek(lexer)->token == '[') {
+            eat_tok(lexer);
+            expect_token(lexer, TOKEN_IDENT);
+            u32 asset_type = ASSET_KIND_NONE;
+            const char *asset_type_string = peek(lexer)->value_ident;
+            if (!asset_type_lookup(asset_type_string, &asset_type)) {
+                printf("Invalid asset type '%s'\n", asset_type_string);
+            }
+            assert(asset_type);
+            begin_asset_type(builder, asset_type);
+            eat_tok(lexer);
+            expect_token(lexer, ']');
+            eat_tok(lexer);
+            
+            printf("Begin asset type '%s'\n", asset_type_string);
+        } else {
+            //
+            // Parse asset definition
+            //
+            expect_token(lexer, TOKEN_IDENT);
+            u32 asset_kind = ASSET_KIND_NONE;
+            const char *test = peek(lexer)->value_ident;
+            if (strcmp(test, "texture") == 0) {
+                asset_kind = ASSET_KIND_TEXTURE;
+            } else if (strcmp(test, "font") == 0) {
+                asset_kind = ASSET_KIND_FONT;
+            } else if (strcmp(test, "sound") == 0) {
+                asset_kind = ASSET_KIND_SOUND;
+            } else {
+                printf("Invalid asset kind '%s'\n", test);
+            }
+            assert(asset_kind);
+            eat_tok(lexer);
+            expect_token(lexer, TOKEN_STR);
+            const char *filename = peek(lexer)->value_str;
+            
+            switch (asset_kind) {
+                case ASSET_KIND_TEXTURE: {
+                    add_texture_asset(builder, filename);
+                    printf("Add texture asset '%s'\n", filename);
+                } break;
+                case ASSET_KIND_FONT: {
+                    add_font_asset(builder, filename);
+                    printf("Add font asset '%s'\n", filename);
+                } break;
+                case ASSET_KIND_SOUND: {
+                    add_sound_asset(builder, filename);
+                    printf("Add sound asset '%s'\n", filename);
+                } break;
+                INVALID_DEFAULT_CASE;
+            }
+            eat_tok(lexer);
+            //
+            // Parse tags
+            //
+            if (peek(lexer)->token == '{') {
+                eat_tok(lexer);
+                while(peek(lexer)->token != '}') {
+                    u32 tag_id = 0;
+                    f32 tag_value = 0;
+                    expect_token(lexer, TOKEN_IDENT);
+                    const char *tag_id_string = peek(lexer)->value_ident;
+                    if (!asset_tag_id_lookup(tag_id_string, &tag_id)) {
+                        printf("Invalid tag id '%s'\n", tag_id_string);
+                    }
+                    eat_tok(lexer);
+                    if (peek(lexer)->token == TOKEN_IDENT) {
+                        const char *value_string = peek(lexer)->value_ident;
+                        u32 value = 0;
+                        if (!entity_kind_lookup(value_string, &value)) {
+                            printf("Invalid tag value, entity kind '%s' is nonexistent\n", value_string);
+                        }
+                        tag_value = value;
+                    } else if (peek(lexer)->token == TOKEN_INT) {
+                        tag_value = (f32)peek(lexer)->value_int;
+                    } else if (peek(lexer)->token == TOKEN_REAL) {
+                        tag_value = (f32)peek(lexer)->value_real;
+                    } else {
+                        assert(false);
+                    }
+                    eat_tok(lexer);
+                    add_tag(builder, tag_id, tag_value);
+                    printf("Add tag %u(%s) %f\n", tag_id, tag_id_string, tag_value);
+                }
+                eat_tok(lexer);
+            }
+        }
+    } 
+}
+
+int main(int argc, char **argv) {
     printf("Start\n");
+    
+    char *filename;
+    if (argc != 2) {
+        printf("Please add filename for asset info file\n");
+        filename = "..\\assets\\assets.info";
+        // return 1;
+    } else {
+        filename = argv[1];
+    }
+    
+    printf("Loading asset info file '%s'\n", filename);
+    
+    FILE *in_file = fopen(filename, "rb");
+    if (!in_file) {
+        printf("Failed to locate asset info file '%s'\n", filename);
+        return 1;
+    }
+    
+#define LEXER_ARENA_SIZE MEGABYTES(16)
+    Lexer lexer_;
+    Lexer *lexer = &lexer_;
+    arena_init(&lexer->arena, malloc(LEXER_ARENA_SIZE), LEXER_ARENA_SIZE);
+    
+    fseek(in_file, 0, SEEK_END);
+    size_t in_file_size = ftell(in_file);
+    fseek(in_file, 0, SEEK_SET);
+    void *in_file_data = malloc(in_file_size + 1);
+    fread(in_file_data, 1, in_file_size, in_file);
+    ((char *)in_file_data)[in_file_size] = 0;
+    
+    lexer_init(lexer, in_file_data, in_file_size + 1);
+    free(in_file_data);
+    fclose(in_file);
     
     AssetBuilder *builder = (AssetBuilder *)malloc(sizeof(AssetBuilder));
     memset(builder, 0, sizeof(*builder));
     
-    begin_asset_type(builder, ASSET_TYPE_PLAYER);
-    add_texture_asset(builder, "dude.png");
-    end_asset_type(builder);
-    
-    begin_asset_type(builder, ASSET_TYPE_WORLD_OBJECT);
-    add_texture_asset(builder, "tree.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_FOREST);
-    add_texture_asset(builder, "cactus.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_DESERT);
-    add_texture_asset(builder, "jungle.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_TREE_JUNGLE);
-    add_texture_asset(builder, "building.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING1);
-    add_tag(builder, ASSET_TAG_BUILDING_IS_BUILT, 0.0f);
-    add_texture_asset(builder, "building1.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING1);
-    add_tag(builder, ASSET_TAG_BUILDING_IS_BUILT, 1.0f);
-    add_texture_asset(builder, "building1.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_BUILDING2);
-    add_texture_asset(builder, "gold.png");
-    add_tag(builder, ASSET_TAG_WORLD_OBJECT_KIND, WORLD_OBJECT_KIND_GOLD_DEPOSIT);
-    end_asset_type(builder);
-    
-    begin_asset_type(builder, ASSET_TYPE_FONT);
-    add_font_asset(builder, "c:/windows/fonts/consola.ttf");
-    end_asset_type(builder);
-    
-    begin_asset_type(builder, ASSET_TYPE_GRASS);
-    add_texture_asset(builder, "grass.png");
-    end_asset_type(builder);
-    
-    begin_asset_type(builder, ASSET_TYPE_ADDITIONAL);
-    add_texture_asset(builder, "select.png");
-    end_asset_type(builder);
-    
-    begin_asset_type(builder, ASSET_TYPE_SOUND);
-    add_sound_asset(builder, "wood.wav");
-    end_asset_type(builder);
+    parse_asset_file_description(builder, lexer);
     
 #define OUT_FILENAME "assets.assets"
+    printf("Writing to file '%s'\n", OUT_FILENAME);
     FILE *out = fopen(OUT_FILENAME, "wb");
-    assert(out);
+    if (!out) {
+        printf("Failed to file for writing '%s'. Check if it is in use\n", OUT_FILENAME);
+        return 1;
+    }
     
     AssetFileHeader header = {};
     header.magic_value = ASSET_FILE_MAGIC_VALUE;

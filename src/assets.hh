@@ -2,6 +2,7 @@
 
 #include "lib.hh"
 
+#include "game_enums.hh"
 #include "asset_file.hh"
 #include "os.hh"
 
@@ -9,27 +10,6 @@
 #define ASSET_TAG_COUNT 10
 struct AssetTagList {
     f32 tags[ASSET_TAG_COUNT];
-};
-
-enum {
-    // Tress
-    ASSET_TAG_BIOME = 0,  
-    // Building
-    ASSET_TAG_WORLD_OBJECT_KIND = 0,
-    ASSET_TAG_BUILDING_IS_BUILT = 1,
-    // Player 
-    // Font
-};
-
-enum AssetType {
-    ASSET_TYPE_NONE,
-    ASSET_TYPE_WORLD_OBJECT,
-    ASSET_TYPE_PLAYER,  
-    ASSET_TYPE_FONT,    
-    ASSET_TYPE_GRASS,    
-    ASSET_TYPE_ADDITIONAL,
-    ASSET_TYPE_SOUND,
-    ASSET_TYPE_SENTINEL,  
 };
 
 struct AssetTypeInfo {

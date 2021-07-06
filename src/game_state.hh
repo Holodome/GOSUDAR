@@ -60,7 +60,7 @@ struct GameState {
     PlayingSound *first_playing_sound;
     PlayingSound *first_free_playing_sound;
         
-    WorldObjectSettings world_object_settings[WORLD_OBJECT_KIND_SENTINEL];
+    WorldObjectSettings world_object_settings[10];
     
     SimCamera cam;
     EntityID camera_followed_entity_id;

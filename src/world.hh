@@ -39,7 +39,7 @@ inline bool is_same(EntityID a, EntityID b);
 inline bool is_not_null(EntityID a);
 inline EntityID entity_id_from_storage_index(u32 index);
 
-#include "entity_kinds.hh"
+#include "game_enums.hh"
 
 // @TODO if we want to be fancy, we can use depth kind system
 // So there will be several kind levels, primary being pawn, world object
@@ -52,19 +52,15 @@ struct SimEntity {
     // General data
     Vec2 p;
     EntityID id;
-    u8 flags;
-    u8 kind;
+    u32 flags;
+    u32 kind;
     // Per-kind values
-    u8 world_object_flags;
-    u8 world_object_kind;
-    u8 resource_interactions_left;
+    u32 world_object_flags;
+    u32 world_object_kind;
+    u32 resource_interactions_left;
     // For building
     f32 build_progress; // [0-1]
 };  
-
-CT_ASSERT(ENUM_FITS_IN_VARIABLE(ENTITY_FLAG_SENTINEL, STRUCT_FIELD(SimEntity, flags)));
-CT_ASSERT(ENUM_FITS_IN_VARIABLE(ENTITY_KIND_SENTINEL, STRUCT_FIELD(SimEntity, kind)));
-CT_ASSERT(ENUM_FITS_IN_VARIABLE(WORLD_OBJECT_KIND_SENTINEL, STRUCT_FIELD(SimEntity, world_object_kind)));
 
 // Entity stored in world
 struct Entity {

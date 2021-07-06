@@ -46,6 +46,9 @@ struct GameState {
     MemoryArena arena;
     MemoryArena *frame_arena;
     
+    // RendererSettings last_frame_renderer_settings;
+    RendererSettings renderer_settings;
+    
     u64 playing_sounds_allocated;
     f32 global_volume;
     PlayingSound *first_playing_sound;

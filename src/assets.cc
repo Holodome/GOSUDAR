@@ -146,22 +146,17 @@ Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
     return result;
 }
 
-struct AssetBuilder {
-    Assets *assets;
-    u32 current_asset_type;
-    u32 current_info_idx;  
-};
-
-void begin_asset_type(AssetBuilder *builder, u32 type) {
-    assert(!builder->current_asset_type);
-    builder->current_asset_type = type;
-    AssetTypeInfo *type_info = builder->assets->type_infos + type;
-    type_info->first_info_idx = builder->assets->asset_info_count;
-}
-
-void end_asset_type(AssetBuilder *builder) {
-    assert(builder->current_asset_type);
-    builder->current_asset_type = 0;
+void assets_purge_textures(Assets *assets) {
+    // WE DO SOMETHING VERY STUPID HERE!!!
+    // THIS IS JUST TO TEST HOW CHANGING RENDERER SETTINGS INTERACTS WITH ASSESTS
+    for (size_t i = 0; i < assets->asset_info_count; ++i) {
+        Asset *asset = assets->asset_infos + i;
+        if (asset->file_info.kind == ASSET_KIND_TEXTURE && asset->state == ASSET_STATE_LOADED) {
+            asset->state = ASSET_STATE_UNLOADED;
+        } else if (asset->file_info.kind == ASSET_KIND_FONT && asset->state == ASSET_STATE_LOADED) {
+            asset->state = ASSET_STATE_UNLOADED;
+        }
+    }
 }
 
 Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena) {

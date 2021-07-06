@@ -537,6 +537,8 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
 
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
+    // game_state->last_frame_renderer_settings = game_state->renderer_settings;
+    game_state->renderer_settings.display_size = input->platform->winsize;
     FrameData frame = {};
     frame.input = input;
     frame.assets = assets;
@@ -560,6 +562,10 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
         DEBUG_VALUE(player_pos, "Player pos");
         DEBUG_VALUE(player->world_pos.offset, "Chunk offset");
         DEBUG_VALUE(player->world_pos.chunk, "Chunk coord");
+    }
+    {DEBUG_VALUE_BLOCK("Renderer settings");
+        DEBUG_SWITCH(&game_state->renderer_settings.filtered, "Tex filtration");
+        DEBUG_VALUE(game_state->renderer_settings.display_size, "Display size");
     }
 }
 

@@ -96,6 +96,7 @@ struct RendererCommands {
 
 struct RendererSettings {
     Vec2 display_size;  
+    bool filtered;
 };
 
 #define RENDERER_TEXTURE_DIM   512
@@ -103,8 +104,10 @@ struct RendererSettings {
 #define RENDERER_RECIPROCAL_TEXTURE_SIZE Vec2(1.0f / RENDERER_TEXTURE_DIM, 1.0f / RENDERER_TEXTURE_DIM)
 
 struct RendererFramebuffer {
+    Vec2 size;
     GLuint id;
     GLuint texture_id;  
+    GLuint depth_id;
     
     bool has_depth;
 };
@@ -132,14 +135,16 @@ struct Renderer {
     size_t texture_count;
     GLuint texture_array;
     RendererFramebuffer framebuffers[RENDERER_FRAMEBUFFER_SENTINEL];
-    // Per-frame data
-    Vec4 clear_color;
+    
+    u64 video_memory_used;
 };
 
-void renderer_init(Renderer *renderer, Vec2 display_size);
-RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings, Vec4 clear_color);
+void renderer_init(Renderer *renderer, RendererSettings settings);
+RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
+void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);
+
 
 #define RENDERER_H 1
 #endif

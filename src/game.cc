@@ -5,11 +5,13 @@ void game_init(Game *game) {
 #define FRAME_ARENA_SIZE MEGABYTES(256)
     arena_init(&game->frame_arena, os_alloc(FRAME_ARENA_SIZE), FRAME_ARENA_SIZE);
     game->debug_state = DEBUG_init();
-    Vec2 display_size;
-    game->os = os_init(&display_size);
-    renderer_init(&game->renderer, display_size);
+    RendererSettings default_renderer_settings;
+    default_renderer_settings.display_size = Vec2(0);
+    game->os = os_init(&default_renderer_settings.display_size);
+    renderer_init(&game->renderer, default_renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);
     game_state_init(&game->game_state, &game->frame_arena);
+    game->game_state.renderer_settings = default_renderer_settings;
 }
 
 void game_cleanup(Game *game) {
@@ -48,9 +50,12 @@ void game_update_and_render(Game *game) {
         DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
     }
     
-    RendererSettings renderer_settings = {};
-    renderer_settings.display_size = input->platform->winsize;
-    RendererCommands *commands = renderer_begin_frame(&game->renderer, renderer_settings, Vec4(0.2));
+    if (memcmp(&game->renderer.settings, &game->game_state.renderer_settings, sizeof(RendererSettings)) != 0) {
+        assets_purge_textures(game->assets);
+        init_renderer_for_settings(&game->renderer, game->game_state.renderer_settings);
+    }
+    
+    RendererCommands *commands = renderer_begin_frame(&game->renderer, game->game_state.renderer_settings);
     DEBUG_update(game->debug_state, input, commands, game->assets);
     update_and_render(&game->game_state, input, commands, game->assets);
     renderer_end_frame(&game->renderer);

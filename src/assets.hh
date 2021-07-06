@@ -93,6 +93,7 @@ AssetInfo *assets_get_info(Assets *assets, AssetID id);
 Texture *assets_get_texture(Assets *assets, AssetID id);
 AssetFont *assets_get_font(Assets *assets, AssetID id);
 AssetSound *assets_get_sound(Assets *assets, AssetID id);
+void assets_purge_textures(Assets *assets);
 // This is not related to the assets api, but rather to assets usage code.
 // Currently it is used in the dev ui, but more sophisticated ui system probably will
 // not render use this, as it may want to do dynamic wrapping or something

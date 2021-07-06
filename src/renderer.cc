@@ -153,39 +153,98 @@ static GLuint create_shader(const char *source) {
     return id;
 }
 
-static RendererFramebuffer create_framebuffer(Vec2 size, bool has_depth) {
+static RendererFramebuffer create_framebuffer(Renderer *renderer, Vec2 size, bool has_depth, bool filtered) {
     RendererFramebuffer result;
     result.has_depth = has_depth;
+    result.size = size;
     
-    GLuint id;
-    glGenFramebuffers(1, &id);
-    glBindFramebuffer(GL_FRAMEBUFFER, id);
-    GLuint texture_attachment;
-    glGenTextures(1, &texture_attachment);
-    glBindTexture(GL_TEXTURE_2D, texture_attachment);
+    glGenFramebuffers(1, &result.id);
+    glBindFramebuffer(GL_FRAMEBUFFER, result.id);
+    glGenTextures(1, &result.texture_id);
+    glBindTexture(GL_TEXTURE_2D, result.texture_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_attachment, 0);
+    GLenum filter = filtered ? GL_LINEAR : GL_NEAREST;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, result.texture_id, 0);
+    renderer->video_memory_used += size.x * size.y * 4;
     if (has_depth) {
-        GLuint render_buffer;
-        glGenRenderbuffers(1, &render_buffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, render_buffer);
+        glGenRenderbuffers(1, &result.depth_id);
+        glBindRenderbuffer(GL_RENDERBUFFER, result.depth_id);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size.x, size.y);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, render_buffer);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, result.depth_id);
+        renderer->video_memory_used += size.x * size.y * 3;
     }
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-    result.id = id;
-    result.texture_id = texture_attachment;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return result;
 }
 
-void renderer_init(Renderer *renderer, Vec2 display_size) {
+static void free_framebuffer(Renderer *renderer, RendererFramebuffer *framebuffer) {
+    if (framebuffer->id) {
+        if (framebuffer->has_depth) {
+            renderer->video_memory_used -= framebuffer->size.x * framebuffer->size.y * 3;
+            glDeleteRenderbuffers(1, &framebuffer->depth_id);
+        }
+        glDeleteTextures(1, &framebuffer->texture_id);
+        renderer->video_memory_used -= framebuffer->size.x * framebuffer->size.y * 4;
+        glDeleteFramebuffers(1, &framebuffer->id);
+    }
+}
+
+void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
+    if (renderer->texture_array) {
+        glDeleteTextures(1, &renderer->texture_array);
+        for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+             is_valid(&iter);
+             advance(&iter)) {    
+            renderer->video_memory_used -= iter.width * iter.height * 4;
+        }
+    }
+    
+#define MAX_TEXTURE_COUNT 256
+    renderer->max_texture_count = MAX_TEXTURE_COUNT;
+    glGenTextures(1, &renderer->texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
+    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+         is_valid(&iter);
+         advance(&iter)) {
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
+            iter.width, iter.height, MAX_TEXTURE_COUNT,
+            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
+        renderer->video_memory_used += iter.width * iter.height * 4;
+    }
+    GLenum min_filter = settings.filtered ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
+    GLenum mag_filter = settings.filtered ? GL_LINEAR : GL_NEAREST;
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, min_filter);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, mag_filter);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    
+    size_t white_data_size = get_total_size_for_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+    TempMemory white_temp = begin_temp_memory(&renderer->arena);
+    void *white_data = alloc(&renderer->arena, white_data_size);
+    memset(white_data, 0xFF, white_data_size);
+    renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+    end_temp_memory(white_temp);
+        
+    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD);
+    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_INTERFACE);
+    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_DEBUG);
+    bool is_filtered = settings.filtered;
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(renderer, settings.display_size, true, is_filtered);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(renderer, settings.display_size, false, is_filtered);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(renderer, settings.display_size, false, is_filtered);
+    
+    renderer->settings = settings;
+}
+
+void renderer_init(Renderer *renderer, RendererSettings settings) {
 #define RENDERER_ARENA_SIZE MEGABYTES(256)
     arena_init(&renderer->arena, os_alloc(RENDERER_ARENA_SIZE), RENDERER_ARENA_SIZE);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
-    glCullFace(GL_BACK);
     glDepthMask(GL_TRUE);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthFunc(GL_LEQUAL);
@@ -314,10 +373,12 @@ void main() {
     glGenBuffers(1, &renderer->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, renderer->commands.max_vertex_count * sizeof(Vertex), 0, GL_STREAM_DRAW);
+    renderer->video_memory_used += renderer->commands.max_vertex_count * sizeof(Vertex);
 
     glGenBuffers(1, &renderer->index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
+    renderer->video_memory_used += renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
     glEnableVertexAttribArray(0);
@@ -331,50 +392,10 @@ void main() {
     glEnableVertexAttribArray(4);
 
     glBindVertexArray(0);
-    // Generate textures
-#define MAX_TEXTURE_COUNT 256
-    renderer->max_texture_count = MAX_TEXTURE_COUNT;
-    glGenTextures(1, &renderer->texture_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-         is_valid(&iter);
-         advance(&iter)) {
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
-            iter.width, iter.height, MAX_TEXTURE_COUNT,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
-    }
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    size_t white_data_size = get_total_size_for_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-    void *white_data = malloc(white_data_size);
-    memset(white_data, 0xFF, white_data_size);
-    renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-    free(white_data);
-    // Framebuffers
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(display_size, true);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(display_size, false);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(display_size, false);
-    renderer->settings.display_size = display_size;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    init_renderer_for_settings(renderer, settings);
 }
 
-RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings, Vec4 clear_color) {
-    if (memcmp(&settings, &renderer->settings, sizeof(settings)) != 0) {
-        glDeleteTextures(1, &renderer->framebuffers[0].texture_id);
-        glDeleteTextures(1, &renderer->framebuffers[1].texture_id);
-        glDeleteFramebuffers(1, &renderer->framebuffers[0].id);
-        glDeleteFramebuffers(1, &renderer->framebuffers[1].id);
-        glDeleteFramebuffers(1, &renderer->framebuffers[2].id);
-        renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(settings.display_size, true);
-        renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(settings.display_size, false);
-        renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(settings.display_size, false);
-        renderer->settings = settings;
-    }
-    
-    renderer->clear_color = clear_color;
+RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings) {
     RendererCommands *commands = &renderer->commands;
     commands->quads_count = 0;
     commands->vertex_count = 0;
@@ -435,8 +456,7 @@ void renderer_end_frame(Renderer *renderer) {
     // Render all framebuffers to default one
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, (GLsizei)renderer->settings.display_size.x, (GLsizei)renderer->settings.display_size.y);
-    glClearColor(renderer->clear_color.r, renderer->clear_color.g,
-                 renderer->clear_color.b, renderer->clear_color.a);
+    glClearColor(0.2, 0.2, 0.2, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(renderer->render_framebuffer_shader);
     glDisable(GL_DEPTH_TEST);
@@ -453,6 +473,7 @@ void renderer_end_frame(Renderer *renderer) {
     glUseProgram(0);
     
     {DEBUG_VALUE_BLOCK("Renderer")
+        DEBUG_VALUE(renderer->video_memory_used >> 20, "Video memory used");
         DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
         DEBUG_VALUE(DEBUG_quads_dispatched, "Quads dispatched");
         DEBUG_VALUE(renderer->texture_count, "Texture count");

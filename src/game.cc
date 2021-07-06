@@ -7,6 +7,7 @@ void game_init(Game *game) {
     game->debug_state = DEBUG_init();
     RendererSettings default_renderer_settings;
     default_renderer_settings.display_size = Vec2(0);
+    default_renderer_settings.filtered = true;
     game->os = os_init(&default_renderer_settings.display_size);
     renderer_init(&game->renderer, default_renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);

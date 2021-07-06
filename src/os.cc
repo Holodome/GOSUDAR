@@ -109,7 +109,6 @@ static void set_pixel_format(OS *os, HDC hdc) {
 			WGL_STENCIL_BITS_ARB,				8,
 			WGL_ALPHA_BITS_ARB,					8,
 			WGL_SAMPLE_BUFFERS_ARB,				true,
-			WGL_SAMPLES_ARB,					4,
 			0
         };
         os->wglChoosePixelFormatARB(hdc, attributes, 0, 1,

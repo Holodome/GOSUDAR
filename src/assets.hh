@@ -58,9 +58,9 @@ struct Asset {
     AssetInfo file_info;
     u32 state;
     union {
-        AssetFont  *font;
-        AssetSound *sound;
-        Texture    *texture;
+        AssetFont  font;
+        AssetSound sound;
+        Texture    texture;
     };
 };
 

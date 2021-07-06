@@ -67,21 +67,14 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
         AssetFont *font = assets_get_font(assets, id);
         result = &font->texture;
     } else {
-        if (asset->state == ASSET_STATE_LOADED) {
-            result = asset->texture;
-        } else {
-            result = alloc_struct(&assets->arena, Texture);
-            
+        while (asset->state != ASSET_STATE_LOADED) {
             void *pixels = alloc(assets->frame_arena, asset->file_info.data_size);
             read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, pixels);
             void *mipmaps = generate_mipmaps_from_texture_data(assets->frame_arena, pixels, asset->file_info.width, asset->file_info.height);
-            
-            Texture texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, asset->file_info.width, asset->file_info.height);
-            *result = texture;
-            
-            asset->texture = result;
+            asset->texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, asset->file_info.width, asset->file_info.height);
             asset->state = ASSET_STATE_LOADED;
         }
+        result = &asset->texture;
     }
     return result;
 }
@@ -91,23 +84,23 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
     
     Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_FONT);    
-    if (asset->state == ASSET_STATE_LOADED) {
-        result = asset->font;
-    } else {
-        result = alloc_struct(&assets->arena, AssetFont);
-        result->glyphs = alloc_arr(&assets->arena, asset->file_info.codepoint_count, FontGlyph);
-        
+    while (asset->state != ASSET_STATE_LOADED) {
         void *data = alloc(assets->frame_arena, asset->file_info.data_size);
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, data);
-        memcpy(result->glyphs, data, asset->file_info.codepoint_count * sizeof(FontGlyph));
+        
+        // This check is due to our stupid method to purge textures..
+        // we should already separate fonts and atlases
+        if (!asset->font.glyphs) {
+            asset->font.glyphs = alloc_arr(&assets->arena, asset->file_info.codepoint_count, FontGlyph);
+            memcpy(asset->font.glyphs, data, asset->file_info.codepoint_count * sizeof(FontGlyph));
+        }
         void *pixels = (u8 *)data + asset->file_info.codepoint_count * sizeof(FontGlyph);
         void *mipmaps = generate_mipmaps_from_texture_data(assets->frame_arena, pixels, asset->file_info.atlas_width, asset->file_info.atlas_height);
-        result->texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, 
+        asset->font.texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, 
             asset->file_info.atlas_width, asset->file_info.atlas_height);
-        
-        asset->font = result;
         asset->state = ASSET_STATE_LOADED;
     }
+    result = &asset->font;
     return result;
 }
 
@@ -115,17 +108,12 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     AssetSound *result = 0;
     Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_SOUND);
-    if (asset->state == ASSET_STATE_LOADED) {
-        result = asset->sound;
-    } else {
-        result = alloc_struct(&assets->arena, AssetSound);
+    while (asset->state != ASSET_STATE_LOADED) {
         result->samples = (i16 *)alloc(&assets->arena, asset->file_info.data_size);
-        
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, result->samples);
-        
-        asset->sound = result;
         asset->state = ASSET_STATE_LOADED;
     }
+    result = &asset->sound;
     return result;
 }
 

@@ -124,7 +124,7 @@ void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, A
     push_quad(render_group, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
 }
 
-void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale) {
+void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale) {
     if (!text) {
         return;
     }

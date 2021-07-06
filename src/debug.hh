@@ -23,6 +23,7 @@ enum {
     DEBUG_EVENT_BEGIN_VALUE_BLOCK,
     DEBUG_EVENT_END_VALUE_BLOCK,
     DEBUG_EVENT_VALUE_SWITCH,
+    DEBUG_EVENT_VALUE_DRAG,
     DEBUG_EVENT_VALUE_u64,
     DEBUG_EVENT_VALUE_f32,
     DEBUG_EVENT_VALUE_Vec2,
@@ -37,6 +38,7 @@ struct DebugEvent {
     const char *name;       // user-defined block name
     union {
         bool *value_switch;
+        f32 *value_drag;
         u64 value_u64;
         f32 value_f32;
         Vec2 value_Vec2;
@@ -99,6 +101,7 @@ DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
+#define DEBUG_DRAG(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_DRAG, DEBUG_NAME(), _name); event->value_drag = _value; } while (0);
 #define DEBUG_BEGIN_VALUE_BLOCK_(_debug_name, _name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_VALUE_BLOCK, _debug_name, _name)
 #define DEBUG_BEGIN_VALUE_BLOCK(_name) DEBUG_BEGIN_VALUE_BLOCK_(DEBUG_NAME(), _name)
 #define DEBUG_END_VALUE_BLOCK()   RECORD_DEBUG_EVENT(DEBUG_EVENT_END_VALUE_BLOCK, DEBUG_NAME(), "#END_VALUE_BLOCK")
@@ -161,6 +164,7 @@ struct DebugOpenBlock {
 enum {
     DEBUG_VALUE_NONE,  
     DEBUG_VALUE_SWITCH,  
+    DEBUG_VALUE_DRAG,  
     DEBUG_VALUE_u64,  
     DEBUG_VALUE_f32,  
     DEBUG_VALUE_Vec2,  
@@ -173,6 +177,7 @@ struct DebugValue {
     u32 value_kind;
     union {
         bool *value_switch;
+        f32 *value_drag;
         u64 value_u64;  
         f32 value_f32;
         Vec2 value_Vec2;

@@ -167,6 +167,20 @@ DEBUG_EVENT_VALUE_DEF(Vec2i)
                     value->next = value_block_stack[current_value_block_stack_index]->first_value;
                     value_block_stack[current_value_block_stack_index]->first_value = value;
                 } break; 
+                case DEBUG_EVENT_VALUE_DRAG: {
+                    DebugValue *value = debug_state->first_free_value;         
+                    if (value) {                                               
+                        debug_state->first_free_value = value->next;           
+                    } else {                          
+                        ++debug_state->debug_values_allocated;                         
+                        value = alloc_struct(&debug_state->arena, DebugValue); 
+                    }                                                          
+                    value->value_kind = DEBUG_VALUE_DRAG;                   
+                    value->value_drag = event->value_drag;               
+                    value->name = event->name;                                 
+                    value->next = value_block_stack[current_value_block_stack_index]->first_value;
+                    value_block_stack[current_value_block_stack_index]->first_value = value;
+                } break; 
                 case DEBUG_EVENT_BEGIN_VALUE_BLOCK: {
                     DebugValueBlock *block = get_value_block(debug_state);
                     block->name = event->name;
@@ -222,10 +236,15 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     case DEBUG_VALUE_SWITCH: {
                         snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       
                     } break;
+                    case DEBUG_VALUE_DRAG: {
+                        snprintf(buffer, sizeof(buffer), "%s", value->name);       
+                    } break;
                 }
                 
                 if (value->value_kind == DEBUG_VALUE_SWITCH) {
                     dev_ui_checkbox(dev_ui, buffer, value->value_switch);
+                } else if (value->value_kind == DEBUG_VALUE_DRAG) {
+                    dev_ui_drag(dev_ui, buffer, value->value_drag);
                 } else {
                     dev_ui_labelf(dev_ui, buffer);
                 }
@@ -239,7 +258,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
 void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets, commands);
-    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
+    dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / input->platform->frame_dt, (u32)(input->platform->frame_dt * 1000));
     display_values(&dev_ui, debug_state);
     if (dev_ui_section(&dev_ui, "Profiler")) {
         DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);

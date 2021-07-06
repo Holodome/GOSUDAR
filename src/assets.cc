@@ -47,8 +47,8 @@ AssetID assets_get_first_of_type(Assets *assets, AssetType type) {
     return result;
 }
 
-static void *generate_mipmaps_from_texture_data(Assets *assets, void *pixels, u32 w, u32 h) {
-    void *mips_data = alloc(&assets->arena, get_total_size_for_mips(w, h));
+static void *generate_mipmaps_from_texture_data(MemoryArena *arena, void *pixels, u32 w, u32 h) {
+    void *mips_data = alloc(arena, get_total_size_for_mips(w, h));
     memcpy(mips_data, pixels, w * h * 4);
     generate_sequential_mips(w, h, mips_data);
     return mips_data;
@@ -71,16 +71,14 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
             result = asset->texture;
         } else {
             result = alloc_struct(&assets->arena, Texture);
-            TempMemory load_temp = begin_temp_memory(&assets->arena);
             
-            void *pixels = alloc(&assets->arena, asset->file_info.data_size);
+            void *pixels = alloc(assets->frame_arena, asset->file_info.data_size);
             read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, pixels);
-            void *mipmaps = generate_mipmaps_from_texture_data(assets, pixels, asset->file_info.width, asset->file_info.height);
+            void *mipmaps = generate_mipmaps_from_texture_data(assets->frame_arena, pixels, asset->file_info.width, asset->file_info.height);
             
             Texture texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, asset->file_info.width, asset->file_info.height);
             *result = texture;
             
-            end_temp_memory(load_temp);
             asset->texture = result;
             asset->state = ASSET_STATE_LOADED;
         }
@@ -99,17 +97,14 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
         result = alloc_struct(&assets->arena, AssetFont);
         result->glyphs = alloc_arr(&assets->arena, asset->file_info.codepoint_count, FontGlyph);
         
-        TempMemory load_temp = begin_temp_memory(&assets->arena);
-        
-        void *data = alloc(&assets->arena, asset->file_info.data_size);
+        void *data = alloc(assets->frame_arena, asset->file_info.data_size);
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, data);
         memcpy(result->glyphs, data, asset->file_info.codepoint_count * sizeof(FontGlyph));
         void *pixels = (u8 *)data + asset->file_info.codepoint_count * sizeof(FontGlyph);
-        void *mipmaps = generate_mipmaps_from_texture_data(assets, pixels, asset->file_info.atlas_width, asset->file_info.atlas_height);
+        void *mipmaps = generate_mipmaps_from_texture_data(assets->frame_arena, pixels, asset->file_info.atlas_width, asset->file_info.atlas_height);
         result->texture = renderer_create_texture_mipmaps(assets->renderer, mipmaps, 
             asset->file_info.atlas_width, asset->file_info.atlas_height);
         
-        end_temp_memory(load_temp);
         asset->font = result;
         asset->state = ASSET_STATE_LOADED;
     }
@@ -169,9 +164,10 @@ void end_asset_type(AssetBuilder *builder) {
     builder->current_asset_type = 0;
 }
 
-Assets *assets_init(Renderer *renderer) {
+Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena) {
     Assets *assets = bootstrap_alloc_struct(Assets, arena, MEGABYTES(512));
     assets->renderer = renderer;
+    assets->frame_arena = frame_arena;
     
     FileHandle file = open_file("assets.assets");
     assets->asset_file = file;

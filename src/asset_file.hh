@@ -4,19 +4,6 @@
 
 #define ASSET_FILE_MAGIC_VALUE PACK_4U8_TO_U32('G', 'O', 'S', 'U')
 
-struct FontGlyph {
-	u32 utf32;
-	u16 min_x;
-	u16 min_y;
-	u16 max_x;
-	u16 max_y;
-	f32 offset1_x;
-	f32 offset1_y;
-	f32 offset2_x;
-	f32 offset2_y;
-	f32 x_advance;
-};
-
 #pragma pack(push, 1)
 struct AssetInfo {
     u32 kind;

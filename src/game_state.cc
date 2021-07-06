@@ -56,7 +56,7 @@ static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
 static void world_gen(GameState *game_state) {
     Entropy entropy;
     entropy.state = 12345678;
-    SimRegion *gen_sim = begin_sim(&game_state->frame_arena, game_state->world, Vec2i(0), Vec2i(0));
+    SimRegion *gen_sim = begin_sim(game_state->frame_arena, game_state->world, Vec2i(0), Vec2i(0));
     // Initialize game_state 
     game_state->camera_followed_entity_id = add_player(gen_sim);
     for (size_t i = 0; i < 1000; ++i) {
@@ -107,9 +107,8 @@ static WorldObjectSettings building_settings() {
     return result;
 }
 
-void game_state_init(GameState *game_state) {
-#define FRAME_ARENA_SIZE MEGABYTES(256)
-    arena_init(&game_state->frame_arena, os_alloc(FRAME_ARENA_SIZE), FRAME_ARENA_SIZE);
+void game_state_init(GameState *game_state, MemoryArena *frame_arena) {
+    game_state->frame_arena = frame_arena;
 #define WORLD_ARENA_SIZE MEGABYTES(512)
     arena_init(&game_state->arena, os_alloc(WORLD_ARENA_SIZE), WORLD_ARENA_SIZE);
     game_state->world_object_settings[WORLD_OBJECT_KIND_TREE_DESERT] = tree_settings(1);
@@ -226,16 +225,16 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
             bool continue_interaction = false;
             switch (game_state->interaction_kind) {
                 case PLAYER_INTERACTION_KIND_MINE_RESOURCE: {
-                    continue_interaction = is_key_held(input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_NO_LOCK);
+                    continue_interaction = is_key_held(input, KEY_MOUSE_LEFT);
                 } break;
                 case PLAYER_INTERACTION_KIND_BUILD: {
-                    continue_interaction = is_key_held(input, KEY_MOUSE_RIGHT, INPUT_ACCESS_TOKEN_NO_LOCK);
+                    continue_interaction = is_key_held(input, KEY_MOUSE_RIGHT);
                 } break;
                 INVALID_DEFAULT_CASE;
             }
             
             if (continue_interaction) {
-                game_state->interaction_current_time += get_dt(input);
+                game_state->interaction_current_time += input->platform->frame_dt;
                 if (game_state->interaction_current_time >= game_state->interaction_time) {
                     // finalize interaction
                     switch (game_state->interaction_kind) {
@@ -279,11 +278,11 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
         } else {
             u8 interaction_kind = PLAYER_INTERACTION_KIND_NONE;
             if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE) {
-                if (is_key_held(input, KEY_MOUSE_LEFT, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+                if (is_key_held(input, KEY_MOUSE_LEFT)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_MINE_RESOURCE;  
                 } 
+                if (is_key_held(input, KEY_MOUSE_RIGHT)) {
             } else if (settings->flags & WORLD_OBJECT_SETTINGS_FLAG_IS_BUILDING) {
-                if (is_key_held(input, KEY_MOUSE_RIGHT, INPUT_ACCESS_TOKEN_NO_LOCK)) {
                     interaction_kind = PLAYER_INTERACTION_KIND_BUILD;
                 }
             }
@@ -317,29 +316,29 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
 
 static void update_interface(GameState *game_state, FrameData *frame) {
     InputManager *input = frame->input;
-    if (is_key_pressed(input, KEY_Z, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, KEY_Z)) {
         game_state->allow_camera_controls = !game_state->allow_camera_controls;
     }
-    if (is_key_pressed(input, KEY_B, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, KEY_B)) {
         game_state->is_in_building_mode = !game_state->is_in_building_mode;
     }
-    if (is_key_pressed(input, KEY_X, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+    if (is_key_pressed(input, KEY_X)) {
         game_state->show_grid = !game_state->show_grid;
     }
     
     // Update camera input
-    if (game_state->allow_camera_controls && input->access_token == INPUT_ACCESS_TOKEN_NO_LOCK) {
-        f32 x_view_coef = 1.0f * get_dt(input);
-        f32 y_view_coef = 0.6f * get_dt(input);
-        f32 x_angle_change = mouse_d(input).x * x_view_coef;
-        f32 y_angle_change = mouse_d(input).y * y_view_coef;
+    if (game_state->allow_camera_controls) {
+        f32 x_view_coef = 1.0f * input->platform->frame_dt;
+        f32 y_view_coef = 0.6f * input->platform->frame_dt;
+        f32 x_angle_change = input->platform->mdelta.x * x_view_coef;
+        f32 y_angle_change = input->platform->mdelta.y * y_view_coef;
         game_state->cam.yaw += x_angle_change;
         game_state->cam.yaw = unwind_rad(game_state->cam.yaw);
         game_state->cam.pitch += y_angle_change;
 #define MIN_CAM_PITCH (HALF_PI * 0.1f)
 #define MAX_CAM_PITCH (HALF_PI * 0.9f)
         game_state->cam.pitch = clamp(game_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
-        f32 delta_zoom = get_mwheel(input);
+        f32 delta_zoom = input->platform->mwheel;
         // printf("%f\n", delta_zoom);
         game_state->cam.distance_from_player -= delta_zoom;
         game_state->cam.distance_from_player = clamp(game_state->cam.distance_from_player, 0.5f, 10);
@@ -356,20 +355,20 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
     if (!game_state->interaction_kind) {
         // Calculate player movement
         Vec2 player_delta = Vec2(0);
-        f32 move_coef = 4.0f * get_dt(input);
+        f32 move_coef = 4.0f * input->platform->frame_dt;
         f32 z_speed = 0;
-        if (is_key_held(input, KEY_W, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        if (is_key_held(input, KEY_W)) {
             z_speed = move_coef;
-        } else if (is_key_held(input, KEY_S, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        } else if (is_key_held(input, KEY_S)) {
             z_speed = -move_coef;
         }
         player_delta.x += z_speed *  sinf(game_state->cam.yaw);
         player_delta.y += z_speed * -cosf(game_state->cam.yaw);
         
         f32 x_speed = 0;
-        if (is_key_held(input, KEY_D, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        if (is_key_held(input, KEY_D)) {
             x_speed = move_coef;
-        } else if (is_key_held(input, KEY_A, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+        } else if (is_key_held(input, KEY_A)) {
             x_speed = -move_coef;
         }
         player_delta.x += x_speed * cosf(game_state->cam.yaw);
@@ -389,13 +388,13 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
 #define CAMERA_FOV rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  100.0f
-    frame->projection = Mat4x4::perspective(CAMERA_FOV, window_size(input).aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    frame->projection = Mat4x4::perspective(CAMERA_FOV, input->platform->winsize.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     frame->view = Mat4x4::identity() * Mat4x4::rotation(game_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game_state->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-sim->cam_p);
     sim->cam_mvp = frame->projection * frame->view;
     // Get mouse point projected on plane
-    Vec3 ray_dir = uv_to_world(frame->projection, frame->view, Vec2((2.0f * mouse_p(input).x) / window_size(input).x - 1.0f,
-													           1.0f - (2.0f * mouse_p(input).y) / window_size(input).y));
+    Vec3 ray_dir = uv_to_world(frame->projection, frame->view, Vec2((2.0f * input->platform->mpos.x) / input->platform->winsize.x - 1.0f,
+													           1.0f - (2.0f * input->platform->mpos.y) / input->platform->winsize.y));
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, sim->cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = sim->cam_p + ray_dir * t;
@@ -411,7 +410,7 @@ static void update_world_simulation(GameState *game_state, FrameData *frame) {
             building->p = p;
             building->kind = ENTITY_KIND_WORLD_OBJECT;
             building->world_object_kind = WORLD_OBJECT_KIND_BUILDING1 + game_state->selected_building;
-            if (is_key_held(input, KEY_MOUSE_RIGHT, INPUT_ACCESS_TOKEN_NO_LOCK)) {
+            if (is_key_held(input, KEY_MOUSE_RIGHT)) {
                 game_state->is_in_building_mode = false;
             } else {
                 building->flags |= ENTITY_FLAG_SINGLE_FRAME_LIFESPAN;
@@ -506,10 +505,9 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
         push_quad(&world_render_group, v, assets_get_first_of_type(assets, ASSET_TYPE_ADDITIONAL));
     }
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
-    TempMemory zsort = begin_temp_memory(&game_state->frame_arena);
     size_t max_drawable_count = sim->entity_count;
-    SortEntry *sort_a = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
-    SortEntry *sort_b = alloc_arr(&game_state->frame_arena, max_drawable_count, SortEntry);
+    SortEntry *sort_a = alloc_arr(game_state->frame_arena, max_drawable_count, SortEntry);
+    SortEntry *sort_b = alloc_arr(game_state->frame_arena, max_drawable_count, SortEntry);
     size_t drawable_count = 0;
     for (EntityIterator iter = iterate_all_entities(sim);
          is_valid(&iter);
@@ -539,7 +537,6 @@ static void render_world(GameState *game_state, FrameData *frame, RendererComman
 
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
-    arena_clear(&game_state->frame_arena);
     FrameData frame = {};
     frame.input = input;
     frame.assets = assets;
@@ -548,16 +545,17 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     WorldPosition camera_position = get_world_entity(game_state->world, game_state->camera_followed_entity_id)->world_pos;
     Vec2i min_chunk_coord, max_chunk_coord;
     get_sim_region_bounds(camera_position, &min_chunk_coord, &max_chunk_coord);
-    frame.sim = begin_sim(&game_state->frame_arena, game_state->world, min_chunk_coord, max_chunk_coord);
+    frame.sim = begin_sim(game_state->frame_arena, game_state->world, min_chunk_coord, max_chunk_coord);
     update_interface(game_state, &frame);
     update_world_simulation(game_state, &frame);
     render_world(game_state, &frame, commands, assets);
     end_sim(frame.sim);
-    update_sound(game_state, frame.assets, input->input);
+    update_sound(game_state, frame.assets, input->platform);
     
     Entity *player = get_world_entity(game_state->world, game_state->camera_followed_entity_id);
     Vec2 player_pos = DEBUG_world_pos_to_p(player->world_pos);
     {DEBUG_VALUE_BLOCK("GameState")
+        DEBUG_DRAG(&game_state->global_volume, "Volume");
         DEBUG_VALUE(game_state->playing_sounds_allocated, "Playing sounds allocated");
         DEBUG_VALUE(player_pos, "Player pos");
         DEBUG_VALUE(player->world_pos.offset, "Chunk offset");

@@ -2,12 +2,14 @@
 
 void game_init(Game *game) {
     game->is_running = true;   
+#define FRAME_ARENA_SIZE MEGABYTES(256)
+    arena_init(&game->frame_arena, os_alloc(FRAME_ARENA_SIZE), FRAME_ARENA_SIZE);
     game->debug_state = DEBUG_init();
     Vec2 display_size;
     game->os = os_init(&display_size);
     renderer_init(&game->renderer, display_size);
-    game->assets = assets_init(&game->renderer);
-    game_state_init(&game->game_state);
+    game->assets = assets_init(&game->renderer, &game->frame_arena);
+    game_state_init(&game->game_state, &game->frame_arena);
 }
 
 void game_cleanup(Game *game) {
@@ -15,18 +17,19 @@ void game_cleanup(Game *game) {
 
 void game_update_and_render(Game *game) {
     FRAME_MARKER();
+    arena_clear(&game->frame_arena);
     DEBUG_begin_frame(game->debug_state);
     
     Platform *platform = os_begin_frame(game->os);
     InputManager input_ = create_input_manager(platform);
     InputManager *input = &input_;
-    if (is_key_pressed(input, KEY_ESCAPE, INPUT_ACCESS_TOKEN_ALL) || platform->is_quit_requested) {
+    if (is_key_pressed(input, KEY_ESCAPE) || platform->is_quit_requested) {
         game->is_running = false;
     }    
-    if (is_key_pressed(input, KEY_F11, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F11)) {
         platform->fullscreen = !platform->fullscreen;
     }
-    if (is_key_pressed(input, KEY_F10, INPUT_ACCESS_TOKEN_ALL)) {
+    if (is_key_pressed(input, KEY_F10)) {
         platform->vsync = !platform->vsync;
     }
     
@@ -38,15 +41,15 @@ void game_update_and_render(Game *game) {
         DEBUG_VALUE(game->debug_state->debug_values_allocated, "Values allocated");
     }
     {DEBUG_VALUE_BLOCK("Memory")
+        DEBUG_VALUE(game->frame_arena.peak_size >> 10, "Frame arena size");
         DEBUG_VALUE(game->debug_state->arena.peak_size >> 10, "Debug arena size");
-        DEBUG_VALUE(game->game_state.frame_arena.peak_size >> 10, "Frame arena size");
         DEBUG_VALUE(game->game_state.arena.peak_size >> 10, "Game arena size");
         DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
         DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
     }
     
     RendererSettings renderer_settings = {};
-    renderer_settings.display_size = window_size(input);
+    renderer_settings.display_size = input->platform->winsize;
     RendererCommands *commands = renderer_begin_frame(&game->renderer, renderer_settings, Vec4(0.2));
     DEBUG_update(game->debug_state, input, commands, game->assets);
     update_and_render(&game->game_state, input, commands, game->assets);

@@ -39,6 +39,10 @@ enum {
     KEY_COUNT
 };  
 
+inline bool is_mouse_keycode(u32 keycode) {
+    return KEY_MOUSE_LEFT <= keycode && keycode <= KEY_MOUSE_RIGHT;
+}
+
 // A way of platform layer communcating with game.
 // In the begging of the frame platform layer supplies gaem with all information about user input 
 // it needs, during the frame game can modify some values in this struct to make commands to the 
@@ -68,14 +72,6 @@ inline void update_key_state(Platform *input, u32 key, bool new_down) {
     input->is_keys_down[key] = new_down;
 }
 
-enum {
-    INPUT_ACCESS_TOKEN_NO_LOCK, 
-    INPUT_ACCESS_TOKEN_GAME_INTERFACE,  
-    INPUT_ACCESS_TOKEN_GAME_MENU,  
-    INPUT_ACCESS_TOKEN_DEV_UI,  
-    INPUT_ACCESS_TOKEN_ALL,  
-};
-
 // Wrapper for input locking in case some game sections overlap
 // So when game detects that dev ui is focused, it locks input for it
 // Access tokens are ordered by priority
@@ -86,69 +82,45 @@ enum {
 // this delay does not occure in game circumstances, and can be easilly avoided in other cases, 
 // for example setting lock in the begging of the frame
 struct InputManager {
-    Platform *input;
-    u32 access_token;
+    Platform *platform;
+    bool is_mouse_locked;
+    bool is_keyboard_locked;
 };
 
-inline InputManager create_input_manager(Platform *input) {
+inline InputManager create_input_manager(Platform *platform) {
     InputManager result;
-    result.input = input;
-    result.access_token = INPUT_ACCESS_TOKEN_NO_LOCK;
+    result.platform = platform;
+    result.is_keyboard_locked = false;
+    result.is_mouse_locked = false;
     return result;
 }
 
-void lock_input(InputManager *manager, u32 access_token) {
-    assert(!manager->access_token);
-    manager->access_token = access_token;
+inline void lock_mouse(InputManager *manager) {
+    manager->is_mouse_locked = true;
 }
 
-void unlock_input(InputManager *manager) {
-    assert(manager->access_token);
-    manager->access_token = INPUT_ACCESS_TOKEN_NO_LOCK;
-}
-
-bool is_key_pressed(InputManager *manager, u32 key, u32 access_token) {
+inline bool is_key_pressed(InputManager *manager, u32 key) {
     bool result = false;
-    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = manager->input->is_keys_down[key] && manager->input->keys_transition_count[key];
-    }
+    // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
+        result = manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
+    // }
     return result;
 }
 
-bool is_key_released(InputManager *manager, u32 key, u32 access_token) {
+inline bool is_key_released(InputManager *manager, u32 key) {
     bool result = false;
-    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = !manager->input->is_keys_down[key] && manager->input->keys_transition_count[key];
-    }
+    // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
+        result = !manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
+    // }
     return result;
 }
 
-bool is_key_held(InputManager *manager, u32 key, u32 access_token) {
+bool is_key_held(InputManager *manager, u32 key) {
     bool result = false;
-    if (manager->access_token == access_token || access_token == INPUT_ACCESS_TOKEN_ALL) {
-        result = manager->input->is_keys_down[key];
-    }
+    // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
+        result = manager->platform->is_keys_down[key];
+    // }
     return result;
-}
-
-f32 get_mwheel(InputManager *manager) {
-    return manager->input->mwheel;
-}
-
-Vec2 mouse_p(InputManager *manager) {
-    return manager->input->mpos;
-}
-
-Vec2 mouse_d(InputManager *manager) {
-    return manager->input->mdelta;
-}
-
-Vec2 window_size(InputManager *manager) {
-    return manager->input->winsize;   
-}
-
-f32 get_dt(InputManager *manager) {
-    return manager->input->frame_dt;
 }
 
 #define INPUT_HH 1

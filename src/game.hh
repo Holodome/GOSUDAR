@@ -15,6 +15,11 @@
 // Game state is the logic of the game
 // It decides how to use all data recived from input, what to render when to close etc.
 struct Game {
+    // Global temporary arena - easy way to allocate some stuff that doesn't need to exist for long
+    // Just dump any temporary data here - during development and maybe even after we can afford not to 
+    // worry about a couple of megabytes
+    MemoryArena frame_arena;
+    
     OS *os;
     Renderer renderer;
     Assets *assets;

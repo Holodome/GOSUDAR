@@ -5,7 +5,6 @@
 #include "assets.cc"
 #include "dev_ui.cc"
 #include "game.cc"
-#include "interface.cc"
 #include "game_state.cc"
 #include "world.cc"
 #include "main.cc"

@@ -284,10 +284,11 @@ SimRegion *begin_sim(MemoryArena *arena, World *world, Vec2i min_chunk, Vec2i ma
             }        
         }
     }
-    DEBUG_VALUE(sim->entity_count, "Sim entity count");
-    DEBUG_VALUE(sim->world->_entity_count, "World entity count");
-    DEBUG_VALUE(sim->world->DEBUG_id_list_entries_allocated, "Unused id list entries");
-    
+    {DEBUG_VALUE_BLOCK("Sim")
+        DEBUG_VALUE(sim->entity_count, "Sim entity count");
+        DEBUG_VALUE(sim->world->_entity_count, "World entity count");
+        DEBUG_VALUE(sim->world->DEBUG_id_list_entries_allocated, "Unused id list entries");
+    }
     return sim;
 }
 

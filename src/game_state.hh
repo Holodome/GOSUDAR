@@ -4,7 +4,6 @@
 #include "world.hh"
 #include "assets.hh"
 #include "input.hh"
-#include "interface.hh"
 
 enum {
     PLAYER_INTERACTION_KIND_NONE,
@@ -23,14 +22,6 @@ struct FrameData {
     Mat4x4 projection;
     InputManager *input;
 };  
-
-enum {
-    GAME_STATE_BUTTON_NONE,  
-    GAME_STATE_BUTTON_BUILDING_MODE,  
-    GAME_STATE_BUTTON_MOVE_CAMERA,  
-    GAME_STATE_BUTTON_MOVE_BUILDING1,  
-    GAME_STATE_BUTTON_MOVE_BUILDING2,  
-};
 
 enum {
     WORLD_OBJECT_SETTINGS_FLAG_IS_RESOURCE = 0x1,
@@ -53,7 +44,7 @@ struct PlayingSound {
 // All game-related data is stored here. Like player resources, debug thigs etc.
 struct GameState {
     MemoryArena arena;
-    MemoryArena frame_arena;
+    MemoryArena *frame_arena;
     
     u64 playing_sounds_allocated;
     f32 global_volume;
@@ -85,7 +76,7 @@ struct GameState {
 
 WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object_kind);
 
-void game_state_init(GameState *game_state);
+void game_state_init(GameState *game_state, MemoryArena *frame_arena);
 void update_and_render(GameState *game_state, InputManager *input, RendererCommands *commands, Assets *assets);
 
 void play_sound(GameState *game_state, AssetID sound_id);

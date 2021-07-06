@@ -26,7 +26,7 @@ void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect = 
 void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color = WHITE, f32 thickness = 1.0f);
 void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color = WHITE, f32 thickness = 1.0f);
 void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color = WHITE, f32 thickness = 1.0f);
-void push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale);
+void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale);
 
 
 #define RENDER_GROUP_HH 1

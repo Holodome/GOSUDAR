@@ -36,7 +36,6 @@ struct DevUILayout {
     RenderGroup render_group;
     
     DevUIID hot_id;
-    DevUIID active_id;
     
     bool is_focused;
     
@@ -50,6 +49,7 @@ void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args);
 void dev_ui_labelf(DevUILayout *layout, const char *format, ...);
 bool dev_ui_button(DevUILayout *layout, const char *label);
 bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value);
+bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value);
 bool dev_ui_section(DevUILayout *layout, const char *name);
 void dev_ui_end_section(DevUILayout *layout);
 void dev_ui_last_line(DevUILayout *layout);

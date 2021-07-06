@@ -29,6 +29,19 @@ enum {
     ASSET_KIND_SOUND,
 };
 
+struct FontGlyph {
+	u32 utf32;
+	u16 min_x;
+	u16 min_y;
+	u16 max_x;
+	u16 max_y;
+	f32 offset1_x;
+	f32 offset1_y;
+	f32 offset2_x;
+	f32 offset2_y;
+	f32 x_advance;
+};
+
 struct AssetFont {
     Texture texture;
     FontGlyph *glyphs;
@@ -58,6 +71,7 @@ struct AssetTag {
 
 struct Assets {
     MemoryArena arena;
+    MemoryArena *frame_arena;
     struct Renderer *renderer;
     
     FileHandle asset_file;
@@ -72,7 +86,7 @@ struct Assets {
     AssetTypeInfo *type_infos;
 };  
 
-Assets *assets_init(Renderer *renderer);
+Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena);
 AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches);
 AssetID assets_get_first_of_type(Assets *assets, AssetType type);
 AssetInfo *assets_get_info(Assets *assets, AssetID id);

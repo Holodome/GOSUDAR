@@ -180,7 +180,7 @@ static RendererFramebuffer create_framebuffer(Vec2 size, bool has_depth) {
     return result;
 }
 
-void renderer_init(Renderer *renderer, Vec2 win_size) {
+void renderer_init(Renderer *renderer, Vec2 display_size) {
 #define RENDERER_ARENA_SIZE MEGABYTES(256)
     arena_init(&renderer->arena, os_alloc(RENDERER_ARENA_SIZE), RENDERER_ARENA_SIZE);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
@@ -354,10 +354,10 @@ void main() {
     renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     free(white_data);
     // Framebuffers
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(win_size, true);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(win_size, false);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(win_size, false);
-    renderer->settings.display_size = win_size;
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(display_size, true);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(display_size, false);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_DEBUG] = create_framebuffer(display_size, false);
+    renderer->settings.display_size = display_size;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

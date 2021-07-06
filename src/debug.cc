@@ -238,10 +238,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
 
 void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
     TIMED_FUNCTION();
-    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets);
-    
-    RenderGroup interface_render_group = render_group_begin(commands, assets,
-        setup_2d(RENDERER_FRAMEBUFFER_DEBUG, Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
+    DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets, commands);
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / get_dt(input), (u32)(get_dt(input) * 1000));
     display_values(&dev_ui, debug_state);
     if (dev_ui_section(&dev_ui, "Profiler")) {
@@ -269,7 +266,7 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
         dev_ui_end_section(&dev_ui);
     }
     
-    dev_ui_end(&dev_ui, &interface_render_group);
+    dev_ui_end(&dev_ui);
 }
 
 void DEBUG_begin_frame(DebugState *debug_state) {

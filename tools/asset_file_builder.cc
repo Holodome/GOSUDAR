@@ -293,12 +293,14 @@ static void parse_asset_file_description(AssetBuilder *builder, Lexer *lexer) {
                         printf("Invalid tag id '%s'\n", tag_id_string);
                     }
                     eat_tok(lexer);
+                    const char *entity_kind_str = 0;
                     if (peek(lexer)->token == TOKEN_IDENT) {
                         const char *value_string = peek(lexer)->value_ident;
                         u32 value = 0;
                         if (!entity_kind_lookup(value_string, &value)) {
                             printf("Invalid tag value, entity kind '%s' is nonexistent\n", value_string);
                         }
+                        entity_kind_str = value_string;
                         tag_value = value;
                     } else if (peek(lexer)->token == TOKEN_INT) {
                         tag_value = (f32)peek(lexer)->value_int;
@@ -309,7 +311,7 @@ static void parse_asset_file_description(AssetBuilder *builder, Lexer *lexer) {
                     }
                     eat_tok(lexer);
                     add_tag(builder, tag_id, tag_value);
-                    printf("Add tag %u(%s) %f\n", tag_id, tag_id_string, tag_value);
+                    printf("Add tag %u(%s) %.2f(%s)\n", tag_id, tag_id_string, tag_value, entity_kind_str ? entity_kind_str : "");
                 }
                 eat_tok(lexer);
             }
@@ -357,6 +359,7 @@ int main(int argc, char **argv) {
     memset(builder, 0, sizeof(*builder));
     
     parse_asset_file_description(builder, lexer);
+    free(lexer->arena.data);
     
 #define OUT_FILENAME "assets.assets"
     printf("Writing to file '%s'\n", OUT_FILENAME);
@@ -402,7 +405,7 @@ int main(int argc, char **argv) {
     fseek(out, asset_type_infos_offset, SEEK_SET);
     fwrite(builder->type_infos, sizeof(AssetTypeInfo), ASSET_TYPE_SENTINEL, out);
     fclose(out);
-    printf("Total assets file size: %llu\n", data_offset);
+    printf("Total assets file size: %llu (%llumb)\n", data_offset, data_offset >> 20);
     printf("Assets written: %u\n", builder->info_count);
     printf("End\n");
     return 0;

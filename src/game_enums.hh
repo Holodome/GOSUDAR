@@ -40,6 +40,8 @@ inline bool DEBUG_enum_string_lookup_(const EnumString *strings, size_t strings_
 // What we want to do later is have some checksum for all serialized enums - so we can check asset files 
 // if they have the same checksum and eassily tell that they are from the same version of the game
 // If maintaining this verbose structure can become hard - we may switch to having some tool that generate enum tables for us
+// Or later we can remove the notion of entity enum completely - let text files define enum values,
+// so there can be arbitrary number of enttiy kinds, each of which can have its own set of actually in-game defined behavoiurs
 //
 #define ENTITY_KIND_ENUM_NAME EntityKind
 #define ENTITY_KINDS                                    \

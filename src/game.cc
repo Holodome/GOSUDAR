@@ -3,10 +3,9 @@
 void game_init(Game *game) {
     game->is_running = true;   
     game->debug_state = DEBUG_init();
-    Vec2 win_size;
-    game->os = os_init(&win_size);
-    renderer_init(&game->renderer, win_size);
-
+    Vec2 display_size;
+    game->os = os_init(&display_size);
+    renderer_init(&game->renderer, display_size);
     game->assets = assets_init(&game->renderer);
     game_state_init(&game->game_state);
 }
@@ -49,8 +48,8 @@ void game_update_and_render(Game *game) {
     RendererSettings renderer_settings = {};
     renderer_settings.display_size = window_size(input);
     RendererCommands *commands = renderer_begin_frame(&game->renderer, renderer_settings, Vec4(0.2));
-    update_and_render(&game->game_state, input, commands, game->assets);
     DEBUG_update(game->debug_state, input, commands, game->assets);
+    update_and_render(&game->game_state, input, commands, game->assets);
     renderer_end_frame(&game->renderer);
     os_end_frame(game->os);
     DEBUG_frame_end(game->debug_state);

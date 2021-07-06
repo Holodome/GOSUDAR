@@ -154,7 +154,7 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     return result;
 }
 
-OS *os_init(Vec2 *win_size) {
+OS *os_init(Vec2 *display_size) {
     OS *os = bootstrap_alloc_struct(OS, arena);
     
     // Set working directory
@@ -195,7 +195,7 @@ OS *os_init(Vec2 *win_size) {
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);
-    *win_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
+    *display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     
     LARGE_INTEGER pf;
     QueryPerformanceFrequency(&pf);

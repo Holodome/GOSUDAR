@@ -16,25 +16,25 @@ static DevUIID id_empty() {
     return {};
 }
 
-static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetID tex_id = INVALID_ASSET_ID, Rect uv_rect = Rect(0, 0, 1, 1)) {
-    DevUIDrawQueueEntry entry = {};
-    entry.v[0].p = Vec3(rect.top_left());
-    entry.v[0].uv = uv_rect.top_left();
-    entry.v[0].c = color;
-    entry.v[1].p = Vec3(rect.top_right());
-    entry.v[1].uv = uv_rect.top_right();
-    entry.v[1].c = color;
-    entry.v[2].p = Vec3(rect.bottom_left());
-    entry.v[2].uv = uv_rect.bottom_left();
-    entry.v[2].c = color;
-    entry.v[3].p = Vec3(rect.bottom_right());
-    entry.v[3].uv = uv_rect.bottom_right();
-    entry.v[3].c = color;
-    entry.texture = tex_id;
+// static void push_rect(DevUILayout *layout, Rect rect, Vec4 color = WHITE, AssetID tex_id = INVALID_ASSET_ID, Rect uv_rect = Rect(0, 0, 1, 1)) {
+//     DevUIDrawQueueEntry entry = {};
+//     entry.v[0].p = Vec3(rect.top_left());
+//     entry.v[0].uv = uv_rect.top_left();
+//     entry.v[0].c = color;
+//     entry.v[1].p = Vec3(rect.top_right());
+//     entry.v[1].uv = uv_rect.top_right();
+//     entry.v[1].c = color;
+//     entry.v[2].p = Vec3(rect.bottom_left());
+//     entry.v[2].uv = uv_rect.bottom_left();
+//     entry.v[2].c = color;
+//     entry.v[3].p = Vec3(rect.bottom_right());
+//     entry.v[3].uv = uv_rect.bottom_right();
+//     entry.v[3].c = color;
+//     entry.texture = tex_id;
     
-    assert(layout->draw_queue_entry_count < layout->max_draw_queue_entry_count);
-    layout->draw_queue[layout->draw_queue_entry_count++] = entry;
-}
+//     assert(layout->draw_queue_entry_count < layout->max_draw_queue_entry_count);
+//     layout->draw_queue[layout->draw_queue_entry_count++] = entry;
+// }
 
 static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color = WHITE) {
     AssetInfo *info = assets_get_info(layout->assets, layout->font_id);
@@ -59,7 +59,7 @@ static void push_text(DevUILayout *layout, Vec2 p, const char *text, Vec4 color 
 			f32 t2 = glyph->max_y * rheight;
 			f32 char_advance = glyph->x_advance;
 			offset.x += char_advance;
-            push_rect(layout, Rect(x1, y1, x2 - x1, y2 - y1), color, layout->font_id, Rect(s1, t1, s2 - s1, t2 - t1));
+            push_rect(&layout->render_group, Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1), layout->font_id);
 		}
 	}    
 }
@@ -130,16 +130,19 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
     return result;
 }
 
-DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets) {
+DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets, RendererCommands *commands) {
     DevUILayout layout = {};
     layout.dev_ui = dev_ui;
     layout.active_id = dev_ui->active_id;
-    layout.temp_mem = begin_temp_memory(&dev_ui->arena);
-    layout.max_draw_queue_entry_count = 4096;
-    layout.draw_queue = alloc_arr(&dev_ui->arena, layout.max_draw_queue_entry_count, DevUIDrawQueueEntry);
+    // layout.temp_mem = begin_temp_memory(&dev_ui->arena);
+    // layout.max_draw_queue_entry_count = 4096;
+    // layout.draw_queue = alloc_arr(&dev_ui->arena, layout.max_draw_queue_entry_count, DevUIDrawQueueEntry);
     layout.input = input;
     layout.assets = assets;
     layout.font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
+    RenderGroup interface_render_group = render_group_begin(commands, assets,
+        setup_2d(RENDERER_FRAMEBUFFER_DEBUG, Mat4x4::ortographic_2d(0, window_size(input).x, window_size(input).y, 0)));
+    layout.render_group = interface_render_group;
     return layout;
 }
 
@@ -234,21 +237,8 @@ void dev_ui_end_section(DevUILayout *layout) {
     layout->horizontal_offset -= DEV_UI_SECTION_OFFSET;
 }
 
-void dev_ui_end(DevUILayout *layout, RenderGroup *render_group) {
-    for (size_t i = 0; i < layout->draw_queue_entry_count; ++i) {
-        DevUIDrawQueueEntry *entry = layout->draw_queue + i;
-        Texture tex = *assets_get_texture(render_group->assets, entry->texture);
-        push_quad(render_group, entry->v[0].p, entry->v[1].p, entry->v[2].p, entry->v[3].p, 
-            entry->v[0].c, entry->v[1].c, entry->v[2].c, entry->v[3].c, 
-            entry->v[0].uv, entry->v[1].uv, entry->v[2].uv, entry->v[3].uv,
-            tex);
-    }
-    end_temp_memory(layout->temp_mem);
+void dev_ui_end(DevUILayout *layout) {
     layout->dev_ui->active_id = layout->active_id;
-    
-    if (!layout->is_focused && layout->input->access_token == INPUT_ACCESS_TOKEN_DEV_UI) {
-        unlock_input(layout->input);
-    }
 }
 
 void dev_ui_begin_sizable(DevUILayout *layout) {

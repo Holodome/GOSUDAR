@@ -136,7 +136,7 @@ struct Renderer {
     Vec4 clear_color;
 };
 
-void renderer_init(Renderer *renderer, Vec2 win_size);
+void renderer_init(Renderer *renderer, Vec2 display_size);
 RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings, Vec4 clear_color);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);

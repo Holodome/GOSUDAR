@@ -1,5 +1,7 @@
 #include "debug.hh"
 
+#if INTERNAL_BUILD
+
 #include "os.hh"
 #include "game_state.hh"
 
@@ -306,3 +308,5 @@ DebugState *DEBUG_init() {
     debug_table = &debug_state->debug_table;
     return debug_state;
 }
+
+#endif 

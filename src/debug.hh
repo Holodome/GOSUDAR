@@ -6,6 +6,8 @@
 
 #include <intrin.h>
 
+#if INTERNAL_BUILD
+
 // We need to keep at least two event arrays because our current system can't process blocks that 
 // include frame end, like the function processing events itself
 // But this is really a corner case, so see if we can avoid it?
@@ -224,6 +226,29 @@ DebugState *DEBUG_init();
 void DEBUG_begin_frame(DebugState *debug_state);
 void DEBUG_update(DebugState *debug_state, struct InputManager *input, RendererCommands *commands, Assets *assets);
 void DEBUG_frame_end(DebugState *debug_state);
+
+#else 
+
+struct DebugState;
+#define DEBUG_init(...) 0
+#define DEBUG_begin_frame(...) ((void)0)
+#define DEBUG_update(...) ((void)0)
+#define DEBUG_frame_end(...) ((void)0)
+
+#define DEBUG_NAME()
+#define TIMED_BLOCK(...)
+#define BEGIN_BLOCK(...)
+#define END_BLOCK(...)
+#define TIMED_FUNCTION(...)
+#define FRAME_MARKER(...)
+#define DEBUG_VALUE(...)
+#define DEBUG_SWITCH(...)
+#define DEBUG_DRAG(...)
+#define DEBUG_BEGIN_VALUE_BLOCK(...)
+#define DEBUG_END_VALUE_BLOC(...)
+#define DEBUG_VALUE_BLOCK(...)
+
+#endif 
 
 #define DEBUG_HH 1
 #endif

@@ -39,5 +39,9 @@ typedef double f64;
 #define INVLALID_CODE_PATH  assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
 
+#ifndef INTERNAL_BUILD
+#define INTERNAL_BUILD 1
+#endif
+
 #define GENERAL_H 1
 #endif

@@ -193,29 +193,24 @@ static void free_framebuffer(Renderer *renderer, RendererFramebuffer *framebuffe
 }
 
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
-    if (renderer->texture_array) {
-        glDeleteTextures(1, &renderer->texture_array);
-        for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-             is_valid(&iter);
-             advance(&iter)) {    
-            renderer->video_memory_used -= iter.width * iter.height * 4;
+    renderer->texture_count = 0;
+    GLenum min_filter, mag_filter;
+    if (settings.filtered) {
+        mag_filter = GL_LINEAR;
+        if (settings.mipmapping) {
+            min_filter = GL_LINEAR_MIPMAP_LINEAR;
+        }  else {
+            min_filter = GL_LINEAR;
+        }
+    } else {
+        mag_filter = GL_NEAREST;
+        if (settings.mipmapping) {
+            min_filter = GL_NEAREST_MIPMAP_NEAREST;
+        }  else {
+            min_filter = GL_NEAREST;
         }
     }
-    
-#define MAX_TEXTURE_COUNT 256
-    renderer->max_texture_count = MAX_TEXTURE_COUNT;
-    glGenTextures(1, &renderer->texture_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-         is_valid(&iter);
-         advance(&iter)) {
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
-            iter.width, iter.height, MAX_TEXTURE_COUNT,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
-        renderer->video_memory_used += iter.width * iter.height * 4;
-    }
-    GLenum min_filter = settings.filtered ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
-    GLenum mag_filter = settings.filtered ? GL_LINEAR : GL_NEAREST;
+    glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array); 
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, mag_filter);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -324,13 +319,12 @@ void main()
     assert(renderer->view_location != (GLuint)-1);
     const char *render_framebuffer_shader_code = R"FOO(#ifdef VERTEX_SHADER
 layout(location = 0) in vec2 position;
-layout(location = 1) in vec2 uv;
 
 out vec2 frag_uv;
 
 void main() {
     gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    frag_uv = uv;
+    frag_uv = (position + vec2(1)) / 2;
 }
 #else     
 
@@ -351,19 +345,16 @@ void main() {
     glBindVertexArray(renderer->render_framebuffer_vao);
     GLuint renderer_framebuffer_vbo;
     f32 render_framebuffer_data[] = {
-        -1.0f, -1.0f, 0.0f, 0.0f,  
-        -1.0f, 1.0f, 0.0f, 1.0f,  
-        1.0f, -1.0f, 1.0f, 0.0f,  
-        1.0f, 1.0f, 1.0f, 1.0f,  
+        -1.0f, -1.0f, 
+        -1.0f, 1.0f, 
+        1.0f, -1.0f, 
+        1.0f, 1.0f, 
     };
     glGenBuffers(1, &renderer_framebuffer_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, renderer_framebuffer_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(render_framebuffer_data), render_framebuffer_data, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, (void *)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 8, (void *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, (void *)8);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     
     // Generate vertex arrays
@@ -380,18 +371,31 @@ void main() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
     renderer->video_memory_used += renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, p));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, p));
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, uv));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, n));
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, n));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, c));
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, c));
     glEnableVertexAttribArray(3);
-    glVertexAttribIPointer(4, 1, GL_UNSIGNED_SHORT, sizeof(Vertex), (void *)offsetof(Vertex, tex));
+    glVertexAttribIPointer(4, 1, GL_UNSIGNED_SHORT, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, tex));
     glEnableVertexAttribArray(4);
 
     glBindVertexArray(0);
+     
+#define MAX_TEXTURE_COUNT 256
+    renderer->max_texture_count = MAX_TEXTURE_COUNT;
+    glGenTextures(1, &renderer->texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
+    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+         is_valid(&iter);
+         advance(&iter)) {
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
+            iter.width, iter.height, MAX_TEXTURE_COUNT,
+            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
+        renderer->video_memory_used += iter.width * iter.height * 4;
+    }
     init_renderer_for_settings(renderer, settings);
 }
 

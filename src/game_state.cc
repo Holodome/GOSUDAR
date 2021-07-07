@@ -565,6 +565,7 @@ void update_and_render(GameState *game_state, InputManager *input, RendererComma
     }
     {DEBUG_VALUE_BLOCK("Renderer settings");
         DEBUG_SWITCH(&game_state->renderer_settings.filtered, "Tex filtration");
+        DEBUG_SWITCH(&game_state->renderer_settings.mipmapping, "Mipmapping");
         DEBUG_VALUE(game_state->renderer_settings.display_size, "Display size");
     }
 }

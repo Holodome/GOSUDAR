@@ -8,6 +8,7 @@ void game_init(Game *game) {
     RendererSettings default_renderer_settings;
     default_renderer_settings.display_size = Vec2(0);
     default_renderer_settings.filtered = true;
+    default_renderer_settings.mipmapping = true;
     game->os = os_init(&default_renderer_settings.display_size);
     renderer_init(&game->renderer, default_renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);

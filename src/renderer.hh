@@ -97,6 +97,7 @@ struct RendererCommands {
 struct RendererSettings {
     Vec2 display_size;  
     bool filtered;
+    bool mipmapping;
 };
 
 #define RENDERER_TEXTURE_DIM   512

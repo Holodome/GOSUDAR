@@ -143,6 +143,7 @@ void renderer_init(Renderer *renderer, RendererSettings settings);
 RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings);
 void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
+// Clean all previous settings and init new
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);
 
 

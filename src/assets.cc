@@ -3,7 +3,7 @@
 #include "os.hh"
 #include "mips.hh"
 
-#include "wave.hh"
+#include "renderer.hh"
 
 AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *weights, AssetTagList *matches) {
     TIMED_FUNCTION();
@@ -87,7 +87,6 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
     while (asset->state != ASSET_STATE_LOADED) {
         void *data = alloc(assets->frame_arena, asset->file_info.data_size);
         read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, data);
-        
         // This check is due to our stupid method to purge textures..
         // we should already separate fonts and atlases
         if (!asset->font.glyphs) {
@@ -109,8 +108,8 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_SOUND);
     while (asset->state != ASSET_STATE_LOADED) {
-        result->samples = (i16 *)alloc(&assets->arena, asset->file_info.data_size);
-        read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, result->samples);
+        asset->sound.samples = (i16 *)alloc(&assets->arena, asset->file_info.data_size);
+        read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, asset->sound.samples);
         asset->state = ASSET_STATE_LOADED;
     }
     result = &asset->sound;
@@ -135,13 +134,13 @@ Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
 }
 
 void assets_purge_textures(Assets *assets) {
-    // WE DO SOMETHING VERY STUPID HERE!!!
-    // THIS IS JUST TO TEST HOW CHANGING RENDERER SETTINGS INTERACTS WITH ASSESTS
     for (size_t i = 0; i < assets->asset_info_count; ++i) {
         Asset *asset = assets->asset_infos + i;
         if (asset->file_info.kind == ASSET_KIND_TEXTURE && asset->state == ASSET_STATE_LOADED) {
             asset->state = ASSET_STATE_UNLOADED;
         } else if (asset->file_info.kind == ASSET_KIND_FONT && asset->state == ASSET_STATE_LOADED) {
+            // WE DO SOMETHING VERY STUPID HERE!!!
+            // THIS IS JUST TO TEST HOW CHANGING RENDERER SETTINGS INTERACTS WITH ASSESTS
             asset->state = ASSET_STATE_UNLOADED;
         }
     }

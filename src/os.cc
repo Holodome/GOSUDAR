@@ -633,7 +633,7 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
         }
         else 
         {
-            assert(false);
+            INVLALID_CODE_PATH;
         }
     }
 }
@@ -656,7 +656,7 @@ void write_file(FileHandle handle, size_t offset, size_t size, const void *sourc
         }
         else 
         {
-            assert(false);
+            INVLALID_CODE_PATH;
         }
     }    
 }

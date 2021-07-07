@@ -35,12 +35,8 @@ typedef double f64;
 
 #define STRUCT_FIELD(_struct, _field) (((_struct *)(0))->_field)
 #define VARIABLE_MAX_VALUE(_variable) ((1llu << (8llu * sizeof(_variable))) - 1)
-// For overengineering!
-// We want to use as small data types for enums as possible, so its better to have some check that all enum values can fit into it
-// Sentinel is max value of enum + 1. So in case u8 field, 1 << 8 >= (1 << 8 + 1) - false, because 8-bit value cant fit 9 bit
-// Max value of u8 is (1 << 8 - 1) and enum is 1 << 8, so (1 << 8 - 1) >= (1 << 8) <=> (1 << 8) >= (1 << 8 + 1) - right side is 
-#define ENUM_FITS_IN_VARIABLE(_sentinel, _variable) (_sentinel <= VARIABLE_MAX_VALUE(_variable) + 1)
-#define INVALID_DEFAULT_CASE default: assert(false);
+#define INVALID_DEFAULT_CASE default: assert(!"Invalid switch default case");
+#define INVLALID_CODE_PATH  assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
 
 #define GENERAL_H 1

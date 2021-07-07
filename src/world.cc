@@ -138,7 +138,7 @@ void free_id(World *world, EntityID id) {
         new_entry = alloc_struct(world->world_arena, IDListEntry);
     }
     new_entry->id = id;
-    LIST_ADD(world->free_id_list, new_entry);
+    LLIST_ADD(world->free_id_list, new_entry);
 }
 
 Entity *get_world_entity(World *world, EntityID id) {

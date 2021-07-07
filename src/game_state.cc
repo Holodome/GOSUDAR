@@ -301,7 +301,7 @@ static void update_interactions(GameState *game_state, FrameData *frame, InputMa
                         cancel_interaction = true;
                     }
                 } else {
-                    assert(false);
+                    INVLALID_CODE_PATH;
                 }
                 
                 if (!cancel_interaction) {
@@ -578,12 +578,12 @@ WorldObjectSettings *get_object_settings(GameState *game_state, u32 world_object
 void play_sound(GameState *game_state, AssetID sound_id) {
     PlayingSound *playing_sound = game_state->first_free_playing_sound;
     if (playing_sound) {
-        LIST_POP(game_state->first_free_playing_sound);
+        LLIST_POP(game_state->first_free_playing_sound);
     } else {
         ++game_state->playing_sounds_allocated;
         playing_sound = alloc_struct(&game_state->arena, PlayingSound);
     }
-    LIST_ADD(game_state->first_playing_sound, playing_sound);
+    LLIST_ADD(game_state->first_playing_sound, playing_sound);
     
     playing_sound->play_cursor = 0.0f;
     playing_sound->is_finished = false;
@@ -591,7 +591,7 @@ void play_sound(GameState *game_state, AssetID sound_id) {
 }
 
 void update_sound(GameState *game_state, Assets *assets, Platform *platform) {
-    LIST_ITER(game_state->first_playing_sound, playing_sound) {
+    LLIST_ITER(game_state->first_playing_sound, playing_sound) {
         assert(!playing_sound->is_finished);
         AssetInfo *info = assets_get_info(assets, playing_sound->sound_id);
         AssetSound *sound = assets_get_sound(assets, playing_sound->sound_id);
@@ -660,8 +660,8 @@ void update_sound(GameState *game_state, Assets *assets, Platform *platform) {
     while (game_state->first_playing_sound && 
         game_state->first_playing_sound->is_finished) {
         PlayingSound *sound = game_state->first_playing_sound;
-        LIST_POP(game_state->first_playing_sound);
-        LIST_ADD(game_state->first_free_playing_sound, sound);
+        LLIST_POP(game_state->first_playing_sound);
+        LLIST_ADD(game_state->first_free_playing_sound, sound);
     }
     // @TODO remove from other parts of list too
 }

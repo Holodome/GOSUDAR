@@ -16,8 +16,6 @@ struct DevUIView {
 };
 
 struct DevUI {
-    MemoryArena arena;
-    
     DevUIID active_id;
     DevUIView view_hash[128];
 };

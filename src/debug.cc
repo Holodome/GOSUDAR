@@ -19,6 +19,17 @@ static DebugValueBlock *get_value_block(DebugState *debug_state) {
     return block;
 }
 
+static DebugValue *get_debug_value(DebugState *debug_state) {
+    DebugValue *value = debug_state->first_free_value;         
+    if (value) {                                               
+        debug_state->first_free_value = value->next;           
+    } else {                          
+        ++debug_state->debug_values_allocated;                         
+        value = alloc_struct(&debug_state->arena, DebugValue); 
+    }
+    return value;
+}
+
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
     // Free values and value blocks
     DebugValueBlock *value_block_stack[DEBUG_VALUE_BLOCK_MAX_DEPTH] = {};
@@ -135,18 +146,11 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                 } break;
 #define DEBUG_EVENT_VALUE_DEF(_type)                            \
 case DEBUG_EVENT_VALUE_##_type: {                               \
-    DebugValue *value = debug_state->first_free_value;          \
-    if (value) {                                                \
-        debug_state->first_free_value = value->next;            \
-    } else {                                                    \
-        debug_state->debug_values_allocated++;                  \
-        value = alloc_struct(&debug_state->arena, DebugValue);  \
-    }                                                           \
+    DebugValue *value = get_debug_value(debug_state);           \
     value->value_kind = DEBUG_VALUE_##_type;                    \
     value->value_##_type = event->value_##_type;                \
     value->name = event->name;                                  \
-    value->next = value_block_stack[current_value_block_stack_index]->first_value; \
-    value_block_stack[current_value_block_stack_index]->first_value = value; \
+    LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); \
 } break;
 DEBUG_EVENT_VALUE_DEF(u64)
 DEBUG_EVENT_VALUE_DEF(f32)
@@ -154,32 +158,18 @@ DEBUG_EVENT_VALUE_DEF(Vec2)
 DEBUG_EVENT_VALUE_DEF(Vec3)
 DEBUG_EVENT_VALUE_DEF(Vec2i)
                 case DEBUG_EVENT_VALUE_SWITCH: {
-                    DebugValue *value = debug_state->first_free_value;         
-                    if (value) {                                               
-                        debug_state->first_free_value = value->next;           
-                    } else {                          
-                        ++debug_state->debug_values_allocated;                         
-                        value = alloc_struct(&debug_state->arena, DebugValue); 
-                    }                                                          
+                    DebugValue *value = get_debug_value(debug_state);                                                
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
                     value->value_switch = event->value_switch;               
                     value->name = event->name;                                 
-                    value->next = value_block_stack[current_value_block_stack_index]->first_value;
-                    value_block_stack[current_value_block_stack_index]->first_value = value;
+                    LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); 
                 } break; 
                 case DEBUG_EVENT_VALUE_DRAG: {
-                    DebugValue *value = debug_state->first_free_value;         
-                    if (value) {                                               
-                        debug_state->first_free_value = value->next;           
-                    } else {                          
-                        ++debug_state->debug_values_allocated;                         
-                        value = alloc_struct(&debug_state->arena, DebugValue); 
-                    }                                                          
+                    DebugValue *value = get_debug_value(debug_state);                                                
                     value->value_kind = DEBUG_VALUE_DRAG;                   
                     value->value_drag = event->value_drag;               
-                    value->name = event->name;                                 
-                    value->next = value_block_stack[current_value_block_stack_index]->first_value;
-                    value_block_stack[current_value_block_stack_index]->first_value = value;
+                    value->name = event->name;                                
+                    LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); 
                 } break; 
                 case DEBUG_EVENT_BEGIN_VALUE_BLOCK: {
                     DebugValueBlock *block = get_value_block(debug_state);
@@ -215,7 +205,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
         value_block_stack[current_value_block_stack_index] = block->next;
         
         if (dev_ui_section(dev_ui, block->name)) {
-            LIST_ITER(block->first_value, value) {
+            LLIST_ITER(block->first_value, value) {
                 char buffer[64];
                 switch (value->value_kind) {
                     case DEBUG_VALUE_f32: {
@@ -314,7 +304,5 @@ DebugState *DEBUG_init() {
 #define DEBUG_ARENA_SIZE MEGABYTES(256)
     DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena, DEBUG_ARENA_SIZE);
     debug_table = &debug_state->debug_table;
-    size_t dev_ui_arena_size = MEGABYTES(8);
-    debug_state->dev_ui.arena = subarena(&debug_state->arena, dev_ui_arena_size);
     return debug_state;
 }

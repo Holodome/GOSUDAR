@@ -240,8 +240,8 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR2);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(renderer, settings.display_size, true, settings.filtered);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size * 0.5, false, settings.filtered);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size * 0.5, false, settings.filtered);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
+    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
     // renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
     // renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
     
@@ -368,19 +368,18 @@ in vec2 blur_uvs[11];
 uniform sampler2D tex;
 
 void main() {
-    out_color = vec4(0.01) * texture(tex, vec2(0));
-    out_color.xy = blur_uvs[5];
-    // out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    // out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    // out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    // out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    // out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    // out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    // out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    // out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    // out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    // out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    // out_color += texture(tex, blur_uvs[10]) * 0.0093;
+    out_color = vec4(0);
+    out_color += texture(tex, blur_uvs[0]) * 0.0093;
+    out_color += texture(tex, blur_uvs[1]) * 0.028002;
+    out_color += texture(tex, blur_uvs[2]) * 0.065984;
+    out_color += texture(tex, blur_uvs[3]) * 0.121703;
+    out_color += texture(tex, blur_uvs[4]) * 0.175713;
+    out_color += texture(tex, blur_uvs[5]) * 0.198596;
+    out_color += texture(tex, blur_uvs[6]) * 0.175713;
+    out_color += texture(tex, blur_uvs[7]) * 0.121703;
+    out_color += texture(tex, blur_uvs[8]) * 0.065984;
+    out_color += texture(tex, blur_uvs[9]) * 0.028002;
+    out_color += texture(tex, blur_uvs[10]) * 0.0093;
 }
 
 #endif)FOO";
@@ -413,19 +412,18 @@ in vec2 blur_uvs[11];
 uniform sampler2D tex;
 
 void main() {
-    out_color = vec4(0.01)* texture(tex, vec2(0));
-    out_color.xy = blur_uvs[5];
-    // out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    // out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    // out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    // out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    // out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    // out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    // out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    // out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    // out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    // out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    // out_color += texture(tex, blur_uvs[10]) * 0.0093;
+    out_color = vec4(0);
+    out_color += texture(tex, blur_uvs[0]) * 0.0093;
+    out_color += texture(tex, blur_uvs[1]) * 0.028002;
+    out_color += texture(tex, blur_uvs[2]) * 0.065984;
+    out_color += texture(tex, blur_uvs[3]) * 0.121703;
+    out_color += texture(tex, blur_uvs[4]) * 0.175713;
+    out_color += texture(tex, blur_uvs[5]) * 0.198596;
+    out_color += texture(tex, blur_uvs[6]) * 0.175713;
+    out_color += texture(tex, blur_uvs[7]) * 0.121703;
+    out_color += texture(tex, blur_uvs[8]) * 0.065984;
+    out_color += texture(tex, blur_uvs[9]) * 0.028002;
+    out_color += texture(tex, blur_uvs[10]) * 0.0093;
 }
 
 #endif)FOO";
@@ -503,6 +501,11 @@ RendererCommands *renderer_begin_frame(Renderer *renderer) {
     return commands;
 }
 
+static void bind_framebuffer(RendererFramebuffer *framebuffer) {
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->id);
+    glViewport(0, 0, framebuffer->size.x, framebuffer->size.y);
+}
+
 void renderer_end_frame(Renderer *renderer) {
     TIMED_FUNCTION();
     // Upload data from vertex array to OpenGL buffers
@@ -533,7 +536,7 @@ void renderer_end_frame(Renderer *renderer) {
     for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
         RenderQuads *quads = renderer->commands.quads + i;
         RendererFramebuffer *framebuffer = renderer->framebuffers + quads->setup.framebuffer;
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->id);
+        bind_framebuffer(framebuffer);
         glBindVertexArray(renderer->vertex_array);
         glUseProgram(renderer->standard_shader);
         glUniformMatrix4fv(renderer->view_location, 1, false, quads->setup.view.value_ptr());
@@ -557,7 +560,7 @@ void renderer_end_frame(Renderer *renderer) {
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glActiveTexture(GL_TEXTURE0);
     if (renderer->commands.perform_blur) {
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1].id);
+        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR1);
         glUseProgram(renderer->horizontal_gaussian_blur_shader);
         glBindVertexArray(renderer->render_framebuffer_vao);
         glUniform1f(renderer->horizontal_gaussian_blur_target_width, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x);
@@ -567,7 +570,8 @@ void renderer_end_frame(Renderer *renderer) {
         glUseProgram(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].id);
+        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR2);
+        glViewport(0, 0, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
         glUseProgram(renderer->vertical_gaussian_blur_shader);
         glBindVertexArray(renderer->render_framebuffer_vao);
         glUniform1f(renderer->vertical_gaussian_blur_target_height, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
@@ -576,8 +580,8 @@ void renderer_end_frame(Renderer *renderer) {
         glBindVertexArray(0);
         glUseProgram(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD].id);
+        // @TODO we can remove this step
+        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(renderer->render_framebuffer_shader);

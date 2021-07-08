@@ -42,8 +42,14 @@ struct FontGlyph {
 	f32 x_advance;
 };
 
+struct AssetTexture {
+    Texture texture;
+    void *mipmaps;  
+};
+
 struct AssetFont {
     Texture texture;
+    void *atlas_mipmaps;
     FontGlyph *glyphs;
 };
 
@@ -58,9 +64,9 @@ struct Asset {
     AssetInfo file_info;
     u32 state;
     union {
-        AssetFont  font;
-        AssetSound sound;
-        Texture    texture;
+        AssetFont    font;
+        AssetSound   sound;
+        AssetTexture texture;
     };
 };
 

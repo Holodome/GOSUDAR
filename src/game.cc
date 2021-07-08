@@ -49,6 +49,7 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->is_paused = false;
         } 
         if (game->pause_main_menu->button.is_pressed) {
+            game->is_paused = false;
             game->game_state = GAME_STATE_MAIN_MENU;
         }
         if (game->pause_exit->button.is_pressed) {
@@ -71,6 +72,14 @@ void game_update_and_render(Game *game) {
     FRAME_MARKER();
     arena_clear(&game->frame_arena);
     DEBUG_begin_frame(game->debug_state);
+    
+    {DEBUG_VALUE_BLOCK("Memory")
+        DEBUG_VALUE(game->frame_arena.peak_size >> 10, "Frame arena size");
+        DEBUG_VALUE(game->debug_state->arena.peak_size >> 10, "Debug arena size");
+        DEBUG_VALUE(game->arena.peak_size >> 10, "Game arena size");
+        DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
+        DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
+    }
     
     Platform *platform = os_begin_frame(game->os);
     game->input = create_input_manager(platform);

@@ -106,7 +106,6 @@ static void set_pixel_format(OS *os, HDC hdc) {
 			WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB,	GL_TRUE,
 			WGL_COLOR_BITS_ARB,					32,
 			WGL_DEPTH_BITS_ARB,					24,
-			WGL_STENCIL_BITS_ARB,				8,
 			WGL_ALPHA_BITS_ARB,					8,
 			WGL_SAMPLE_BUFFERS_ARB,				true,
 			0
@@ -503,7 +502,7 @@ Platform *os_begin_frame(OS *os) {
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);
-    input->winsize = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
+    input->display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);

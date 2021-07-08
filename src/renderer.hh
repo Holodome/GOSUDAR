@@ -34,9 +34,8 @@ enum {
     // Actually, this can be rendered to default framebuffer, but it introduces some complexity in draw order
     // This probably should bother, but we'll see
     RENDERER_FRAMEBUFFER_GAME_INTERFACE,  
-    // Just dump it here so we don't care about draw order...
-    // Of course this is slower - but who cares for debug code, while it doesn't make computer explode
-    RENDERER_FRAMEBUFFER_DEBUG,  
+    RENDERER_FRAMEBUFFER_BLUR1,  
+    RENDERER_FRAMEBUFFER_BLUR2,  
     RENDERER_FRAMEBUFFER_SENTINEL,  
 };
 
@@ -92,12 +91,15 @@ struct RendererCommands {
     RenderQuads *last_quads;
     
     Texture white_texture;
+    
+    bool perform_blur;
 };
 
 struct RendererSettings {
     Vec2 display_size;  
     bool filtered;
     bool mipmapping;
+    bool vsync;
 };
 
 #define RENDERER_TEXTURE_DIM   512
@@ -127,6 +129,13 @@ struct Renderer {
     GLuint render_framebuffer_tex_location;
     GLuint render_framebuffer_vao;
     
+    GLuint horizontal_gaussian_blur_shader;
+    GLuint horizontal_gaussian_blur_tex_location;
+    GLuint horizontal_gaussian_blur_target_width;
+    GLuint vertical_gaussian_blur_shader;
+    GLuint vertical_gaussian_blur_tex_location;
+    GLuint vertical_gaussian_blur_target_height;
+    
     RendererCommands commands;
     
     GLuint vertex_array;
@@ -141,8 +150,11 @@ struct Renderer {
 };
 
 void renderer_init(Renderer *renderer, RendererSettings settings);
-RendererCommands *renderer_begin_frame(Renderer *renderer, RendererSettings settings);
+RendererCommands *renderer_begin_frame(Renderer *renderer);
 void renderer_end_frame(Renderer *renderer);
+// Creates texture from mipmaps data.
+// @TODO see if we need to zero-initialize all mipmap levels to transparent so 
+// filtering works properly - maybe we can just avoid using textures of non-standart sizes?
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 // Clean all previous settings and init new
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);

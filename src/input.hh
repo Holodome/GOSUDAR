@@ -49,7 +49,7 @@ inline bool is_mouse_keycode(u32 keycode) {
 // platform layer, like go fullscreen or switch vsync
 // The idea of this structure is not to provide api, but simply pass data between modules
 struct Platform {
-    Vec2 winsize;
+    Vec2 display_size;
     Vec2 mpos;
     Vec2 mdelta;
     f32 mwheel; 
@@ -63,8 +63,8 @@ struct Platform {
     u64 sample_count_to_output;
     u64 samples_per_second;
     // Settings that can be changed
-    bool vsync;
     bool fullscreen;
+    bool vsync;
 };
 
 inline void update_key_state(Platform *input, u32 key, bool new_down) {

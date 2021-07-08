@@ -15,6 +15,11 @@ enum GameStateKind {
     GAME_STATE_PLAY,  
 };
 
+enum MainMenuState {
+    MAIN_MENU_MAIN_SCREEN,  
+    MAIN_MENU_SETTINGS,  
+};
+
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
 // Game state is the logic of the game
@@ -49,9 +54,17 @@ struct Game {
     //
     // Main menu state
     //
+    MainMenuState main_menu_state;
     UIElement *main_menu_interface;
     UIElement *main_menu_start_game_button;
+    UIElement *main_menu_settings_button;
     UIElement *main_menu_exit_button;
+    
+    UIElement *settings_interface;
+    UIElement *settings_vsync;
+    UIElement *settings_texture_filtering;
+    UIElement *settings_texture_mipmapping;
+    UIElement *settings_back;
     //
     // Game state
     //
@@ -60,6 +73,12 @@ struct Game {
     UIElement *pause_continue;
     UIElement *pause_main_menu;
     UIElement *pause_exit;
+    
+    UIElement *game_interface;
+    UIElement *game_interface_button_mine_resource;
+    UIElement *game_interface_button_ground_interact;
+    UIElement *game_interface_button_building1;
+    UIElement *game_interface_button_building2;
 };
 
 void game_init(Game *game);

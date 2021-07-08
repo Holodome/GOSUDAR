@@ -242,9 +242,6 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
     renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
-    // renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
-    // renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
-    
     
     renderer->settings = settings;
 }
@@ -556,9 +553,11 @@ void renderer_end_frame(Renderer *renderer) {
     }
     
     glDisable(GL_DEPTH_TEST);
+    // Switch to premultiplied alpha
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glActiveTexture(GL_TEXTURE0);
+    // Make gaussian blur pass
     if (renderer->commands.perform_blur) {
         bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR1);
         glUseProgram(renderer->horizontal_gaussian_blur_shader);
@@ -596,7 +595,7 @@ void renderer_end_frame(Renderer *renderer) {
     // Render all framebuffers to default one
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, (GLsizei)renderer->settings.display_size.x, (GLsizei)renderer->settings.display_size.y);
-    glClearColor(0.2, 0.2, 0.2, 0.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(renderer->render_framebuffer_shader);
     glBindVertexArray(renderer->render_framebuffer_vao);

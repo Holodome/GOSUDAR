@@ -502,7 +502,9 @@ Platform *os_begin_frame(OS *os) {
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);
-    input->display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
+    Vec2 display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
+    input->window_size_changed = display_size != input->display_size;
+    input->display_size = display_size;
     
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);

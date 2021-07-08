@@ -9,6 +9,8 @@ enum UIElementKind {
     UI_ELEMENT_BLOCK,  
     UI_ELEMENT_CONTAINER,  
     UI_ELEMENT_BUTTON,  
+    UI_ELEMENT_LABEL,  
+    UI_ELEMENT_CHECKBOX,  
 };
 
 enum UIElementConstraintDesignation {
@@ -66,6 +68,18 @@ struct UIElement {
             bool is_held;
             bool is_pressed;
         } button;
+        struct {
+            Vec4 color;
+            const char *text;
+        } label;
+        struct {
+            Vec4 color_active;
+            Vec4 color_inactive;
+            const char *text;
+            
+            bool is_held;
+            bool *value;
+        } checkbox;
     };
     
     UIElement *next;
@@ -73,11 +87,20 @@ struct UIElement {
 
 UIElement *new_ui_element(MemoryArena *arena, UIElement **ll_elements, UIElementKind kind);
 UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color);
+UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color, const char *text);
 UIElement *create_ui_button(MemoryArena *arena, UIElement **ll_elements, Rect rect,
      Vec4 color_inactive, Vec4 color_active, const char *text);
+UIElement *create_ui_button_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
+     Vec4 color_inactive, Vec4 color_active, const char *text, Vec4 background);
+UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect rect,
+    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value);
+UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
+    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value, Vec4 background);
 // void set_constraint(UIElement *element, UIElementConstraintDesignation designation, UIElementConstraint constraint);
 void interface_recalculate_rects(UIElement *first_element, InputManager *input);
 void update_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);
+
+static bool draw_ui_frames = false;
 
 #define INTERFACE_HH 1
 #endif

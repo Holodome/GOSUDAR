@@ -58,6 +58,7 @@ struct Platform {
     f32 frame_dt;
     u32 utf32;
     bool is_quit_requested;
+    bool window_size_changed;
     
     i16 *sound_samples;
     u64 sample_count_to_output;

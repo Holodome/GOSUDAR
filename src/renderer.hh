@@ -34,6 +34,7 @@ enum {
     // Actually, this can be rendered to default framebuffer, but it introduces some complexity in draw order
     // This probably should bother, but we'll see
     RENDERER_FRAMEBUFFER_GAME_INTERFACE,  
+    // Reserved renderer framebuffers
     RENDERER_FRAMEBUFFER_BLUR1,  
     RENDERER_FRAMEBUFFER_BLUR2,  
     RENDERER_FRAMEBUFFER_SENTINEL,  

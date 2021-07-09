@@ -3,7 +3,6 @@
 #if INTERNAL_BUILD
 
 #include "os.hh"
-#include "game_state.hh"
 
 DebugTable *debug_table;
 

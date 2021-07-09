@@ -1,20 +1,19 @@
 #include "game.hh"
 
-
 static bool is_in_same_cell(Vec2 a, Vec2 b) {
     Vec2 a_floor = floor_to_cell(a);
     Vec2 b_floor = floor_to_cell(b);
     return a_floor == b_floor;
 }
 
-static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
+static bool is_cell_occupied(Game *game, Vec2 p) {
     TIMED_FUNCTION();
     bool occupied = false;
     
-    for (EntityIterator iter = iterate_all_entities(sim);
+    for (EntityIterator iter = iterate_all_entities(game);
          is_valid(&iter);
          advance(&iter)) {
-        SimEntity *entity = iter.ptr;
+        Entity *entity = iter.ptr;
         if (entity->kind & ENTITY_KIND_WORLD_OBJECT) {
             if (is_in_same_cell(entity->p, p)) {
                 occupied = true;
@@ -25,17 +24,23 @@ static bool is_cell_occupied(SimRegion *sim, Vec2 p) {
     return occupied;
 }
 
-static EntityID add_player(SimRegion *sim) {
-    SimEntity *entity = create_entity(sim);
+Entity *create_entity(Game *game) {
+    Entity *result = game->entities + game->entity_count;
+    result->id.value = game->entity_count++;
+    return result;
+}
+
+static EntityID add_player(Game *game) {
+    Entity *entity = create_entity(game);
     entity->p = {};
     entity->kind = ENTITY_KIND_PLAYER;
     return entity->id;
 }
 
-static EntityID add_tree(SimRegion *sim, Vec2 pos) {
+static EntityID add_tree(Game *game, Vec2 pos) {
     pos = floor_to_cell(pos);
     
-    SimEntity *entity = create_entity(sim);
+    Entity *entity = create_entity(game);
     entity->p = pos;
     entity->kind = ENTITY_KIND_WORLD_OBJECT;
     entity->world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
@@ -43,10 +48,10 @@ static EntityID add_tree(SimRegion *sim, Vec2 pos) {
     return entity->id;
 }
 
-static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
+static EntityID add_gold_vein(Game *game, Vec2 pos) {
     pos = floor_to_cell(pos);
     
-    SimEntity *entity = create_entity(sim);
+    Entity *entity = create_entity(game);
     entity->p = pos;
     entity->kind = ENTITY_KIND_WORLD_OBJECT;
     entity->world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
@@ -57,16 +62,15 @@ static EntityID add_gold_vein(SimRegion *sim, Vec2 pos) {
 static void world_gen(Game *game) {
     Entropy entropy;
     entropy.state = 12345678;
-    SimRegion *gen_sim = begin_sim(&game->frame_arena, game->world, Vec2i(0), Vec2i(0));
     // Initialize game_state 
-    game->camera_followed_entity = add_player(gen_sim);
+    game->camera_followed_entity = add_player(game);
     for (size_t i = 0; i < 1000; ++i) {
         do {
             Vec2 p;
             p.x = random_bilateral(&entropy) * CHUNK_SIZE * 5;
             p.y = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            if (!is_cell_occupied(gen_sim, p)) {
-                add_tree(gen_sim, p);
+            if (!is_cell_occupied(game, p)) {
+                add_tree(game, p);
                 break;
             }
         } while (true);
@@ -77,13 +81,12 @@ static void world_gen(Game *game) {
             Vec2 p;
             p.x = random_bilateral(&entropy) * CHUNK_SIZE * 5;
             p.y = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            if (!is_cell_occupied(gen_sim, p)) {
-                add_gold_vein(gen_sim, p);
+            if (!is_cell_occupied(game, p)) {
+                add_gold_vein(game, p);
                 break;
             }
         } while (0);
     }
-    end_sim(gen_sim);
 }
 
 //
@@ -201,16 +204,16 @@ void game_init(Game *game) {
     renderer_init(&game->renderer, game->renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);
     
-    game->world = alloc_struct(&game->arena, World);
-    game->world->world_arena = &game->arena;
-    // Initialize world
-    world_init(game->world);
     world_gen(game);
     game->game_state = GAME_STATE_MAIN_MENU;
     build_interface_for_window_size(game);
 }
 
-static void update_game(Game *game, SimRegion *sim) {
+Entity *get_entity_by_id(Game *game, EntityID id) {
+    return game->entities + id.value;
+}
+
+static void update_game(Game *game) {
     f32 x_view_coef = 1.0f * game->input.platform->frame_dt;
     f32 y_view_coef = 0.6f * game->input.platform->frame_dt;
     f32 x_angle_change = game->input.platform->mdelta.x * x_view_coef;
@@ -226,7 +229,7 @@ static void update_game(Game *game, SimRegion *sim) {
     game->cam.distance_from_player -= delta_zoom;
     game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 10);
     
-    SimEntity *camera_followed_entity = get_entity_by_id(sim, game->camera_followed_entity);
+    Entity *camera_followed_entity = get_entity_by_id(game, game->camera_followed_entity);
     // Calculate player movement
     Vec2 player_delta = Vec2(0);
     f32 move_coef = 4.0f * game->input.platform->frame_dt;
@@ -270,7 +273,7 @@ static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
     out[3] = Vec3(x + 1, 0, y + 1) * TILE_SIZE;
 }
 
-static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, AssetID *id_dest, Vec2 *size_dest) {
+static void get_sprite_settings_for_entity(Assets *assets, Entity *entity, AssetID *id_dest, Vec2 *size_dest) {
     AssetID texture_id = INVALID_ASSET_ID;
     Vec2 size = Vec2(0, 0);
     switch(entity->kind) {
@@ -295,33 +298,34 @@ static void get_sprite_settings_for_entity(Assets *assets, SimEntity *entity, As
     *size_dest = size;
 }
 
-static void render_game(Game *game, SimRegion *sim, RendererCommands *commands) {
+static void render_game(Game *game, RendererCommands *commands) {
     TIMED_FUNCTION();    
-    SimEntity *camera_followed_entity = get_entity_by_id(sim, game->camera_followed_entity);
+    Entity *camera_followed_entity = get_entity_by_id(game, game->camera_followed_entity);
     Vec3 center_pos = xz(camera_followed_entity->p);
     f32 horiz_distance = game->cam.distance_from_player * cosf(game->cam.pitch);
     f32 vert_distance = game->cam.distance_from_player * sinf(game->cam.pitch);
     f32 offsetx = horiz_distance * sinf(-game->cam.yaw);
     f32 offsetz = horiz_distance * cosf(-game->cam.yaw);
-    sim->cam_p.x = offsetx + center_pos.x;
-    sim->cam_p.z = offsetz + center_pos.z;
-    sim->cam_p.y = vert_distance;
+    Vec3 cam_p;
+    cam_p.x = offsetx + center_pos.x;
+    cam_p.z = offsetz + center_pos.z;
+    cam_p.y = vert_distance;
     
 #define CAMERA_FOV rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  100.0f
     game->projection = Mat4x4::perspective(CAMERA_FOV, game->input.platform->display_size.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     game->view = Mat4x4::identity() * Mat4x4::rotation(game->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game->cam.yaw, Vec3(0, 1, 0))
-        * Mat4x4::translate(-sim->cam_p);
-    sim->cam_mvp = game->projection * game->view;
+        * Mat4x4::translate(-cam_p);
+    game->mvp = game->projection * game->view;
     RenderGroup world_render_group = render_group_begin(commands, game->assets,
         setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, game->view, game->projection));
     // Draw ground
     BEGIN_BLOCK("Ground");
     AssetID ground_tex_id = assets_get_first_of_type(game->assets, ASSET_TYPE_GRASS);
-    for (i32 chunk_x = sim->min_chunk.x; chunk_x <= sim->max_chunk.x; ++chunk_x) {
-        for (i32 chunk_y = sim->min_chunk.y; chunk_y <= sim->max_chunk.y; ++chunk_y) {
-            Vec2i chunk_pos_in_tiles = (Vec2i(chunk_x, chunk_y) - sim->min_chunk) * TILES_IN_CHUNK;
+    for (i32 chunk_x = -5; chunk_x <= 4; ++chunk_x) {
+        for (i32 chunk_y = -5; chunk_y <= 4; ++chunk_y) {
+            Vec2i chunk_pos_in_tiles = Vec2i(chunk_x, chunk_y) * TILES_IN_CHUNK;
             for (i32 tile_x = 0; tile_x < TILES_IN_CHUNK; ++tile_x) {
                 for (i32 tile_y = 0; tile_y < TILES_IN_CHUNK; ++tile_y) {
                     Vec2i tile_pos = chunk_pos_in_tiles + Vec2i(tile_x, tile_y);
@@ -334,20 +338,20 @@ static void render_game(Game *game, SimRegion *sim, RendererCommands *commands) 
     }
     END_BLOCK();
     // Collecting entities for drawing is better done after updating in case some of them are deleted...
-    size_t max_drawable_count = sim->entity_count;
+    size_t max_drawable_count = game->entity_count;
     SortEntry *sort_a = alloc_arr(&game->frame_arena, max_drawable_count, SortEntry);
     SortEntry *sort_b = alloc_arr(&game->frame_arena, max_drawable_count, SortEntry);
     size_t drawable_count = 0;
-    for (EntityIterator iter = iterate_all_entities(sim);
+    for (EntityIterator iter = iterate_all_entities(game);
          is_valid(&iter);
          advance(&iter), ++drawable_count) {
-        SimEntity *ent = iter.ptr;
-        sort_a[drawable_count].sort_key = dot(sim->cam_mvp.get_z(), xz(ent->p) - sim->cam_p);
+        Entity *ent = iter.ptr;
+        sort_a[drawable_count].sort_key = dot(game->mvp.get_z(), xz(ent->p) - cam_p);
         sort_a[drawable_count].sort_index = iter.idx;
     }
     radix_sort(sort_a, sort_b, drawable_count);
     for (size_t drawable_idx = 0; drawable_idx < drawable_count; ++drawable_idx) {
-        SimEntity *entity = &sim->entities[sort_a[drawable_count - drawable_idx - 1].sort_index];
+        Entity *entity = &game->entities[sort_a[drawable_count - drawable_idx - 1].sort_index];
         AssetID texture_id;
         Vec2 size;
         get_sprite_settings_for_entity(game->assets, entity, &texture_id, &size);
@@ -357,7 +361,7 @@ static void render_game(Game *game, SimRegion *sim, RendererCommands *commands) 
         if (entity->kind == ENTITY_KIND_WORLD_OBJECT && entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BLUEPRINT) {
             color.a = 0.5f;
         }
-        get_billboard_positions(pos, sim->cam_mvp.get_x(), sim->cam_mvp.get_y(), size.x, size.y, billboard);
+        get_billboard_positions(pos, game->mvp.get_x(), game->mvp.get_y(), size.x, size.y, billboard);
         push_quad(&world_render_group, billboard[0], billboard[1], billboard[2], billboard[3], color, texture_id);
     }
     
@@ -369,12 +373,10 @@ static void update_game_state(Game *game, RendererCommands *commands) {
         game->is_paused = !game->is_paused;
     }
     
-    SimRegion *sim = begin_sim(&game->frame_arena, game->world, Vec2i(-5), Vec2i(4));
     if (!game->is_paused) {
-        update_game(game, sim);
+        update_game(game);
     }
-    render_game(game, sim, commands);
-    end_sim(sim);
+    render_game(game, commands);
     
     if (game->is_paused) {
         commands->perform_blur = true;

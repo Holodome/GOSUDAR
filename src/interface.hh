@@ -49,10 +49,15 @@ inline UIElementConstraint center_constraint() {
     return { UI_ELEMENT_CONTRAINT_KIND_CENTER, 0 };
 }
 
+struct UIListener {
+    bool is_pressed;  
+};
+
 struct UIElement {
     UIElementKind kind;
     // UIElementConstraint constraints[4];
     Rect rect;
+    UIListener listener;
     union {
         struct {
             UIElement *first_child;
@@ -96,7 +101,7 @@ UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect 
     Vec4 color_inactive, Vec4 color_active, const char *text, bool *value);
 UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
     Vec4 color_inactive, Vec4 color_active, const char *text, bool *value, Vec4 background);
-// void set_constraint(UIElement *element, UIElementConstraintDesignation designation, UIElementConstraint constraint);
+UIListener *get_listener(UIElement *element);
 void interface_recalculate_rects(UIElement *first_element, InputManager *input);
 void update_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);
 

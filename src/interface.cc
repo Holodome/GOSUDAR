@@ -61,6 +61,10 @@ UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elem
     return result;
 }
 
+UIListener *get_listener(UIElement *element) {
+    return &element->listener;
+}
+
 void update_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets) {
     RenderGroup ui_render_group = render_group_begin(commands, assets, setup_2d(RENDERER_FRAMEBUFFER_GAME_INTERFACE, 
         Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0)));
@@ -77,6 +81,7 @@ void update_interface(UIElement *first_element, InputManager *input, RendererCom
         
         UIElement *element = element_depth_stack[depth_stack_index];
         element_depth_stack[depth_stack_index] = element->next;
+        memset(&element->listener, 0, sizeof(element->listener));
         
         switch (element->kind) {
             case UI_ELEMENT_CONTAINER: {
@@ -95,6 +100,7 @@ void update_interface(UIElement *first_element, InputManager *input, RendererCom
                     if (element->button.is_held && is_key_held(input, KEY_MOUSE_LEFT)) {
                         element->button.is_held = true;
                     } else if (element->button.is_held) {
+                        element->listener.is_pressed = true;
                         element->button.is_pressed = true;
                         element->button.is_held = false;
                     } 

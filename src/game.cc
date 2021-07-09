@@ -18,56 +18,77 @@ void game_init(Game *game) {
     //
     // Main menu
     //
-    create_ui_label(&game->arena, &game->main_menu_interface, Rect(550, 150, 100, 50), Vec4(0.8, 0.2, 0.3, 1.0), "GOSUDAR");
-    game->main_menu_start_game_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
-        Rect(550, 300, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Start game", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->main_menu_settings_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
-        Rect(550, 400, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Settings", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->main_menu_exit_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
-        Rect(550, 550, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Exit game", Vec4(0.4, 0.4, 0.4, 1.0));
+    Vec2 text_box_size = Vec2(100, 50);
+    f32 text_box_x = (game->renderer_settings.display_size.x - text_box_size.x) * 0.5f;
+    Vec4 text_box_background = Vec4(0.4, 0.4, 0.4, 1.0);
+    Vec4 button_color0 = Vec4(0.6, 0.6, 0.6, 1.0);
+    Vec4 button_color1 = Vec4(0.8, 0.8, 0.8, 1.0);
+    Vec4 button_color2 = Vec4(0.8, 0.8, 0.0, 1.0);
+    Vec4 title_color = Vec4(0.8, 0.2, 0.3, 1.0);
+    create_ui_label(&game->arena, &game->main_menu_interface, Rect(text_box_x, 150, 100, 50), title_color, "GOSUDAR");
+    UIElement *start_game_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
+        Rect(Vec2(text_box_x, 300), text_box_size), button_color0, button_color1, "Start game", text_box_background);
+    game->main_menu_start_game_button = get_listener(start_game_button);
+    UIElement *settings_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
+        Rect(Vec2(text_box_x, 400), text_box_size), button_color0, button_color1, "Settings", text_box_background);
+    game->main_menu_settings_button = get_listener(settings_button);
+    UIElement *exit_button = create_ui_button_background(&game->arena, &game->main_menu_interface,
+        Rect(Vec2(text_box_x, 550), text_box_size), button_color0, button_color1, "Exit game", text_box_background);
+    game->main_menu_exit_button = get_listener(exit_button);
     //
     // Settings
     //
-    create_ui_label(&game->arena, &game->settings_interface, Rect(550, 50, 100, 50), Vec4(0.8, 0.1, 0.3, 1.0), "Settings");
-    game->settings_texture_filtering = create_ui_checkbox(&game->arena, &game->settings_interface,
-        Rect(550, 200, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.0, 1.0), "Bilinear filtering", 
+    create_ui_label(&game->arena, &game->settings_interface, Rect(Vec2(text_box_x, 50), text_box_size), title_color, "Settings");
+    UIElement *texture_filtering = create_ui_checkbox(&game->arena, &game->settings_interface,
+        Rect(Vec2(text_box_x, 200), text_box_size), button_color0, button_color2, "Bilinear filtering", 
         &game->renderer_settings.filtered);
-    game->settings_texture_mipmapping = create_ui_checkbox(&game->arena, &game->settings_interface,
-        Rect(550, 300, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.0, 1.0), "Mipmaps", 
+    game->settings_texture_filtering = get_listener(texture_filtering);
+    UIElement *mipmapping = create_ui_checkbox(&game->arena, &game->settings_interface,
+        Rect(Vec2(text_box_x, 300), text_box_size), button_color0, button_color2, "Mipmaps", 
         &game->renderer_settings.mipmapping);
-    game->settings_vsync = create_ui_checkbox(&game->arena, &game->settings_interface,
-        Rect(550, 400, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.0, 1.0), "Vsync", 
+    game->settings_texture_mipmapping = get_listener(mipmapping);
+    UIElement *vsync = create_ui_checkbox(&game->arena, &game->settings_interface,
+        Rect(Vec2(text_box_x, 400), text_box_size), button_color0, button_color2, "Vsync", 
         &game->renderer_settings.vsync);
-    game->settings_back = create_ui_button_background(&game->arena, &game->settings_interface,
-        Rect(550, 550, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Back", Vec4(0.4, 0.4, 0.4, 1.0));
+    game->settings_vsync = get_listener(vsync);
+    UIElement *settings_back = create_ui_button_background(&game->arena, &game->settings_interface,
+        Rect(Vec2(text_box_x, 550), text_box_size), button_color0, button_color1, "Back", text_box_background);
+    game->settings_back = get_listener(settings_back);
     //
     // Pause
     //
-    create_ui_label(&game->arena, &game->pause_interface, Rect(550, 150, 100, 50), Vec4(0.8, 0.2, 0.3, 1.0), "Pause");
-    game->pause_continue = create_ui_button_background(&game->arena, &game->pause_interface,
-        Rect(550, 300, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Continue", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->pause_main_menu = create_ui_button_background(&game->arena, &game->pause_interface,
-        Rect(550, 400, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Main menu", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->pause_exit = create_ui_button_background(&game->arena, &game->pause_interface,
-        Rect(550, 500, 100, 50), Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Exit", Vec4(0.4, 0.4, 0.4, 1.0));
+    create_ui_label(&game->arena, &game->pause_interface, Rect(Vec2(text_box_x, 150), text_box_size), title_color, "Pause");
+    UIElement *pause_continue = create_ui_button_background(&game->arena, &game->pause_interface,
+        Rect(Vec2(text_box_x, 300), text_box_size), button_color0, button_color1, "Continue", text_box_background);
+    game->pause_continue = get_listener(pause_continue);
+    UIElement *pause_main_menu = create_ui_button_background(&game->arena, &game->pause_interface,
+        Rect(Vec2(text_box_x, 400), text_box_size), button_color0, button_color1, "Main menu", text_box_background);
+    game->pause_main_menu = get_listener(pause_main_menu);
+    UIElement *pause_exit = create_ui_button_background(&game->arena, &game->pause_interface,
+        Rect(Vec2(text_box_x, 500), text_box_size), button_color0, button_color1, "Exit", text_box_background);
+    game->pause_exit = get_listener(pause_exit);
     //
     // Game interface
     //
     f32 down_menu_height = 150.0f;
     Rect down_menu_rect = Rect(0, game->renderer_settings.display_size.y - down_menu_height,
         game->renderer_settings.display_size.x, down_menu_height);
-    game->game_interface_button_mine_resource = create_ui_button_background(&game->arena, &game->game_interface, 
+    UIElement *mine_button = create_ui_button_background(&game->arena, &game->game_interface, 
         Rect(down_menu_rect.p + Vec2(20), Vec2(100, 30)),
-        Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Mine", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->game_interface_button_ground_interact = create_ui_button_background(&game->arena, &game->game_interface,
+        button_color0, button_color1, "Mine", text_box_background);
+    game->game_interface_button_mine_resource = get_listener(mine_button);
+    UIElement *ground_interact = create_ui_button_background(&game->arena, &game->game_interface,
          Rect(down_menu_rect.p + Vec2(20, 80), Vec2(100, 30)),
-        Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Ground", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->game_interface_button_building1 = create_ui_button_background(&game->arena, &game->game_interface, 
+        button_color0, button_color1, "Ground", text_box_background);
+    game->game_interface_button_ground_interact = get_listener(ground_interact);
+    UIElement *building1 = create_ui_button_background(&game->arena, &game->game_interface, 
         Rect(down_menu_rect.p + Vec2(170, 20), Vec2(100, 30)),
-        Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Building1", Vec4(0.4, 0.4, 0.4, 1.0));
-    game->game_interface_button_building2 = create_ui_button_background(&game->arena, &game->game_interface,
+        button_color0, button_color1, "Building1", text_box_background);
+    game->game_interface_button_building1 = get_listener(building1);
+    UIElement *building2 = create_ui_button_background(&game->arena, &game->game_interface,
          Rect(down_menu_rect.p + Vec2(170, 80), Vec2(100, 30)),
-        Vec4(0.6, 0.6, 0.6, 1.0), Vec4(0.8, 0.8, 0.8, 1.0), "Building2", Vec4(0.4, 0.4, 0.4, 1.0));
+        button_color0, button_color1, "Building2", text_box_background);
+    game->game_interface_button_building2 = get_listener(building2);
     create_ui_block(&game->arena, &game->game_interface, down_menu_rect, Vec4(0.2, 0.2, 0.2, 1.0));
 }
 
@@ -87,14 +108,14 @@ static void update_game_state(Game *game, RendererCommands *commands) {
     if (game->is_paused) {
         commands->perform_blur = true;
         update_interface(game->pause_interface, &game->input, commands, game->assets);
-        if (game->pause_continue->button.is_pressed) {
+        if (game->pause_continue->is_pressed) {
             game->is_paused = false;
         } 
-        if (game->pause_main_menu->button.is_pressed) {
+        if (game->pause_main_menu->is_pressed) {
             game->is_paused = false;
             game->game_state = GAME_STATE_MAIN_MENU;
         }
-        if (game->pause_exit->button.is_pressed) {
+        if (game->pause_exit->is_pressed) {
             game->is_running = false;
         }
     } else {
@@ -105,13 +126,13 @@ static void update_game_state(Game *game, RendererCommands *commands) {
 static void update_main_menu_state(Game *game, RendererCommands *commands) {
     if (game->main_menu_state == MAIN_MENU_MAIN_SCREEN) {
         update_interface(game->main_menu_interface, &game->input, commands, game->assets);
-        if (game->main_menu_start_game_button->button.is_pressed) {
+        if (game->main_menu_start_game_button->is_pressed) {
             game->game_state = GAME_STATE_PLAY;
         } 
-        if (game->main_menu_settings_button->button.is_pressed) {
+        if (game->main_menu_settings_button->is_pressed) {
             game->main_menu_state = MAIN_MENU_SETTINGS;   
         }
-        if (game->main_menu_exit_button->button.is_pressed) {
+        if (game->main_menu_exit_button->is_pressed) {
             game->is_running = false;
         }
     } else if (game->main_menu_state == MAIN_MENU_SETTINGS) {
@@ -119,7 +140,7 @@ static void update_main_menu_state(Game *game, RendererCommands *commands) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         }
         update_interface(game->settings_interface, &game->input, commands, game->assets);
-        if (game->settings_back->button.is_pressed) {
+        if (game->settings_back->is_pressed) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         } 
     }
@@ -147,7 +168,7 @@ void game_update_and_render(Game *game) {
     
     Platform *platform = os_begin_frame(game->os);
     game->input = create_input_manager(platform);
-    if (platform->is_quit_requested) {
+    if (platform->is_quit_requested || (is_key_held(&game->input, KEY_ALT) && is_key_pressed(&game->input, KEY_F4))) {
         game->is_running = false;
     }     
     if (is_key_pressed(&game->input, KEY_F11)) {

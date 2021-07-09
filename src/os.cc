@@ -135,8 +135,7 @@ static void set_pixel_format(OS *os, HDC hdc) {
 }
 
 
-static LRESULT WINAPI
-main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+static LRESULT WINAPI main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     LRESULT result = 0;
     switch (message) {
         case WM_QUIT:
@@ -150,6 +149,33 @@ main_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     }
     
     return result;
+}
+
+void go_fullscreen(OS *os, bool fullscreen) {
+    static WINDOWPLACEMENT LastWindowPlacement = {sizeof(WINDOWPLACEMENT)};
+
+    DWORD WindowStyle = GetWindowLong(os->hwnd, GWL_STYLE);
+    // Set fullscreen (actually this is windowed fullscreen!)
+    if (fullscreen) {
+        MONITORINFO MonitorInfo = {sizeof(MONITORINFO)};
+        if (GetWindowPlacement(os->hwnd, &LastWindowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(os->hwnd, MONITOR_DEFAULTTOPRIMARY),
+                           &MonitorInfo)) {
+            SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
+
+            SetWindowPos(os->hwnd, HWND_TOP,
+                MonitorInfo.rcMonitor.left,
+                MonitorInfo.rcMonitor.top,
+                MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    } else {
+        SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(os->hwnd, &LastWindowPlacement);
+        SetWindowPos(os->hwnd, 0, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
 }
 
 OS *os_init(Vec2 *display_size) {
@@ -186,10 +212,14 @@ OS *os_init(Vec2 *display_size) {
 #define WINDOW_HEIGHT 720
 #define WINDOW_NAME "GOSUDAR"
     os->hwnd = CreateWindowExA(WS_EX_APPWINDOW, wndclss.lpszClassName, WINDOW_NAME, 
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
+        WS_CAPTION | WS_SYSMENU | WS_VISIBLE, 
+        CW_USEDEFAULT, CW_USEDEFAULT,
         WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
     ShowWindow(os->hwnd, SW_SHOW);
     UpdateWindow(os->hwnd);
+    
+    go_fullscreen(os, true);
+    os->platform.fullscreen = true;
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);
@@ -353,9 +383,8 @@ Platform *os_begin_frame(OS *os) {
     TIMED_FUNCTION();
     Platform *input = &os->platform;
     input->mwheel = 0;
-        
-    memset(input->keys_transition_count, 0, sizeof(input->keys_transition_count));
     input->utf32 = 0;
+    memset(input->keys_transition_count, 0, sizeof(input->keys_transition_count));
     
     MSG msg;
     while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) {
@@ -414,6 +443,9 @@ Platform *os_begin_frame(OS *os) {
                     } break;
                     case 0x01D: {
                         key = KEY_CTRL;
+                    } break;
+                    case 0x038: {
+                        key = KEY_ALT;
                     } break;
                     case 0x039: {
                         key = KEY_SPACE;
@@ -530,33 +562,6 @@ Platform *os_begin_frame(OS *os) {
     os->old_fullscreen = input->fullscreen;
     
     return input;
-}
-
-void go_fullscreen(OS *os, bool fullscreen) {
-    static WINDOWPLACEMENT LastWindowPlacement = {sizeof(WINDOWPLACEMENT)};
-
-    DWORD WindowStyle = GetWindowLong(os->hwnd, GWL_STYLE);
-    // Set fullscreen (actually this is windowed fullscreen!)
-    if (fullscreen) {
-        MONITORINFO MonitorInfo = {sizeof(MONITORINFO)};
-        if (GetWindowPlacement(os->hwnd, &LastWindowPlacement) &&
-            GetMonitorInfo(MonitorFromWindow(os->hwnd, MONITOR_DEFAULTTOPRIMARY),
-                           &MonitorInfo)) {
-            SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
-
-            SetWindowPos(os->hwnd, HWND_TOP,
-                MonitorInfo.rcMonitor.left,
-                MonitorInfo.rcMonitor.top,
-                MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-                MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-        }
-    } else {
-        SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(os->hwnd, &LastWindowPlacement);
-        SetWindowPos(os->hwnd, 0, 0, 0, 0, 0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-    }
 }
 
 void os_end_frame(OS *os) {

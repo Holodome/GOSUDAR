@@ -56,29 +56,29 @@ struct Game {
     //
     MainMenuState main_menu_state;
     UIElement *main_menu_interface;
-    UIElement *main_menu_start_game_button;
-    UIElement *main_menu_settings_button;
-    UIElement *main_menu_exit_button;
+    UIListener *main_menu_start_game_button;
+    UIListener *main_menu_settings_button;
+    UIListener *main_menu_exit_button;
     
     UIElement *settings_interface;
-    UIElement *settings_vsync;
-    UIElement *settings_texture_filtering;
-    UIElement *settings_texture_mipmapping;
-    UIElement *settings_back;
+    UIListener *settings_vsync;
+    UIListener *settings_texture_filtering;
+    UIListener *settings_texture_mipmapping;
+    UIListener *settings_back;
     //
     // Game state
     //
     bool is_paused;
     UIElement *pause_interface;
-    UIElement *pause_continue;
-    UIElement *pause_main_menu;
-    UIElement *pause_exit;
+    UIListener *pause_continue;
+    UIListener *pause_main_menu;
+    UIListener *pause_exit;
     
     UIElement *game_interface;
-    UIElement *game_interface_button_mine_resource;
-    UIElement *game_interface_button_ground_interact;
-    UIElement *game_interface_button_building1;
-    UIElement *game_interface_button_building2;
+    UIListener *game_interface_button_mine_resource;
+    UIListener *game_interface_button_ground_interact;
+    UIListener *game_interface_button_building1;
+    UIListener *game_interface_button_building2;
 };
 
 void game_init(Game *game);

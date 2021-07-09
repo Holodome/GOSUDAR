@@ -13,6 +13,7 @@ enum {
     KEY_X,
     KEY_SHIFT,
     KEY_CTRL,
+    KEY_ALT,
     KEY_SPACE,
     KEY_ENTER, 
     KEY_ESCAPE,

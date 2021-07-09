@@ -217,9 +217,11 @@ OS *os_init(Vec2 *display_size) {
         WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
     ShowWindow(os->hwnd, SW_SHOW);
     UpdateWindow(os->hwnd);
+    SetForegroundWindow(os->hwnd);
+    SetFocus(os->hwnd);
     
-    go_fullscreen(os, true);
-    os->platform.fullscreen = true;
+    // go_fullscreen(os, true);
+    // os->platform.fullscreen = true;
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);

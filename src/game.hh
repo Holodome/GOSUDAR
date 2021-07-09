@@ -54,6 +54,7 @@ struct Game {
     //
     // Main menu state
     //
+    MemoryArena interface_arena;
     MainMenuState main_menu_state;
     UIElement *main_menu_interface;
     UIListener *main_menu_start_game_button;
@@ -68,6 +69,13 @@ struct Game {
     //
     // Game state
     //
+    SimCamera cam;
+    World *world;
+    EntityID camera_followed_entity;
+    Mat4x4 view;
+    Mat4x4 projection;
+    Mat4x4 mvp;
+    
     bool is_paused;
     UIElement *pause_interface;
     UIListener *pause_continue;

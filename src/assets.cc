@@ -87,7 +87,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
     Asset *asset = assets->asset_infos + id.value;
     assert(asset->file_info.kind == ASSET_KIND_FONT);    
     while (asset->state != ASSET_STATE_LOADED) {
-        if (!asset->font.glyphs || !asset->texture.mipmaps) {
+        if (!asset->font.glyphs || !asset->font.atlas_mipmaps) {
             void *data = alloc(assets->frame_arena, asset->file_info.data_size);
             read_file(assets->asset_file, asset->file_info.data_offset, asset->file_info.data_size, data);
             // This check is due to our stupid method to purge textures..
@@ -98,7 +98,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
             }
             if (!asset->font.atlas_mipmaps) {
                 void *pixels = (u8 *)data + asset->file_info.codepoint_count * sizeof(FontGlyph);
-                asset->font.atlas_mipmaps = generate_mipmaps_from_texture_data(assets->frame_arena, pixels, asset->file_info.atlas_width, asset->file_info.atlas_height);
+                asset->font.atlas_mipmaps = generate_mipmaps_from_texture_data(&assets->arena, pixels, asset->file_info.atlas_width, asset->file_info.atlas_height);
             }
         }
         asset->font.texture = renderer_create_texture_mipmaps(assets->renderer, asset->font.atlas_mipmaps, 

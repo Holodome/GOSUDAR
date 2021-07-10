@@ -16,7 +16,7 @@ extern _type _name;
 
 // Just for fun, see if we can use u16 for indices effectively
 #define RENDERER_INDEX_TYPE u16
-#define RENDERER_MAX_INDEX  VARIABLE_MAX_VALUE(RENDERER_INDEX_TYPE)
+#define RENDERER_MAX_INDEX  MAX_VALUE(RENDERER_INDEX_TYPE)
 #define GL_INDEX_TYPE  (sizeof(RENDERER_INDEX_TYPE) == 4 ? GL_UNSIGNED_INT : sizeof(RENDERER_INDEX_TYPE) == 2 ? GL_UNSIGNED_SHORT : sizeof(RENDERER_INDEX_TYPE) == 1 ? GL_UNSIGNED_BYTE : 0)
 
 struct Vertex {

@@ -103,7 +103,7 @@ UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elem
     Vec4 color_inactive, Vec4 color_active, const char *text, bool *value, Vec4 background);
 UIListener *get_listener(UIElement *element);
 void interface_recalculate_rects(UIElement *first_element, InputManager *input);
-void update_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);
+void update_and_render_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);
 
 static bool draw_ui_frames = false;
 

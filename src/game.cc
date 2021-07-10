@@ -1,92 +1,9 @@
 #include "game.hh"
 
-static bool is_in_same_cell(Vec2 a, Vec2 b) {
-    Vec2 a_floor = floor_to_cell(a);
-    Vec2 b_floor = floor_to_cell(b);
-    return a_floor == b_floor;
-}
-
-static bool is_cell_occupied(Game *game, Vec2 p) {
-    TIMED_FUNCTION();
-    bool occupied = false;
-    
-    for (EntityIterator iter = iterate_all_entities(game);
-         is_valid(&iter);
-         advance(&iter)) {
-        Entity *entity = iter.ptr;
-        if (entity->kind & ENTITY_KIND_WORLD_OBJECT) {
-            if (is_in_same_cell(entity->p, p)) {
-                occupied = true;
-                break;
-            }
-        }        
-    }
-    return occupied;
-}
-
-Entity *create_entity(Game *game) {
-    Entity *result = game->entities + game->entity_count;
-    result->id.value = game->entity_count++;
-    return result;
-}
-
-static EntityID add_player(Game *game) {
-    Entity *entity = create_entity(game);
-    entity->p = {};
+static EntityID add_player(SimRegion *sim) {
+    Entity *entity = create_new_entity(sim, Vec2(0));
     entity->kind = ENTITY_KIND_PLAYER;
     return entity->id;
-}
-
-static EntityID add_tree(Game *game, Vec2 pos) {
-    pos = floor_to_cell(pos);
-    
-    Entity *entity = create_entity(game);
-    entity->p = pos;
-    entity->kind = ENTITY_KIND_WORLD_OBJECT;
-    entity->world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
-    entity->resource_interactions_left = 1;
-    return entity->id;
-}
-
-static EntityID add_gold_vein(Game *game, Vec2 pos) {
-    pos = floor_to_cell(pos);
-    
-    Entity *entity = create_entity(game);
-    entity->p = pos;
-    entity->kind = ENTITY_KIND_WORLD_OBJECT;
-    entity->world_object_kind = WORLD_OBJECT_KIND_GOLD_DEPOSIT;
-    entity->resource_interactions_left = 5;
-    return entity->id;
-}
-
-static void world_gen(Game *game) {
-    Entropy entropy;
-    entropy.state = 12345678;
-    // Initialize game_state 
-    game->camera_followed_entity = add_player(game);
-    for (size_t i = 0; i < 1000; ++i) {
-        do {
-            Vec2 p;
-            p.x = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            p.y = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            if (!is_cell_occupied(game, p)) {
-                add_tree(game, p);
-                break;
-            }
-        } while (true);
-    }
-    
-    for (size_t i = 0; i < 50; ++i) {
-        do {
-            Vec2 p;
-            p.x = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            p.y = random_bilateral(&entropy) * CHUNK_SIZE * 5;
-            if (!is_cell_occupied(game, p)) {
-                add_gold_vein(game, p);
-                break;
-            }
-        } while (0);
-    }
 }
 
 //
@@ -160,9 +77,13 @@ static void build_interface_for_window_size(Game *game) {
     UIElement *pause_main_menu = create_ui_button_background(&game->interface_arena, &game->pause_interface,
         Rect(Vec2(text_box_x, 400), text_box_size), button_color0, button_color1, "Main menu", text_box_background);
     game->pause_main_menu = get_listener(pause_main_menu);
+    UIElement *pause_settings = create_ui_button_background(&game->interface_arena, &game->pause_interface,
+        Rect(Vec2(text_box_x, 500), text_box_size), button_color0, button_color1, "Settings", text_box_background);
+    game->pause_settings = get_listener(pause_settings);
     UIElement *pause_exit = create_ui_button_background(&game->interface_arena, &game->pause_interface,
-        Rect(Vec2(text_box_x, 500), text_box_size), button_color0, button_color1, "Exit", text_box_background);
+        Rect(Vec2(text_box_x, 600), text_box_size), button_color0, button_color1, "Exit", text_box_background);
     game->pause_exit = get_listener(pause_exit);
+    
     //
     // Game interface
     //
@@ -203,17 +124,24 @@ void game_init(Game *game) {
     game->os = os_init(&game->renderer_settings.display_size);
     renderer_init(&game->renderer, game->renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);
+
+    game->world = alloc_struct(&game->arena, World);
+    game->world->arena = &game->arena;
+    game->world->max_entity_id = 1;
+    SimRegion *creation_sim = alloc_struct(&game->frame_arena, SimRegion);
+    begin_sim(creation_sim, &game->frame_arena, game->world, 100, 100, 0);
+    game->camera_followed_entity = add_player(creation_sim);    
+    end_sim(creation_sim);
     
-    world_gen(game);
-    game->game_state = GAME_STATE_MAIN_MENU;
+    game->state = STATE_MAIN_MENU;
     build_interface_for_window_size(game);
 }
 
-Entity *get_entity_by_id(Game *game, EntityID id) {
-    return game->entities + id.value;
-}
-
-static void update_game(Game *game) {
+static void update_and_render_game(Game *game, RendererCommands *commands) {
+    SimRegion *sim = alloc_struct(&game->frame_arena, SimRegion);
+    begin_sim(sim, &game->frame_arena, game->world,
+        100, 100, 5);
+    
     f32 x_view_coef = 1.0f * game->input.platform->frame_dt;
     f32 y_view_coef = 0.6f * game->input.platform->frame_dt;
     f32 x_angle_change = game->input.platform->mdelta.x * x_view_coef;
@@ -227,81 +155,11 @@ static void update_game(Game *game) {
     f32 delta_zoom = game->input.platform->mwheel;
     // printf("%f\n", delta_zoom);
     game->cam.distance_from_player -= delta_zoom;
-    game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 10);
+    game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 1000);
     
-    Entity *camera_followed_entity = get_entity_by_id(game, game->camera_followed_entity);
-    // Calculate player movement
-    Vec2 player_delta = Vec2(0);
-    f32 move_coef = 4.0f * game->input.platform->frame_dt;
-    f32 z_speed = 0;
-    if (is_key_held(&game->input, KEY_W)) {
-        z_speed = move_coef;
-    } else if (is_key_held(&game->input, KEY_S)) {
-        z_speed = -move_coef;
-    }
-    player_delta.x += z_speed *  sinf(game->cam.yaw);
-    player_delta.y += z_speed * -cosf(game->cam.yaw);
-    
-    f32 x_speed = 0;
-    if (is_key_held(&game->input, KEY_D)) {
-        x_speed = move_coef;
-    } else if (is_key_held(&game->input, KEY_A)) {
-        x_speed = -move_coef;
-    }
-    player_delta.x += x_speed * cosf(game->cam.yaw);
-    player_delta.y += x_speed * sinf(game->cam.yaw);     
-    camera_followed_entity->p += player_delta;
-}
-
-static void get_billboard_positions(Vec3 mstorage_index_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
-    Vec3 top_left = mstorage_index_bottom - right * width * 0.5f + up * height;
-    Vec3 bottom_left = top_left - up * height;
-    Vec3 top_right = top_left + right * width;
-    Vec3 bottom_right = top_right - up * height;
-    out[0] = top_left;
-    out[1] = bottom_left;
-    out[2] = top_right;
-    out[3] = bottom_right;
-}
-
-static void get_ground_tile_positions(Vec2i tile_pos, Vec3 out[4]) {
-    f32 x = (f32)tile_pos.x;
-    f32 y = (f32)tile_pos.y;
-    out[0] = Vec3(x, 0, y) * TILE_SIZE;
-    out[1] = Vec3(x, 0, y + 1) * TILE_SIZE;
-    out[2] = Vec3(x + 1, 0, y) * TILE_SIZE;
-    out[3] = Vec3(x + 1, 0, y + 1) * TILE_SIZE;
-}
-
-static void get_sprite_settings_for_entity(Assets *assets, Entity *entity, AssetID *id_dest, Vec2 *size_dest) {
-    AssetID texture_id = INVALID_ASSET_ID;
-    Vec2 size = Vec2(0, 0);
-    switch(entity->kind) {
-        case ENTITY_KIND_PLAYER: {
-            texture_id = assets_get_first_of_type(assets, ASSET_TYPE_PLAYER);
-            size = Vec2(0.5f);
-        } break;
-        case ENTITY_KIND_WORLD_OBJECT: {
-            size = Vec2(0.5f);
-            AssetTagList tags = {};
-            AssetTagList weights = {};
-            tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = entity->world_object_kind;
-            weights.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1000.0f;
-            tags.tags[ASSET_TAG_BUILDING_IS_BUILT] = (bool)(entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BUILT);
-            weights.tags[ASSET_TAG_BUILDING_IS_BUILT] = 1.0f;
-            texture_id = assets_get_closest_match(assets, ASSET_TYPE_WORLD_OBJECT, &weights, &tags);
-        } break;
-        INVALID_DEFAULT_CASE;
-    }
-        
-    *id_dest = texture_id;
-    *size_dest = size;
-}
-
-static void render_game(Game *game, RendererCommands *commands) {
-    TIMED_FUNCTION();    
-    Entity *camera_followed_entity = get_entity_by_id(game, game->camera_followed_entity);
-    Vec3 center_pos = xz(camera_followed_entity->p);
+    Entity *camera_controlled_entity = get_entity_by_id(sim, game->camera_followed_entity);
+    assert(camera_controlled_entity);
+    Vec3 center_pos = xz(camera_controlled_entity->p);
     f32 horiz_distance = game->cam.distance_from_player * cosf(game->cam.pitch);
     f32 vert_distance = game->cam.distance_from_player * sinf(game->cam.pitch);
     f32 offsetx = horiz_distance * sinf(-game->cam.yaw);
@@ -313,94 +171,80 @@ static void render_game(Game *game, RendererCommands *commands) {
     
 #define CAMERA_FOV rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
-#define CAMERA_FAR_PLANE  100.0f
+#define CAMERA_FAR_PLANE  10000.0f
     game->projection = Mat4x4::perspective(CAMERA_FOV, game->input.platform->display_size.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     game->view = Mat4x4::identity() * Mat4x4::rotation(game->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-cam_p);
     game->mvp = game->projection * game->view;
     RenderGroup world_render_group = render_group_begin(commands, game->assets,
         setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, game->view, game->projection));
-    // Draw ground
-    BEGIN_BLOCK("Ground");
-    AssetID ground_tex_id = assets_get_first_of_type(game->assets, ASSET_TYPE_GRASS);
-    for (i32 chunk_x = -5; chunk_x <= 4; ++chunk_x) {
-        for (i32 chunk_y = -5; chunk_y <= 4; ++chunk_y) {
-            Vec2i chunk_pos_in_tiles = Vec2i(chunk_x, chunk_y) * TILES_IN_CHUNK;
-            for (i32 tile_x = 0; tile_x < TILES_IN_CHUNK; ++tile_x) {
-                for (i32 tile_y = 0; tile_y < TILES_IN_CHUNK; ++tile_y) {
-                    Vec2i tile_pos = chunk_pos_in_tiles + Vec2i(tile_x, tile_y);
-                    Vec3 tile_v[4];
-                    get_ground_tile_positions(tile_pos, tile_v);
-                    push_quad(&world_render_group, tile_v, ground_tex_id);
-                }
-            }
-        }
-    }
-    END_BLOCK();
-    // Collecting entities for drawing is better done after updating in case some of them are deleted...
-    size_t max_drawable_count = game->entity_count;
-    SortEntry *sort_a = alloc_arr(&game->frame_arena, max_drawable_count, SortEntry);
-    SortEntry *sort_b = alloc_arr(&game->frame_arena, max_drawable_count, SortEntry);
-    size_t drawable_count = 0;
-    for (EntityIterator iter = iterate_all_entities(game);
-         is_valid(&iter);
-         advance(&iter), ++drawable_count) {
-        Entity *ent = iter.ptr;
-        sort_a[drawable_count].sort_key = dot(game->mvp.get_z(), xz(ent->p) - cam_p);
-        sort_a[drawable_count].sort_index = iter.idx;
-    }
-    radix_sort(sort_a, sort_b, drawable_count);
-    for (size_t drawable_idx = 0; drawable_idx < drawable_count; ++drawable_idx) {
-        Entity *entity = &game->entities[sort_a[drawable_count - drawable_idx - 1].sort_index];
-        AssetID texture_id;
-        Vec2 size;
-        get_sprite_settings_for_entity(game->assets, entity, &texture_id, &size);
-        Vec3 billboard[4];
-        Vec3 pos = Vec3(entity->p.x, 0, entity->p.y);
-        Vec4 color = WHITE;
-        if (entity->kind == ENTITY_KIND_WORLD_OBJECT && entity->world_object_flags & WORLD_OBJECT_FLAG_IS_BLUEPRINT) {
-            color.a = 0.5f;
-        }
-        get_billboard_positions(pos, game->mvp.get_x(), game->mvp.get_y(), size.x, size.y, billboard);
-        push_quad(&world_render_group, billboard[0], billboard[1], billboard[2], billboard[3], color, texture_id);
+        
+    u32 chunk_count = get_chunk_count_for_radius(sim->chunk_radius);
+    AssetID ground_tex = assets_get_first_of_type(game->assets, ASSET_TYPE_GRASS);
+    for (u32 i = 0; i < chunk_count; ++i) {
+        SimRegionChunk *chunk = sim->chunks + i;
+        u32 returned_array_idx = chunk_array_index(sim->chunk_radius, chunk->chunk_x, chunk->chunk_y);
+        assert(returned_array_idx == i);
+        Vec3 p[4] = {
+            Vec3(chunk->chunk_x, 0, chunk->chunk_y) * CHUNK_SIZE,
+            Vec3(chunk->chunk_x, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
+            Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y) * CHUNK_SIZE,
+            Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
+        };
+        push_quad(&world_render_group, p, ground_tex);
     }
     
-    render_group_end(&world_render_group); 
+    render_group_end(&world_render_group);
+    end_sim(sim);
 }
 
 static void update_game_state(Game *game, RendererCommands *commands) {
-    if (is_key_pressed(&game->input, KEY_ESCAPE)) {
-        game->is_paused = !game->is_paused;
-    }
+    update_and_render_game(game, commands);
     
-    if (!game->is_paused) {
-        update_game(game);
-    }
-    render_game(game, commands);
-    
-    if (game->is_paused) {
+    if (game->game_state == GAME_STATE_PAUSED) {
+        if (is_key_pressed(&game->input, KEY_ESCAPE)) {
+            game->game_state = GAME_STATE_PLAYING;
+        }
+        
         commands->perform_blur = true;
-        update_interface(game->pause_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->pause_interface, &game->input, commands, game->assets);
         if (game->pause_continue->is_pressed) {
-            game->is_paused = false;
+            game->game_state = GAME_STATE_PLAYING;
         } 
         if (game->pause_main_menu->is_pressed) {
-            game->is_paused = false;
-            game->game_state = GAME_STATE_MAIN_MENU;
+            game->game_state = GAME_STATE_PLAYING;
+            game->state = STATE_MAIN_MENU;
         }
         if (game->pause_exit->is_pressed) {
             game->is_running = false;
         }
+        if (game->pause_settings->is_pressed) {
+            game->game_state = GAME_STATE_SETTINGS;
+        }
+    } else if (game->game_state == GAME_STATE_SETTINGS) {
+        if (is_key_pressed(&game->input, KEY_ESCAPE)) {
+            game->game_state = GAME_STATE_PAUSED;
+        }
+        
+        commands->perform_blur = true;
+        update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
+        if (game->settings_back->is_pressed) {
+            game->game_state = GAME_STATE_PAUSED;
+        }
     } else {
-        update_interface(game->game_interface, &game->input, commands, game->assets);
+        if (is_key_pressed(&game->input, KEY_ESCAPE)) {
+            game->game_state = GAME_STATE_PAUSED;
+        }
+        
+        update_and_render_interface(game->game_interface, &game->input, commands, game->assets);
     }
 }
 
 static void update_main_menu_state(Game *game, RendererCommands *commands) {
     if (game->main_menu_state == MAIN_MENU_MAIN_SCREEN) {
-        update_interface(game->main_menu_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->main_menu_interface, &game->input, commands, game->assets);
         if (game->main_menu_start_game_button->is_pressed) {
-            game->game_state = GAME_STATE_PLAY;
+            game->state = STATE_PLAY;
         } 
         if (game->main_menu_settings_button->is_pressed) {
             game->main_menu_state = MAIN_MENU_SETTINGS;   
@@ -412,7 +256,7 @@ static void update_main_menu_state(Game *game, RendererCommands *commands) {
         if (is_key_pressed(&game->input, KEY_ESCAPE)) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         }
-        update_interface(game->settings_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
         if (game->settings_back->is_pressed) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         } 
@@ -461,11 +305,11 @@ void game_update_and_render(Game *game) {
     }
     
     RendererCommands *commands = renderer_begin_frame(&game->renderer);
-    switch (game->game_state) {
-        case GAME_STATE_MAIN_MENU: {
+    switch (game->state) {
+        case STATE_MAIN_MENU: {
             update_main_menu_state(game, commands);
         } break;
-        case GAME_STATE_PLAY: {
+        case STATE_PLAY: {
             update_game_state(game, commands);
         } break;
     }

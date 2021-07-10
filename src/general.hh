@@ -35,7 +35,7 @@ typedef double f64;
 
 #define STRUCT_FIELD(_struct, _field) (((_struct *)(0))->_field)
 #define STRUCT_OFFSET(_struct, _field) (&STRUCT_FIELD(_struct, _field))
-#define VARIABLE_MAX_VALUE(_variable) ((1llu << (8llu * sizeof(_variable))) - 1)
+#define MAX_VALUE(_variable) ((1llu << (8llu * sizeof(_variable))) - 1)
 #define INVALID_DEFAULT_CASE default: assert(!"Invalid switch default case");
 #define INVLALID_CODE_PATH assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)

@@ -1231,9 +1231,15 @@ struct AssetID {
 #define PACK_4U8_TO_U32_(_a, _b, _c, _d) (((_a) << 0) | ((_b) << 8) | ((_c) << 16) | ((_d) << 24))
 #define PACK_4U8_TO_U32(_a, _b, _c, _d) PACK_4U8_TO_U32_((u32)(_a), (u32)(_b), (u32)(_c), (u32)(_d))
 
-#define LLIST_ITER(_list, _name) for (auto _name = _list; _name; _name = _name->next)
-#define LLIST_ADD(_list, _node) do { _node->next = _list; _list = _node; } while (0);
-#define LLIST_POP(_list) do { _list = _list->next; } while(0);
+#define LLIST_ITER(_list, _name) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
+#define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
+#define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
+#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { if (*(_list_ptr)) { LLIST_ADD(*(_list_ptr), (_node)); } else { *(_list_ptr) = (_node); } } while (0);
+
+inline u8 safe_truncate_u32_u8(u32 value) {
+    assert(value <= MAX_VALUE(u8));
+    return (u8)value;
+}
 
 #define LIB_HH 1
 #endif

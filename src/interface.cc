@@ -65,7 +65,7 @@ UIListener *get_listener(UIElement *element) {
     return &element->listener;
 }
 
-void update_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets) {
+void update_and_render_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets) {
     RenderGroup ui_render_group = render_group_begin(commands, assets, setup_2d(RENDERER_FRAMEBUFFER_GAME_INTERFACE, 
         Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0)));
     UIElement *element_depth_stack[UI_MAX_DEPTH] = {};

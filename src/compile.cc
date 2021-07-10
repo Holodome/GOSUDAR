@@ -4,6 +4,8 @@
 #include "render_group.cc"
 #include "assets.cc"
 #include "dev_ui.cc"
+#include "world.cc"
+#include "sim_region.cc"
 #include "game.cc"
 #include "interface.cc"
 #include "main.cc"

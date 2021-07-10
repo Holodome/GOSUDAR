@@ -98,6 +98,7 @@ struct SimRegion {
     // Chunks are a tool to iterate over entities in certain radius rather than 
     // primary entity storage key
     SimRegionChunk *chunks;
+    u32 chunks_count;
     
     u32 entity_blocks_allocated;
     SimRegionChunkEntityBlock *first_free_entity_block;

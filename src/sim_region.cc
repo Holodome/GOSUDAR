@@ -1,8 +1,8 @@
 #include "sim_region.hh"
 
 void p_to_chunk_coord(Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_dst) {
-    u32 chunk_x = floorf(p.x / CHUNK_SIZE);
-    u32 chunk_y = floorf(p.y / CHUNK_SIZE);
+    i32 chunk_x = floorf(p.x / CHUNK_SIZE);
+    i32 chunk_y = floorf(p.y / CHUNK_SIZE);
     *chunk_x_dst = chunk_x;
     *chunk_y_dst = chunk_y;
     if (chunk_p_dst) {
@@ -11,8 +11,8 @@ void p_to_chunk_coord(Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_
 }
 
 Vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, Vec2 chunk_p) {
-    i32 dchx = sim->center_chunk_x - chunk_x;
-    i32 dchy = sim->center_chunk_y - chunk_y;
+    i32 dchx = chunk_x - sim->center_chunk_x;
+    i32 dchy = chunk_y - sim->center_chunk_y;
     Vec2 result = Vec2(dchx, dchy) * CHUNK_SIZE + chunk_p;   
     return result;
 }
@@ -29,6 +29,7 @@ u32 get_chunk_count_for_radius(u32 radius) {
 }
 
 bool chunk_array_index_to_coord(u32 radius, u32 idx, i32 *dx, i32 *dy) {
+    TIMED_FUNCTION();
     bool result = false;
     
     u32 horiz_offset = 0;
@@ -82,6 +83,7 @@ bool chunk_array_index_to_coord(u32 radius, u32 idx, i32 *dx, i32 *dy) {
 }
 
 u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
+    TIMED_FUNCTION();
     u32 horiz_offset = 0;
     u32 vert_offset = 2 * radius + 1;
     u32 corner_offset = 4 * radius + 1;
@@ -126,6 +128,7 @@ SimRegionChunk *get_chunk(SimRegion *sim, u32 chunk_x, u32 chunk_y) {
     
     u32 index = chunk_array_index(sim->chunk_radius, chunk_x, chunk_y);
     if (index != (u32)-1) {
+        assert(index < sim->chunks_count);
         result = sim->chunks + index;
     }
     return result;
@@ -275,6 +278,7 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
     if (chunk_radius) {
         u32 chunk_count = 4 * chunk_radius + 1 + 4 * (((1 + (chunk_radius - 1)) * (chunk_radius - 1)) >> 1);
         sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk);
+        sim->chunks_count = chunk_count;
         for (u32 chunk_idx = 0; chunk_idx < chunk_count; ++chunk_idx) {
             SimRegionChunk *sim_chunk = sim->chunks + chunk_idx;
             

@@ -159,6 +159,29 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
     
     Entity *camera_controlled_entity = get_entity_by_id(sim, game->camera_followed_entity);
     assert(camera_controlled_entity);
+    // Calculate player movement
+    Vec2 player_delta = Vec2(0);
+    f32 move_coef = 4.0f * game->input.platform->frame_dt;
+    f32 z_speed = 0;
+    if (is_key_held(&game->input, KEY_W)) {
+        z_speed = move_coef;
+    } else if (is_key_held(&game->input, KEY_S)) {
+        z_speed = -move_coef;
+    }
+    player_delta.x += z_speed *  sinf(game->cam.yaw);
+    player_delta.y += z_speed * -cosf(game->cam.yaw);
+    
+    f32 x_speed = 0;
+    if (is_key_held(&game->input, KEY_D)) {
+        x_speed = move_coef;
+    } else if (is_key_held(&game->input, KEY_A)) {
+        x_speed = -move_coef;
+    }
+    player_delta.x += x_speed * cosf(game->cam.yaw);
+    player_delta.y += x_speed * sinf(game->cam.yaw);     
+    Vec2 new_p = camera_controlled_entity->p + player_delta;
+    change_entity_position(sim, camera_controlled_entity, new_p);
+    
     Vec3 center_pos = xz(camera_controlled_entity->p);
     f32 horiz_distance = game->cam.distance_from_player * cosf(game->cam.pitch);
     f32 vert_distance = game->cam.distance_from_player * sinf(game->cam.pitch);

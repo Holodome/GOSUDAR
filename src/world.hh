@@ -51,7 +51,7 @@
 // Cell size in arbitrary game units - basically cell is half a meter, but we define 
 // it to one so it is easy to do operations on spatial partitions and cell arithmetic
 #define CELL_SIZE 1.0f
-#define CHUNK_SIZE CELL_SIZE * CELLS_IN_CHUNK
+#define CHUNK_SIZE (CELL_SIZE * CELLS_IN_CHUNK)
 
 struct WorldChunkEntityBlock {
     u8 entity_count;

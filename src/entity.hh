@@ -6,6 +6,7 @@
 enum {
     ENTITY_FLAG_IS_DELETED = 0x1,
     ENTITY_FLAG_IS_ANCHOR  = 0x2,
+    ENTITY_FLAG_HAS_WORLD_PLACEMENT = 0x4,
 };
 
 struct EntityID {

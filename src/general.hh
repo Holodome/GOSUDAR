@@ -1,5 +1,9 @@
 #if !defined(GENERAL_H)
 
+#ifndef INTERNAL_BUILD
+#define INTERNAL_BUILD 1
+#endif
+
 #define CT_ASSERT(_expr) static_assert(_expr, "Assertion " #_expr " failed")
 
 #include <stdio.h>
@@ -7,12 +11,17 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <assert.h>
 #include <math.h>
 #include <string.h>
 #include <float.h>
 #include <stdarg.h>
 #include <ctype.h>
+
+#if INTERNAL_BUILD
+#include <assert.h>
+#else 
+#define assert(_expr) (_expr)
+#endif 
 
 typedef int8_t  i8;
 typedef int16_t i16;
@@ -39,10 +48,6 @@ typedef double f64;
 #define INVALID_DEFAULT_CASE default: assert(!"Invalid switch default case");
 #define INVLALID_CODE_PATH assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
-
-#ifndef INTERNAL_BUILD
-#define INTERNAL_BUILD 1
-#endif
 
 #define GENERAL_H 1
 #endif

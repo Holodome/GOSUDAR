@@ -31,6 +31,7 @@ enum {
     DEBUG_EVENT_VALUE_Vec2,
     DEBUG_EVENT_VALUE_Vec3,
     DEBUG_EVENT_VALUE_Vec2i,
+    DEBUG_EVENT_VALUE_bool,
 };
 
 struct DebugEvent {
@@ -41,6 +42,7 @@ struct DebugEvent {
     union {
         bool *value_switch;
         f32 *value_drag;
+        u64 value_bool;
         u64 value_u64;
         f32 value_f32;
         Vec2 value_Vec2;
@@ -101,6 +103,7 @@ DEBUG_VALUE_PROC_DEF(f32)
 DEBUG_VALUE_PROC_DEF(Vec2)
 DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
+DEBUG_VALUE_PROC_DEF(bool)
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
 #define DEBUG_DRAG(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_DRAG, DEBUG_NAME(), _name); event->value_drag = _value; } while (0);
@@ -172,6 +175,7 @@ enum {
     DEBUG_VALUE_Vec2,  
     DEBUG_VALUE_Vec2i, 
     DEBUG_VALUE_Vec3, 
+    DEBUG_VALUE_bool 
 };
 
 struct DebugValue {
@@ -185,6 +189,7 @@ struct DebugValue {
         Vec2 value_Vec2;
         Vec3 value_Vec3;
         Vec2i value_Vec2i;
+        bool value_bool;
     };
     DebugValue *next;
 };  

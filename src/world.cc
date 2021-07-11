@@ -47,7 +47,9 @@ static bool entity_block_has_enough_space_for(WorldChunkEntityBlock *entity_bloc
 }
 
 static void clear_entity_block(WorldChunkEntityBlock *entity_block) {
-    memset(entity_block, 0, sizeof(*entity_block));
+    memset(entity_block->entity_data, 0, sizeof(entity_block->entity_data));
+    entity_block->entity_count = 0;
+    entity_block->entity_data_size = 0;
 }
 
 void pack_entity_into_chunk(World *world, WorldChunk *chunk, Entity *src) {

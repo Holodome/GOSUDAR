@@ -158,6 +158,7 @@ DEBUG_EVENT_VALUE_DEF(f32)
 DEBUG_EVENT_VALUE_DEF(Vec2)
 DEBUG_EVENT_VALUE_DEF(Vec3)
 DEBUG_EVENT_VALUE_DEF(Vec2i)
+DEBUG_EVENT_VALUE_DEF(bool)
                 case DEBUG_EVENT_VALUE_SWITCH: {
                     DebugValue *value = get_debug_value(debug_state);                                                
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
@@ -229,6 +230,9 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     } break;
                     case DEBUG_VALUE_DRAG: {
                         snprintf(buffer, sizeof(buffer), "%s", value->name);       
+                    } break;
+                    case DEBUG_VALUE_bool: {
+                        snprintf(buffer, sizeof(buffer), "%s: %s", value->name, value->value_bool ? "true" : "false");
                     } break;
                 }
                 

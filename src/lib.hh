@@ -1098,9 +1098,7 @@ inline u32 utf8_encode(u32 utf32, u8 *dst) {
         *dst++ = 0x80 | (utf32 >> 6 & 0x3F);
         *dst++ = 0x80 | (utf32 & 0x3F);
         len = 4;
-    } else {
-        assert(!"Invalid unicode value");
-    }
+    } 
     return len;
 }
 
@@ -1111,18 +1109,21 @@ inline u32 utf8_decode(const u8 *src, const u8 **new_dst) {
         utf32 = src[0];
         len = 1;
     } else if ((src[0] & 0xE0) == 0xC0) {
-        assert((src[1] & 0xC0) == 0x80 && "Invalid UTF8 sequence");
-        utf32 = (src[0] & 0x1F) << 6 | (src[1] & 0x3F);     
-        len = 2; 
+        if ((src[1] & 0xC0) == 0x80) {
+            utf32 = (src[0] & 0x1F) << 6 | (src[1] & 0x3F);     
+            len = 2; 
+        }
     } else if ((src[0] & 0xF0) == 0xE0) {
-        assert((src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80 && "Invalid UTF8 sequence");
-        utf32 = (src[0] & 0x0F) << 12 | (src[1] & 0x3F) << 6 | (src[2] & 0x3F);     
-        len = 3;
+        if ((src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80) {
+            utf32 = (src[0] & 0x0F) << 12 | (src[1] & 0x3F) << 6 | (src[2] & 0x3F);     
+            len = 3;
+        }
     } else if ((src[0] & 0xF8) == 0xF0) {
-        assert((src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80 && (src[3] & 0xC0) == 0x80 && "Invalid UTF8 sequence");
-        utf32 = (src[0] & 0x03) << 18 | (src[1] & 0x3F) << 12 | (src[2] & 0x3F) << 6 
-            | (src[3] & 0x3F);     
-        len = 4;
+        if ((src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80 && (src[3] & 0xC0) == 0x80) {
+            utf32 = (src[0] & 0x03) << 18 | (src[1] & 0x3F) << 12 | (src[2] & 0x3F) << 6 
+                | (src[3] & 0x3F);     
+            len = 4;
+        }
     }
     
     *new_dst = src + len;
@@ -1239,6 +1240,17 @@ struct AssetID {
 inline u8 safe_truncate_u32_u8(u32 value) {
     assert(value <= MAX_VALUE(u8));
     return (u8)value;
+}
+
+inline u32 next_highest_pow_2(u32 v) {
+    --v;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    ++v;
+    return v;
 }
 
 #define LIB_HH 1

@@ -24,12 +24,16 @@ void get_global_space_p(SimRegion *sim, Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_d
     *chunk_y_dst = sim->center_chunk_y + local_chunk_y;
 }
 
+void get_chunk_coord_from_cell_coord(i32 cell_x, i32 cell_y, i32 *chunk_x_dst, i32 *chunk_y_dst) {
+    *chunk_x_dst = floorf((f32)cell_x / CELLS_IN_CHUNK);
+    *chunk_y_dst = floorf((f32)cell_y / CELLS_IN_CHUNK);
+}
+
 u32 get_chunk_count_for_radius(u32 radius) {
     return 1 + 4 * radius + 4 * (((1 + (radius - 1)) * (radius - 1)) >> 1);
 }
 
 bool chunk_array_index_to_coord(u32 radius, u32 idx, i32 *dx, i32 *dy) {
-    TIMED_FUNCTION();
     bool result = false;
     
     u32 horiz_offset = 0;
@@ -83,13 +87,12 @@ bool chunk_array_index_to_coord(u32 radius, u32 idx, i32 *dx, i32 *dy) {
 }
 
 u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
-    TIMED_FUNCTION();
     u32 horiz_offset = 0;
     u32 vert_offset = 2 * radius + 1;
     u32 corner_offset = 4 * radius + 1;
     u32 corner_size = ((1 + (radius - 1)) * (radius - 1)) >> 1;
     u32 result = (u32)-1;
-    if (radius) {
+    if (radius && abs(dx) + abs(dy) <= radius) {
         if (dy == 0) {
             result = dx + radius;
         } else if (dx == 0) {
@@ -113,9 +116,11 @@ u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
             
             u32 local_dx = abs(dx) - 1;
             u32 local_dy = abs(dy) - 1;
-            u32 row_offset = ((radius - 1) + (radius - 1 - local_dy + 1)) * (local_dy) / 2;
-            if (local_dx < (radius - 1 - local_dy + 1)) {
-                result = current_corner_offset + row_offset + local_dx;
+            if (local_dy < radius - 1) {
+                u32 row_offset = ((radius - 1) + (radius - 1 - local_dy + 1)) * (local_dy) / 2;
+                if (local_dx < (radius - 1 - local_dy)) {
+                    result = current_corner_offset + row_offset + local_dx;
+                }
             }
         }
     }
@@ -123,7 +128,7 @@ u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
 }
 
 
-SimRegionChunk *get_chunk(SimRegion *sim, u32 chunk_x, u32 chunk_y) {
+SimRegionChunk *get_chunk(SimRegion *sim, i32 chunk_x, i32 chunk_y) {
     SimRegionChunk *result = 0; 
     
     u32 index = chunk_array_index(sim->chunk_radius, chunk_x, chunk_y);
@@ -159,7 +164,7 @@ bool remove_entity_from_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id
 
 void add_entity_to_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id) {
     SimRegionChunkEntityBlock *first_block = &chunk->first_block;
-    if (first_block->entity_count == ARRAY_SIZE(first_block->ids) - 1) {
+    if (first_block->entity_count == ARRAY_SIZE(first_block->ids)) {
         SimRegionChunkEntityBlock *new_block = sim->first_free_entity_block;
         if (!new_block) {
             ++sim->entity_blocks_allocated;
@@ -173,14 +178,15 @@ void add_entity_to_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id) {
         first_block->entity_count = 0;
     }
     
-    assert(first_block->entity_count + 1 < ARRAY_SIZE(first_block->ids));
+    assert(first_block->entity_count < ARRAY_SIZE(first_block->ids));
     first_block->ids[first_block->entity_count++] = id;
 }
 
 SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id) {
     SimRegionEntityHash *result = 0;
     u32 hash_value = id.value;
-    u32 hash_mask = sim->entity_count - 1;
+    u32 hash_mask = sim->max_entity_count - 1;
+    assert(is_power_of_two(hash_mask + 1));
     for (size_t offset = 0; offset < sim->entity_count; ++offset) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         SimRegionEntityHash *entry = sim->entity_hash + hash_idx;
@@ -244,6 +250,7 @@ Entity *create_new_entity(SimRegion *sim, Vec2 p, Entity *src) {
 }
 
 void change_entity_position(SimRegion *sim, Entity *entity, Vec2 p) {
+    TIMED_FUNCTION();
     i32 old_chunk_x, old_chunk_y;
     p_to_chunk_coord(entity->p, &old_chunk_x, &old_chunk_y);
     i32 new_chunk_x, new_chunk_y;
@@ -262,6 +269,77 @@ void change_entity_position(SimRegion *sim, Entity *entity, Vec2 p) {
     entity->p = p;
 }
 
+bool is_cell_occupied(SimRegion *sim, i32 cell_x, i32 cell_y) {
+    TIMED_FUNCTION();
+    if (cell_x % 16 == 0 ) {
+        int a = 3;
+    }
+    i32 min_cell_chunk_x, min_cell_chunk_y;
+    get_chunk_coord_from_cell_coord(cell_x - 15, cell_y - 15, &min_cell_chunk_x, &min_cell_chunk_y);
+    i32 max_cell_chunk_x, max_cell_chunk_y;
+    get_chunk_coord_from_cell_coord(cell_x + 15, cell_y + 15, &max_cell_chunk_x, &max_cell_chunk_y);
+    bool is_occupied = false;
+    for (SimChunkIterator chunk_iter = iterate_sim_chunks(sim, min_cell_chunk_x, min_cell_chunk_y, 
+                                                         max_cell_chunk_x, max_cell_chunk_y);
+         is_valid(&chunk_iter) && !is_occupied;
+         advance(&chunk_iter)) {
+        SimRegionChunk *chunk = chunk_iter.ptr;
+        for (SimChunkEntityIterator iter = iterate_chunk_entities(chunk);
+             is_valid(&iter) && !is_occupied;
+             advance(&iter)) {
+            Entity *entity = get_entity_by_id(sim, *iter.ptr);
+            if (entity && entity->flags & ENTITY_FLAG_HAS_WORLD_PLACEMENT) {
+                i32 min_occupancy_cell_x = floorf(entity->p.x);
+                i32 min_occupancy_cell_y = floorf(entity->p.y);
+                i32 max_occupancy_cell_x = min_occupancy_cell_x;
+                i32 max_occupancy_cell_y = min_occupancy_cell_y;
+                if ((min_occupancy_cell_x <= cell_x && cell_x <= max_occupancy_cell_x) && 
+                    (min_occupancy_cell_y <= cell_y && cell_y <= max_occupancy_cell_y)) {
+                    is_occupied = true;
+                    break;       
+                }
+            }
+        }
+    }
+    return is_occupied;
+}
+
+bool check_spatial_placement(SimRegion *sim, i32 cell_x, i32 cell_y, u32 width, u32 height) {
+    // TIMED_FUNCTION();
+    // i32 min_occupant_x = cell_x;
+    // i32 min_occupant_y = cell_y;
+    // i32 max_occupant_x = cell_x + width;
+    // i32 max_occupant_y = cell_y + height;
+    
+    // i32 cell_chunk_x, cell_chunk_y;
+    // get_chunk_coord_from_cell_coord(cell_x, cell_y, &cell_chunk_x, &cell_chunk_y);
+    // bool is_occupied = false;
+    // for (SimChunkIterator iter = iterate_sim_chunks(sim, cell_chunk_x - 1, cell_chunk_y - 1, 
+    //         cell_chunk_x + 1, cell_chunk_y + 1);
+    //      is_valid(&iter) && !is_occupied;
+    //      advance(&iter)) {
+    //     SimRegionChunk *chunk = iter.ptr;
+    //     i32 chunk_pos_in_cells_x = chunk->chunk_x * CELLS_IN_CHUNK;
+    //     i32 chunk_pos_in_cells_y = chunk->chunk_y * CELLS_IN_CHUNK;
+    //     for (u32 spatial_data_idx = 0;
+    //          spatial_data_idx < chunk->spatial_occupancy_count && !is_occupied;
+    //          ++spatial_data_idx) {
+    //         SpatialOccupancy occupancy = chunk->spatial_occupancy[spatial_data_idx];
+    //         i32 min_occupancy_cell_x = chunk_pos_in_cells_x - 1;
+    //         i32 min_occupancy_cell_y = chunk_pos_in_cells_y - 1;
+    //         i32 max_occupancy_cell_x = chunk_pos_in_cells_x + occupancy.x + occupancy.w + 1;
+    //         i32 max_occupancy_cell_y = chunk_pos_in_cells_y + occupancy.y + occupancy.y + 1;
+    //         if (min_occupant_x < max_occupancy_cell_x && max_occupant_x > min_occupancy_cell_x
+    //             && min_occupant_y < max_occupancy_cell_y && max_occupant_y > min_occupancy_cell_y) {
+    //             is_occupied = true;
+    //             break;       
+    //         }
+    //     }
+    // }
+    // return is_occupied;
+    return false;
+}
+
 void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
      i32 center_x, i32 center_y, u32 chunk_radius) {
     TIMED_FUNCTION();
@@ -270,14 +348,15 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
     sim->center_chunk_x = center_x;
     sim->center_chunk_y = center_y;
     sim->chunk_radius = chunk_radius;
-    sim->max_entity_count = 4096;
-    sim->entity_count = 0;
-    sim->entities = alloc_arr(arena, sim->max_entity_count, Entity);
-    sim->entity_hash = alloc_arr(arena, sim->max_entity_count, SimRegionEntityHash);
     
     if (chunk_radius) {
-        u32 chunk_count = 4 * chunk_radius + 1 + 4 * (((1 + (chunk_radius - 1)) * (chunk_radius - 1)) >> 1);
+        u32 chunk_count = get_chunk_count_for_radius(chunk_radius);
+#define MAX_ENTITIES_PER_CHUNK 512
+        sim->max_entity_count = next_highest_pow_2(chunk_count * MAX_ENTITIES_PER_CHUNK);
+        sim->entity_count = 0;
         sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk);
+        sim->entities = alloc_arr(arena, sim->max_entity_count, Entity);
+        sim->entity_hash = alloc_arr(arena, sim->max_entity_count, SimRegionEntityHash);
         sim->chunks_count = chunk_count;
         for (u32 chunk_idx = 0; chunk_idx < chunk_count; ++chunk_idx) {
             SimRegionChunk *sim_chunk = sim->chunks + chunk_idx;
@@ -320,3 +399,122 @@ void end_sim(SimRegion *sim) {
         pack_entity_into_world(sim->world, chunk_x, chunk_y, src);   
     }
 }
+
+static void next(SimChunkIterator *iter) {
+    for (;;) {
+        if (iter->idx < ((iter->max_chunk_y - iter->min_chunk_y + 1) * (iter->max_chunk_x - iter->min_chunk_x + 1))) {
+            i32 local_x = iter->idx % (iter->max_chunk_x - iter->min_chunk_x + 1);
+            i32 local_y = iter->idx / (iter->max_chunk_x - iter->min_chunk_x + 1);
+            i32 chunk_x = iter->min_chunk_x + local_x;
+            i32 chunk_y = iter->min_chunk_y + local_y;
+            SimRegionChunk *chunk = get_chunk(iter->sim, chunk_x, chunk_y);
+            iter->ptr = chunk;
+            ++iter->idx;
+            if (iter->ptr) {
+                break;
+            }
+        } else {
+            iter->ptr = 0;
+            break;
+        }
+    }
+}
+
+SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, f32 radius) {
+    SimChunkIterator iter;
+    iter.sim = sim;
+    Vec2 top_left = p + Vec2(-radius, -radius);
+    Vec2 bottom_right = p + Vec2(radius, radius);
+    p_to_chunk_coord(top_left, &iter.min_chunk_x, &iter.min_chunk_y);
+    p_to_chunk_coord(bottom_right, &iter.max_chunk_x, &iter.min_chunk_y);
+    assert(iter.min_chunk_x <= iter.max_chunk_x);
+    assert(iter.min_chunk_y <= iter.max_chunk_y);
+    iter.idx = 0;
+    next(&iter);
+    return iter;
+}
+
+SimChunkIterator iterate_sim_chunks(SimRegion *sim, i32 min_chunk_x, i32 min_chunk_y, i32 max_chunk_x, i32 max_chunk_y) {
+    SimChunkIterator iter;
+    iter.sim = sim;
+    iter.min_chunk_x = min_chunk_x;
+    iter.min_chunk_y = min_chunk_y;
+    iter.max_chunk_x = max_chunk_x;
+    iter.max_chunk_y = max_chunk_y;
+    assert(iter.min_chunk_x <= iter.max_chunk_x);
+    assert(iter.min_chunk_y <= iter.max_chunk_y);
+    iter.idx = 0;
+    next(&iter);
+    return iter;
+}
+
+bool is_valid(SimChunkIterator *iter) {
+    return iter->ptr;
+}
+
+void advance(SimChunkIterator *iter) {
+    next(iter);
+}
+
+static void set_to_next(SimChunkEntityIterator *iter) {
+    for(;;){
+        if (iter->entity_idx < iter->block->entity_count) {
+            iter->ptr = iter->block->ids + iter->entity_idx++;
+			break;
+        } else if (iter->block->next) {
+            iter->block = iter->block->next;
+            iter->entity_idx = 0;
+        } else {
+            iter->ptr = 0;
+            break;
+        }
+    }
+}
+
+SimChunkEntityIterator iterate_chunk_entities(SimRegionChunk *chunk) {
+    SimChunkEntityIterator iter;
+    iter.block = &chunk->first_block;
+    iter.entity_idx = 0;
+    set_to_next(&iter);
+    return iter;
+}
+
+bool is_valid(SimChunkEntityIterator *iter) {
+    return iter->ptr != 0;
+}
+
+void advance(SimChunkEntityIterator *iter) {
+    set_to_next(iter);
+}
+
+EntityIteratorSettings iter_flag(u32 flag_mask) {
+    EntityIteratorSettings iter = {};
+    iter.flags = ENTITY_ITERATOR_FLAG_BASED;
+    iter.flag_mask = flag_mask;
+    return iter;
+}
+
+EntityIteratorSettings iter_radius(Vec2 origin, Vec2 radius) {
+    EntityIteratorSettings iter = {};
+    iter.flags = ENTITY_ITERATOR_DISTANCE_BASED;
+    iter.origin = origin;
+    iter.radius = radius;
+    return iter;
+}
+
+EntityIteratorSettings iter_all() {
+    return iter_flag(~ENTITY_FLAG_IS_DELETED);
+}
+
+
+// EntityIterator iterate(SimRegion *sim, EntityIteratorSettings settings) {
+    
+// }
+
+// bool is_valid(EntityIterator *iter) {
+    
+// }
+
+// void advance(EntityIterator *iter) {
+    
+// }

@@ -3,6 +3,19 @@
 static EntityID add_player(SimRegion *sim) {
     Entity *entity = create_new_entity(sim, Vec2(0));
     entity->kind = ENTITY_KIND_PLAYER;
+    entity->flags = ENTITY_FLAG_IS_ANCHOR;
+    return entity->id;
+}
+
+
+static EntityID add_tree(SimRegion *sim, Vec2 pos) {
+    pos.x = floorf(pos.x) + 0.5f;
+    pos.y = floorf(pos.y) + 0.5f;
+    Entity *entity = create_new_entity(sim, pos);
+    entity->kind = ENTITY_KIND_WORLD_OBJECT;
+    entity->flags = ENTITY_FLAG_HAS_WORLD_PLACEMENT;
+    entity->world_object_kind = (rand() % 3 + WORLD_OBJECT_KIND_TREE_FOREST);
+    entity->resource_interactions_left = 1;
     return entity->id;
 }
 
@@ -128,40 +141,76 @@ void game_init(Game *game) {
     game->world = alloc_struct(&game->arena, World);
     game->world->arena = &game->arena;
     game->world->max_entity_id = 1;
+    Entropy gen_entropy { 123456789 };
     SimRegion *creation_sim = alloc_struct(&game->frame_arena, SimRegion);
-    begin_sim(creation_sim, &game->frame_arena, game->world, 100, 100, 0);
+    begin_sim(creation_sim, &game->frame_arena, game->world, 100, 100, 5);
     game->camera_followed_entity = add_player(creation_sim);    
+    for (u32 i = 0; i < 1000; ++i) {
+        for (;;) {
+            f32 x = random_bilateral(&gen_entropy) * CHUNK_SIZE * 3;
+            f32 y = random_bilateral(&gen_entropy) * CHUNK_SIZE * 3;
+            if (!is_cell_occupied(creation_sim, floorf(x), floorf(y))) {
+                add_tree(creation_sim, Vec2(x, y));
+                break;
+            }
+        }
+    }
     end_sim(creation_sim);
     
     game->state = STATE_MAIN_MENU;
     build_interface_for_window_size(game);
 }
 
+static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
+    f32 x = uv.x;
+    f32 y = uv.y;
+    Vec3 ray_dc = Vec3(x, y, 1.0f);
+    Vec4 ray_clip = Vec4(ray_dc.xy, -1.0f, 1.0f);
+    Vec4 ray_eye = Mat4x4::inverse(projection) * ray_clip;
+    ray_eye.z = -1.0f;
+    ray_eye.w = 0.0f;
+    Vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
+    return ray_world;
+}
+
+static void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
+    Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
+    Vec3 bottom_left = top_left - up * height;
+    Vec3 top_right = top_left + right * width;
+    Vec3 bottom_right = top_right - up * height;
+    out[0] = top_left;
+    out[1] = bottom_left;
+    out[2] = top_right;
+    out[3] = bottom_right;
+}
+
 static void update_and_render_game(Game *game, RendererCommands *commands) {
     SimRegion *sim = alloc_struct(&game->frame_arena, SimRegion);
     begin_sim(sim, &game->frame_arena, game->world,
         100, 100, 5);
-    
-    f32 x_view_coef = 1.0f * game->input.platform->frame_dt;
-    f32 y_view_coef = 0.6f * game->input.platform->frame_dt;
-    f32 x_angle_change = game->input.platform->mdelta.x * x_view_coef;
-    f32 y_angle_change = game->input.platform->mdelta.y * y_view_coef;
-    game->cam.yaw += x_angle_change;
-    game->cam.yaw = unwind_rad(game->cam.yaw);
-    game->cam.pitch += y_angle_change;
-#define MIN_CAM_PITCH (HALF_PI * 0.1f)
-#define MAX_CAM_PITCH (HALF_PI * 0.9f)
-    game->cam.pitch = clamp(game->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
-    f32 delta_zoom = game->input.platform->mwheel;
-    // printf("%f\n", delta_zoom);
-    game->cam.distance_from_player -= delta_zoom;
-    game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 1000);
+        
+    if (is_key_held(&game->input, KEY_Z)) {
+        f32 x_view_coef = 1.0f * game->input.platform->frame_dt;
+        f32 y_view_coef = 0.6f * game->input.platform->frame_dt;
+        f32 x_angle_change = game->input.platform->mdelta.x * x_view_coef;
+        f32 y_angle_change = game->input.platform->mdelta.y * y_view_coef;
+        game->cam.yaw += x_angle_change;
+        game->cam.yaw = unwind_rad(game->cam.yaw);
+        game->cam.pitch += y_angle_change;
+    #define MIN_CAM_PITCH (HALF_PI * 0.1f)
+    #define MAX_CAM_PITCH (HALF_PI * 0.9f)
+        game->cam.pitch = clamp(game->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
+        f32 delta_zoom = game->input.platform->mwheel;
+        // printf("%f\n", delta_zoom);
+        game->cam.distance_from_player -= delta_zoom;
+        game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 1000);
+    }
     
     Entity *camera_controlled_entity = get_entity_by_id(sim, game->camera_followed_entity);
     assert(camera_controlled_entity);
     // Calculate player movement
     Vec2 player_delta = Vec2(0);
-    f32 move_coef = 4.0f * game->input.platform->frame_dt;
+    f32 move_coef = 16.0f * game->input.platform->frame_dt;
     f32 z_speed = 0;
     if (is_key_held(&game->input, KEY_W)) {
         z_speed = move_coef;
@@ -199,24 +248,93 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
     game->view = Mat4x4::identity() * Mat4x4::rotation(game->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-cam_p);
     game->mvp = game->projection * game->view;
+    
+    Vec3 ray_dir = uv_to_world(game->projection, game->view, Vec2((2.0f * game->input.platform->mpos.x) / game->input.platform->display_size.x - 1.0f,
+		1.0f - (2.0f * game->input.platform->mpos.y) / game->input.platform->display_size.y));
+    f32 t = 0;
+    ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
+    Vec3 mouse_point_xyz = cam_p + ray_dir * t;
+    Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+    Vec2 mouse_projection = mouse_point;
+    
     RenderGroup world_render_group = render_group_begin(commands, game->assets,
         setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, game->view, game->projection));
         
     u32 chunk_count = get_chunk_count_for_radius(sim->chunk_radius);
     AssetID ground_tex = assets_get_first_of_type(game->assets, ASSET_TYPE_GRASS);
+    BEGIN_BLOCK("Ground render");
     for (u32 i = 0; i < chunk_count; ++i) {
         SimRegionChunk *chunk = sim->chunks + i;
-        u32 returned_array_idx = chunk_array_index(sim->chunk_radius, chunk->chunk_x, chunk->chunk_y);
-        assert(returned_array_idx == i);
+#define WORLD_EPSILON 0.01f
         Vec3 p[4] = {
             Vec3(chunk->chunk_x, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
         };
+        Vec3 p1[4];
+        memcpy(p1, p, sizeof(p));
+        p1[0].y = WORLD_EPSILON;
+        p1[1].y = WORLD_EPSILON;
+        p1[2].y = WORLD_EPSILON;
+        p1[3].y = WORLD_EPSILON;
         push_quad(&world_render_group, p, ground_tex);
+        push_quad_outline(&world_render_group, p1[0], p1[1], p1[2], p1[3], BLACK, 0.05f);
+    }
+    Vec2 mouse_cell_pos = Vec2(floorf(mouse_projection.x), floorf(mouse_projection.y));
+    DEBUG_VALUE(mouse_cell_pos, "Selected cell");
+    DEBUG_VALUE(is_cell_occupied(sim, mouse_cell_pos.x, mouse_cell_pos.y), "Is occupied");
+#define MOUSE_CELL_RAD 10
+    for (i32 dy = -MOUSE_CELL_RAD / 2; dy <= MOUSE_CELL_RAD / 2; ++dy) {
+        for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
+            bool is_occupied = is_cell_occupied(sim, mouse_cell_pos.x + dx, mouse_cell_pos.y + dy);
+            if (!is_occupied) {
+                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                push_quad_outline(&world_render_group, v0, v1, v2, v3, BLACK, 0.05f);
+            } else {
+                Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                push_quad_outline(&world_render_group, v0, v1, v2, v3, RED, 0.05f);
+            }
+        }
     }
     
+    END_BLOCK();
+    
+    BEGIN_BLOCK("Render entities");
+    SortEntry *sort_a = alloc_arr(&game->frame_arena, sim->entity_count, SortEntry);
+    SortEntry *sort_b = alloc_arr(&game->frame_arena, sim->entity_count, SortEntry);
+    for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
+        sort_a[entity_idx].sort_key = dot(game->mvp.get_z(), xz(sim->entities[entity_idx].p) - cam_p);
+        sort_a[entity_idx].sort_index = entity_idx;
+    }
+    radix_sort(sort_a, sort_b, sim->entity_count);
+    for (size_t sorted_idx = 0; sorted_idx < sim->entity_count; ++sorted_idx) {
+        Entity *entity = sim->entities + sort_a[sim->entity_count - sorted_idx - 1].sort_index;
+        AssetID texture_id;
+        switch (entity->kind) {
+            case ENTITY_KIND_PLAYER: {
+                texture_id = assets_get_first_of_type(game->assets, ASSET_TYPE_PLAYER);
+            } break;
+            case ENTITY_KIND_WORLD_OBJECT: {
+                AssetTagList match_tags = {};
+                AssetTagList weight_tags = {};
+                match_tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = entity->world_object_kind;
+                weight_tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1.0f;
+                texture_id = assets_get_closest_match(game->assets, ASSET_TYPE_WORLD_OBJECT, &weight_tags, &match_tags);
+            } break;
+        }
+        Vec3 v[4];
+        get_billboard_positions(xz(entity->p), game->mvp.get_x(), game->mvp.get_y(), 1.5f, 1.5f, v);
+        push_quad(&world_render_group, v, texture_id);
+    }
+    END_BLOCK();
+        
     render_group_end(&world_render_group);
     end_sim(sim);
 }
@@ -298,12 +416,6 @@ void game_update_and_render(Game *game) {
         DEBUG_VALUE(game->arena.peak_size >> 10, "Game arena size");
         DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
         DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
-    }
-    {DEBUG_VALUE_BLOCK("Renderer settings");
-        DEBUG_SWITCH(&game->renderer_settings.filtered, "Tex filtration");
-        DEBUG_SWITCH(&game->renderer_settings.mipmapping, "Mipmapping");
-        DEBUG_SWITCH(&game->renderer_settings.vsync, "Vsync");
-        DEBUG_VALUE(game->renderer_settings.display_size, "Display size");
     }
     
     Platform *platform = os_begin_frame(game->os);

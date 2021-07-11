@@ -10,8 +10,7 @@
 struct SpatialOccupancy {
     u8 x;
     u8 y;
-    u8 w;
-    u8 h;
+    u8 r;
 };  
 
 struct SimRegionChunkEntityBlock {
@@ -29,8 +28,8 @@ struct SimRegionChunk {
     // During simulation game makes a lot of calls to check if 
     // given cell in the world is considred empty - so we store 
     // occupancy data additionally to entities
-    u16 spatial_occupancy_count;
-    SpatialOccupancy spatial_occupancy[CELLS_IN_CHUNK * CELLS_IN_CHUNK / 2];
+    // u16 spatial_occupancy_count;
+    // SpatialOccupancy spatial_occupancy[CELLS_IN_CHUNK * CELLS_IN_CHUNK / 2];
     SimRegionChunkEntityBlock first_block;  
 };  
 
@@ -102,11 +101,14 @@ struct SimRegion {
     
     u32 entity_blocks_allocated;
     SimRegionChunkEntityBlock *first_free_entity_block;
+    
+    u32 missing_entity_space;
 };
 
 void p_to_chunk_coord(Vec2 p, i32 *chunk_x, i32 *chunk_y, Vec2 *chunk_p_dst = 0);
 Vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, Vec2 chunk_p);
 void get_global_space_p(SimRegion *sim, Vec2 p, i32 *chunk_x_dst, i32 *chunx_y_dst, Vec2 *chunk_p_dst);
+void get_chunk_coord_from_cell_coord(i32 cell_x, i32 cell_y, i32 *chunk_x_dst, i32 *chunk_y_dst);
 u32 get_chunk_count_for_radius(u32 radius);
 // This is related to how we store chunks in sim region
 // We store them as rhombus - it uses twice less space than storing rectangle,
@@ -128,6 +130,13 @@ Entity *create_new_entity(SimRegion *sim, Vec2 p, Entity *src = 0);
 // but it is more expensive not to use chunks either way
 // So position modifications during frame should be of minimal count
 void change_entity_position(SimRegion *sim, Entity *entity, Vec2 p);
+// All cell coordinates are sim space, basically floored position
+// @TODO this is very slow function - we can cache its results or 
+// create some structure to accelerate checking
+bool is_cell_occupied(SimRegion *sim, i32 cell_x, i32 cell_y);
+// Objects must have at least single cell in between them - 
+// check if object can be placed
+bool check_spatial_placement(SimRegion *sim, i32 cell_x, i32 cell_y, u32 radius);
 
 // We pass sim as argument because its allocation is done in world_state - 
 // it ususally allocates sims as number of anchors
@@ -140,30 +149,59 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
 void end_sim(SimRegion *sim);
 
 struct SimChunkIterator {
+    SimRegion *sim;
+    i32 min_chunk_x;
+    i32 min_chunk_y;
+    i32 max_chunk_x;
+    i32 max_chunk_y;
+    u32 idx;
+    SimRegionChunk *ptr;
 };
 
 // Iterates only chnuks that are inside defined circle 
 // Internally it does rect-based iteration, calculating points that define outer rect
 // of given circle
 // This will return some unwanted chunks if radius gets big
-SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, Vec2 radius);
+SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, f32 radius);
+SimChunkIterator iterate_sim_chunks(SimRegion *sim, i32 min_chunk_x, i32 min_chunk_y, i32 max_chunk_x, i32 max_chunk_y);
+
 // @TODO we way want to add chunk-based circle iteration,
 // or rectangular iteration
 // @TODO this structure can be used in construction of sim regions, where 
 bool is_valid(SimChunkIterator *iter);
 void advance(SimChunkIterator *iter);
 
+// 
+// Iterate entities in chunk
+struct SimChunkEntityIterator {
+    SimRegionChunkEntityBlock *block;
+    u32 entity_idx;
+    EntityID *ptr;
+};
+
+SimChunkEntityIterator iterate_chunk_entities(SimRegionChunk *chunk);
+bool is_valid(SimChunkEntityIterator *iter);
+void advance(SimChunkEntityIterator *iter);
+
 // Tool to iterate entities inside sim region
 // It is quite easy to create all this (useless) iterators now, so why not do it?
 enum {
-    ENTITY_ITERATOR_DISTANCE_BASED,  
-    ENTITY_ITERATOR_FLAG_BASED,  
-    ENTITY_ITERATOR_KIND_BASED,  
-    ENTITY_ITERATOR_FLAG_KIND_BASED,  
-    ENTITY_ITERATOR_DISTANCE_KIND_BASED,  
-    ENTITY_ITERATOR_DISTANCE_FLAG_BASED,  
-    ENTITY_ITERATOR_DISTANCE_FLAG_KIND_BASED,  
+    ENTITY_ITERATOR_DISTANCE_BASED = 0x1,   
+    ENTITY_ITERATOR_FLAG_BASED     = 0x2,   
+    ENTITY_ITERATOR_KIND_BASED     = 0x4,  
 };
+
+struct EntityIteratorSettings {
+    u8 flags;
+    
+    Vec2 origin, radius;
+    u32 flag_mask;
+    i32 kind;
+};  
+
+EntityIteratorSettings iter_flag(u32 flag_mask);
+EntityIteratorSettings iter_radius(Vec2 origin, f32 radius);
+EntityIteratorSettings iter_all();
 
 struct EntityIterator {
     SimRegion *sim;
@@ -178,8 +216,7 @@ struct EntityIterator {
 };
 
 // @TODO iterate using chunks
-EntityIterator iterate_in_radius(SimRegion *sim, Vec2 p, Vec2 radius);
-EntityIterator iterate_flag_mask(SimRegion *sim, u32 flag_mask = ~ENTITY_FLAG_IS_DELETED);
+EntityIterator iterate(SimRegion *sim, EntityIteratorSettings settings);
 bool is_valid(EntityIterator *iter);
 void advance(EntityIterator *iter);
 

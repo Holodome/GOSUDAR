@@ -19,6 +19,9 @@ struct SimRegionChunkEntityBlock {
     // since sim region is rather dense then sparse
     EntityID ids[ENTITIES_IN_BLOCK];  
     SimRegionChunkEntityBlock *next;
+    // @TODO here we can place all kinds of acceleration structures - like
+    // storing entity flags, their locations and whatever else game may need
+    // to access entity for strictly reading
 };
 
 struct SimRegionChunk {

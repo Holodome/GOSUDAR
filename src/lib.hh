@@ -2,6 +2,84 @@
 
 #include "general.hh"
 
+#include <intrin.h>
+
+inline i32 Truncate_i32(f32 value) {
+    return _mm_cvtt_ss2si(_mm_set_ss(value));
+}
+
+inline f32 Truncate(f32 value) {
+    return (f32)Truncate_i32(value);
+}
+
+inline i32 Floor_i32(f32 value) {
+    return _mm_cvt_ss2si(_mm_set_ss(value + value - 0.5f)) >> 1;
+}
+
+inline f32 Floor(f32 value) {
+    return (f32)Floor_i32(value);
+}
+
+inline i32 Round_i32(f32 value) {
+    return _mm_cvt_ss2si(_mm_set_ss(value + value + 0.5f)) >> 1;
+}
+
+inline f32 Round(f32 value) {
+    return (f32)Round_i32(value);
+}
+
+inline i32 Ceil_i32(f32 value) {
+    return -(_mm_cvt_ss2si(_mm_set_ss(-0.5f - (value + value))) >> 1);
+}
+
+inline f32 Ceil(f32 value) {
+    return (f32)Ceil_i32(value);
+}
+
+inline f32 Sqrt(f32 value) {
+    return _mm_cvtss_f32(_mm_sqrt_ps(_mm_set_ss(value)));
+}
+
+inline f32 Rsqrt(f32 value) {
+    return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(value)));
+}
+
+inline f32 Abs(f32 value) {
+    u32 bits = *(u32 *)&value;
+    bits &= 0x7FFFFFFF;
+    return *(f32 *)&bits;
+}
+
+inline i32 Abs(i32 value) {
+    u32 bits = *(u32 *)&value;
+    bits &= 0x7FFFFFFF;
+    return *(i32 *)&bits;
+}
+
+inline f32 Max(f32 a, f32 b) {
+    return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b)));
+}
+
+inline f32 Min(f32 a, f32 b) {
+    return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b)));
+}
+
+inline i32 Max_i32(i32 a, i32 b) {
+    return _mm_cvt_ss2si(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b)));
+}
+
+inline i32 Min_i32(i32 a, i32 b) {
+    return _mm_cvt_ss2si(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b)));
+}
+
+inline f32 Clamp(f32 value, f32 low, f32 high) {
+    return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(high), _mm_max_ss(_mm_set_ss(value), _mm_set_ss(low))));
+}
+
+inline f32 Clamp_i32(f32 value, f32 low, f32 high) {
+    return _mm_cvt_ss2si(_mm_min_ss(_mm_set_ss(high), _mm_max_ss(_mm_set_ss(value), _mm_set_ss(low))));
+}
+
 // @CLEANUP
 void *os_alloc(size_t size);
 
@@ -202,26 +280,8 @@ inline bool is_power_of_two(u64 x) {
     return !(x & (x - 1));
 }
 
-template <typename T>
-T Max(T a, T b) {
-    return a > b ? a : b;
-}
-
-template <typename T>
-T Min(T a, T b) {
-    return a < b ? a : b;
-}
-
-inline f32 rsqrt(f32 a) {
-    return 1.0f / sqrtf(a);
-}
-
 inline f32 rad(f32 deg) {
     return deg * PI / 180.0f;
-}
-
-inline f32 clamp(f32 a, f32 low, f32 high) {
-    return (a < low ? low : a > high ? high : a);
 }
 
 inline f32 unwind_rad(f32 a) {
@@ -235,17 +295,12 @@ inline f32 unwind_rad(f32 a) {
 }
 
 inline f32 saturate(f32 a) {
-    return clamp(a, 0, 1);
+    return Clamp(a, 0, 1);
 }
 
 template <typename T>
 inline T lerp(T a, T b, f32 t) {
     return a * (1.0f - t) + b * t;
-}
-
-template <typename T>
-inline T abs(T a) {
-    return (a < 0 ? -a : a);
 }
 
 template <typename T>
@@ -520,7 +575,7 @@ inline f32 length(T a) {
 
 template <typename T>
 inline T normalize(T a) {
-    T result = a * rsqrt(length_sq(a));
+    T result = a * Rsqrt(length_sq(a));
     return result;
 }
 
@@ -1048,7 +1103,7 @@ inline Quat4 lerp(Quat4 a, Quat4 b, f32 t) {
     if (cos_theta > 0.9995f) {
         result = normalize(a * (1 - t) + b * t);
     } else {
-        f32 theta = acosf(clamp(cos_theta, -1, 1));
+        f32 theta = acosf(Clamp(cos_theta, -1, 1));
         f32 thetap = theta * t;
         Quat4 qperp = normalize(b - a * cos_theta);
         result = a * cosf(thetap) + qperp * sinf(thetap);
@@ -1075,7 +1130,7 @@ inline Vec3 xz(Vec2 xz, f32 y = 0.0f) {
 }
 
 inline Vec2 floor(Vec2 v) {
-    return Vec2(floorf(v.x), floorf(v.y));
+    return Vec2(Floor(v.x), Floor(v.y));
 }
 
 inline u32 utf8_encode(u32 utf32, u8 *dst) {
@@ -1145,10 +1200,10 @@ inline u32 rgba_pack_linear256(u32 r, u32 g, u32 b, u32 a) {
 }
 
 inline u32 rgba_pack_4x8_linear1(Vec4 c) {
-    u32 ru = (u32)roundf(clamp(c.r, 0, 0.999f) * 255.0f);
-    u32 gu = (u32)roundf(clamp(c.g, 0, 0.999f) * 255.0f);
-    u32 bu = (u32)roundf(clamp(c.b, 0, 0.999f) * 255.0f);
-    u32 au = (u32)roundf(clamp(c.a, 0, 0.999f) * 255.0f);
+    u32 ru = (u32)Round_i32(Clamp(c.r, 0, 0.999f) * 255.0f);
+    u32 gu = (u32)Round_i32(Clamp(c.g, 0, 0.999f) * 255.0f);
+    u32 bu = (u32)Round_i32(Clamp(c.b, 0, 0.999f) * 255.0f);
+    u32 au = (u32)Round_i32(Clamp(c.a, 0, 0.999f) * 255.0f);
     return rgba_pack_linear256(ru, gu, bu, au);
 }
 
@@ -1232,11 +1287,6 @@ struct AssetID {
 #define PACK_4U8_TO_U32_(_a, _b, _c, _d) (((_a) << 0) | ((_b) << 8) | ((_c) << 16) | ((_d) << 24))
 #define PACK_4U8_TO_U32(_a, _b, _c, _d) PACK_4U8_TO_U32_((u32)(_a), (u32)(_b), (u32)(_c), (u32)(_d))
 
-#define LLIST_ITER(_list, _name) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
-#define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
-#define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
-#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { if (*(_list_ptr)) { LLIST_ADD(*(_list_ptr), (_node)); } else { *(_list_ptr) = (_node); } } while (0);
-
 inline u8 safe_truncate_u32_u8(u32 value) {
     assert(value <= MAX_VALUE(u8));
     return (u8)value;
@@ -1251,6 +1301,106 @@ inline u32 next_highest_pow_2(u32 v) {
     v |= v >> 16;
     ++v;
     return v;
+}
+
+i8 interlocked_increment(volatile i8 *value) {
+    i8 result = (i8)_InterlockedExchangeAdd8((volatile char *)value, 1) + 1;
+    return result;
+}
+
+i16 interlocked_increment(volatile i16 *value) {
+    i16 result = (i16)_InterlockedIncrement16((volatile short *)value);
+    return result;
+}
+
+i32 interlocked_increment(volatile i32 *value) {
+    i32 result = (i32)_InterlockedIncrement((volatile long *)value);
+    return result;
+}
+
+i64 interlocked_increment(volatile i64 *value) {
+    i64 result = (i64)_InterlockedIncrement64((volatile long long *)value);
+    return result;
+}
+
+i8 interlocked_decrement(volatile i8 *value) {
+    i8 result = (i8)_InterlockedExchangeAdd8((volatile char *)value, -1) - 1;
+    return result;
+}
+
+i16 interlocked_decrement(volatile i16 *value) {
+    i16 result = (i16)_InterlockedDecrement16((volatile short *)value);
+    return result;
+}
+
+i32 interlocked_decrement(volatile i32 *value) {
+    i32 result = (i32)_InterlockedDecrement((volatile long *)value);
+    return result;
+}
+
+i64 interlocked_decrement(volatile i64 *value) {
+    i64 result = (i64)_InterlockedDecrement64((volatile long long *)value);
+    return result;
+}
+
+i8 interlocked_add(volatile i8 *value, i8 A) {
+    i8 result = (i8)_InterlockedExchangeAdd8((volatile char *)value, A);
+    return result;
+}
+
+i16 interlocked_add(volatile i16 *value, i16 A) {
+    i16 result = (i16)_InterlockedExchangeAdd16((volatile short *)value, A);
+    return result;
+}
+
+i32 interlocked_add(volatile i32 *value, i32 A) {
+    i32 result = (i32)_InterlockedExchangeAdd((volatile long *)value, A);
+    return result;
+}
+
+i64 interlocked_add(volatile i64 *value, i64 A) {
+    i64 result = (i64)_InterlockedExchangeAdd64((volatile long long *)value, A);
+    return result;
+}
+
+i8 interlocked_exchange(volatile i8 *dest, i8 exchange) {
+    i8 result = (i8)_InterlockedExchange8((volatile char *)dest, exchange);
+    return result;
+}
+
+i16 interlocked_exchange(volatile i16 *dest, i16 exchange) {
+    i16 result = (i16)_InterlockedExchange16((volatile short *)dest, exchange);
+    return result;
+}
+
+i32 interlocked_exchange(volatile i32 *dest, i32 exchange) {
+    i32 result = (i32)_InterlockedExchange((volatile long *)dest, exchange);
+    return result;
+}
+
+i64 interlocked_exchange(volatile i64 *dest, i64 exchange) {
+    i64 result = (i64)_InterlockedExchange64((volatile long long *)dest, exchange);
+    return result;
+}
+
+i8 interlocked_compare_exchange(volatile i8 *dest, i8 exchange, i8 comparand) {
+    i8 result = (i8)_InterlockedCompareExchange8((volatile char *)dest, exchange, comparand);
+    return result;
+}
+
+i16 interlocked_compare_exchange(volatile i16 *dest, i16 exchange, i16 comparand) {
+    i16 result = (i16)_InterlockedCompareExchange16((volatile short *)dest, exchange, comparand);
+    return result;
+}
+
+i32 interlocked_compare_exchange(volatile i32 *dest, i32 exchange, i32 comparand) {
+    i32 result = (i32)_InterlockedCompareExchange((volatile long *)dest, exchange, comparand);
+    return result;
+}
+
+i64 interlocked_compare_exchange(volatile i64 *dest, i64 exchange, i64 comparand) {
+    i64 result = (i64)_InterlockedCompareExchange64((volatile long long *)dest, exchange, comparand);
+    return result;
 }
 
 #define LIB_HH 1

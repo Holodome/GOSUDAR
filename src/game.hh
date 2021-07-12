@@ -41,6 +41,19 @@ struct Camera {
     f32 distance_from_player;
 };
 
+struct WorldState {
+    Camera cam;    
+    World *world;
+    EntityID camera_followed_entity;
+    // This can be condiered per-frame data,
+    // but it needs to be saved in order
+    // to render when updating is not done
+    Mat4x4 view;
+    Mat4x4 projection;
+    Mat4x4 mvp;
+    Vec2 mouse_projection;
+    
+};  
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
@@ -92,12 +105,8 @@ struct Game {
     // Game state
     //
     GameState game_state;
-    Camera cam;
-    World *world;
-    EntityID camera_followed_entity;
-    Mat4x4 view;
-    Mat4x4 projection;
-    Mat4x4 mvp;
+    
+    WorldState world_state;
     
     UIElement *pause_interface;
     UIListener *pause_continue;

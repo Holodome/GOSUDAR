@@ -562,7 +562,7 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
       ld:
 
          l = (stbsp__uint32)(sn - s);
-         // clamp to precision
+         // Clamp to precision
          if (l > (stbsp__uint32)pr)
             l = pr;
          lead[0] = 0;
@@ -693,7 +693,7 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
          if (stbsp__real_to_str(&sn, &l, num, &dp, fv, (pr - 1) | 0x80000000))
             fl |= STBSP__NEGATIVE;
 
-         // clamp the precision and delete extra zeros after clamp
+         // Clamp the precision and delete extra zeros after Clamp
          n = pr;
          if (l > (stbsp__uint32)pr)
             l = pr;

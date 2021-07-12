@@ -67,9 +67,7 @@ void advance(MipIterator *iter) {
 
 size_t get_total_size_for_mips(u32 width, u32 height) {
     size_t result = 0;
-    for (MipIterator iter = iterate_mips(width, height);
-         is_valid(&iter);
-         advance(&iter)) {
+    ITERATE(iter, iterate_mips(width, height)) {
         result += iter.width * iter.height * 4;
     }
     return result;

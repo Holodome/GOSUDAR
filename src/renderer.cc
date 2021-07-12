@@ -477,9 +477,7 @@ void main() {
     renderer->max_texture_count = MAX_TEXTURE_COUNT;
     glGenTextures(1, &renderer->texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
-         is_valid(&iter);
-         advance(&iter)) {
+    ITERATE(iter, iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM)) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
             iter.width, iter.height, MAX_TEXTURE_COUNT,
             0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
@@ -630,9 +628,7 @@ Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 widt
     tex.height = (u16)height;
     assert(tex.width == width && tex.height == height);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-    for (MipIterator iter = iterate_mips(width, height);
-         is_valid(&iter);
-         advance(&iter)) { 
+    ITERATE(iter, iterate_mips(width, height)) {
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, iter.level, 0, 0,
             tex.index, iter.width, iter.height, 1,
             GL_RGBA, GL_UNSIGNED_BYTE, (u32 *)data + iter.pixel_offset);    

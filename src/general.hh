@@ -49,5 +49,18 @@ typedef double f64;
 #define INVLALID_CODE_PATH assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
 
+// Linked list
+#define LLIST_ITER(_list, _name) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
+#define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
+#define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
+#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { if (*(_list_ptr)) { LLIST_ADD(*(_list_ptr), (_node)); } else { *(_list_ptr) = (_node); } } while (0);
+
+// All iterators are defined with 3 functions:
+// next() - used internally (but can actually be made part of api???)
+// is_valid()
+// advance()
+// This API allows use of this macro which saves space writing countless for loops
+#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&_iter_name); advance(&_iter_name) )
+
 #define GENERAL_H 1
 #endif

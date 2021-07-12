@@ -1,5 +1,6 @@
 #include "render_group.hh"
 
+#include "renderer.hh"
 
 // Returns quads that render group should use with given setup.
 // This quads are guaranteed to fit at least single quad in it

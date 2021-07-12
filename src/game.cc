@@ -9,8 +9,8 @@ static EntityID add_player(SimRegion *sim) {
 
 
 static EntityID add_tree(SimRegion *sim, Vec2 pos) {
-    pos.x = floorf(pos.x) + 0.5f;
-    pos.y = floorf(pos.y) + 0.5f;
+    pos.x = Floor(pos.x) + 0.5f;
+    pos.y = Floor(pos.y) + 0.5f;
     Entity *entity = create_new_entity(sim, pos);
     entity->kind = ENTITY_KIND_WORLD_OBJECT;
     entity->flags = ENTITY_FLAG_HAS_WORLD_PLACEMENT;
@@ -138,18 +138,18 @@ void game_init(Game *game) {
     renderer_init(&game->renderer, game->renderer_settings);
     game->assets = assets_init(&game->renderer, &game->frame_arena);
 
-    game->world = alloc_struct(&game->arena, World);
-    game->world->arena = &game->arena;
-    game->world->max_entity_id = 1;
+    game->world_state.world = alloc_struct(&game->arena, World);
+    game->world_state.world->arena = &game->arena;
+    game->world_state.world->max_entity_id = 1;
     Entropy gen_entropy { 123456789 };
     SimRegion *creation_sim = alloc_struct(&game->frame_arena, SimRegion);
-    begin_sim(creation_sim, &game->frame_arena, game->world, 100, 100, 5);
-    game->camera_followed_entity = add_player(creation_sim);    
+    begin_sim(creation_sim, &game->frame_arena, game->world_state.world, 100, 100, 5);
+    game->world_state.camera_followed_entity = add_player(creation_sim);    
     for (u32 i = 0; i < 1000; ++i) {
         for (;;) {
             f32 x = random_bilateral(&gen_entropy) * CHUNK_SIZE * 3;
             f32 y = random_bilateral(&gen_entropy) * CHUNK_SIZE * 3;
-            if (!is_cell_occupied(creation_sim, floorf(x), floorf(y))) {
+            if (!is_cell_occupied(creation_sim, Floor(x), Floor(y))) {
                 add_tree(creation_sim, Vec2(x, y));
                 break;
             }
@@ -186,7 +186,7 @@ static void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 wi
 
 static void update_and_render_game(Game *game, RendererCommands *commands) {
     SimRegion *sim = alloc_struct(&game->frame_arena, SimRegion);
-    begin_sim(sim, &game->frame_arena, game->world,
+    begin_sim(sim, &game->frame_arena, game->world_state.world,
         100, 100, 5);
         
     if (is_key_held(&game->input, KEY_Z)) {
@@ -194,19 +194,19 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
         f32 y_view_coef = 0.6f * game->input.platform->frame_dt;
         f32 x_angle_change = game->input.platform->mdelta.x * x_view_coef;
         f32 y_angle_change = game->input.platform->mdelta.y * y_view_coef;
-        game->cam.yaw += x_angle_change;
-        game->cam.yaw = unwind_rad(game->cam.yaw);
-        game->cam.pitch += y_angle_change;
+        game->world_state.cam.yaw += x_angle_change;
+        game->world_state.cam.yaw = unwind_rad(game->world_state.cam.yaw);
+        game->world_state.cam.pitch += y_angle_change;
     #define MIN_CAM_PITCH (HALF_PI * 0.1f)
     #define MAX_CAM_PITCH (HALF_PI * 0.9f)
-        game->cam.pitch = clamp(game->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
+        game->world_state.cam.pitch = Clamp(game->world_state.cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         f32 delta_zoom = game->input.platform->mwheel;
         // printf("%f\n", delta_zoom);
-        game->cam.distance_from_player -= delta_zoom;
-        game->cam.distance_from_player = clamp(game->cam.distance_from_player, 0.5f, 1000);
+        game->world_state.cam.distance_from_player -= delta_zoom;
+        game->world_state.cam.distance_from_player = Clamp(game->world_state.cam.distance_from_player, 0.5f, 1000);
     }
     
-    Entity *camera_controlled_entity = get_entity_by_id(sim, game->camera_followed_entity);
+    Entity *camera_controlled_entity = get_entity_by_id(sim, game->world_state.camera_followed_entity);
     assert(camera_controlled_entity);
     // Calculate player movement
     Vec2 player_delta = Vec2(0);
@@ -217,8 +217,8 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
     } else if (is_key_held(&game->input, KEY_S)) {
         z_speed = -move_coef;
     }
-    player_delta.x += z_speed *  sinf(game->cam.yaw);
-    player_delta.y += z_speed * -cosf(game->cam.yaw);
+    player_delta.x += z_speed *  sinf(game->world_state.cam.yaw);
+    player_delta.y += z_speed * -cosf(game->world_state.cam.yaw);
     
     f32 x_speed = 0;
     if (is_key_held(&game->input, KEY_D)) {
@@ -226,16 +226,16 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
     } else if (is_key_held(&game->input, KEY_A)) {
         x_speed = -move_coef;
     }
-    player_delta.x += x_speed * cosf(game->cam.yaw);
-    player_delta.y += x_speed * sinf(game->cam.yaw);     
+    player_delta.x += x_speed * cosf(game->world_state.cam.yaw);
+    player_delta.y += x_speed * sinf(game->world_state.cam.yaw);     
     Vec2 new_p = camera_controlled_entity->p + player_delta;
     change_entity_position(sim, camera_controlled_entity, new_p);
     
     Vec3 center_pos = xz(camera_controlled_entity->p);
-    f32 horiz_distance = game->cam.distance_from_player * cosf(game->cam.pitch);
-    f32 vert_distance = game->cam.distance_from_player * sinf(game->cam.pitch);
-    f32 offsetx = horiz_distance * sinf(-game->cam.yaw);
-    f32 offsetz = horiz_distance * cosf(-game->cam.yaw);
+    f32 horiz_distance = game->world_state.cam.distance_from_player * cosf(game->world_state.cam.pitch);
+    f32 vert_distance = game->world_state.cam.distance_from_player * sinf(game->world_state.cam.pitch);
+    f32 offsetx = horiz_distance * sinf(-game->world_state.cam.yaw);
+    f32 offsetz = horiz_distance * cosf(-game->world_state.cam.yaw);
     Vec3 cam_p;
     cam_p.x = offsetx + center_pos.x;
     cam_p.z = offsetz + center_pos.z;
@@ -244,21 +244,21 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
 #define CAMERA_FOV rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  10000.0f
-    game->projection = Mat4x4::perspective(CAMERA_FOV, game->input.platform->display_size.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
-    game->view = Mat4x4::identity() * Mat4x4::rotation(game->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game->cam.yaw, Vec3(0, 1, 0))
+    game->world_state.projection = Mat4x4::perspective(CAMERA_FOV, game->input.platform->display_size.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    game->world_state.view = Mat4x4::identity() * Mat4x4::rotation(game->world_state.cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(game->world_state.cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-cam_p);
-    game->mvp = game->projection * game->view;
+    game->world_state.mvp = game->world_state.projection * game->world_state.view;
     
-    Vec3 ray_dir = uv_to_world(game->projection, game->view, Vec2((2.0f * game->input.platform->mpos.x) / game->input.platform->display_size.x - 1.0f,
+    Vec3 ray_dir = uv_to_world(game->world_state.projection, game->world_state.view, Vec2((2.0f * game->input.platform->mpos.x) / game->input.platform->display_size.x - 1.0f,
 		1.0f - (2.0f * game->input.platform->mpos.y) / game->input.platform->display_size.y));
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
-    Vec2 mouse_projection = mouse_point;
+    game->world_state.mouse_projection = mouse_point;
     
     RenderGroup world_render_group = render_group_begin(commands, game->assets,
-        setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, game->view, game->projection));
+        setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, game->world_state.view, game->world_state.projection));
         
     u32 chunk_count = get_chunk_count_for_radius(sim->chunk_radius);
     AssetID ground_tex = assets_get_first_of_type(game->assets, ASSET_TYPE_GRASS);
@@ -281,7 +281,7 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
         push_quad(&world_render_group, p, ground_tex);
         push_quad_outline(&world_render_group, p1[0], p1[1], p1[2], p1[3], BLACK, 0.05f);
     }
-    Vec2 mouse_cell_pos = Vec2(floorf(mouse_projection.x), floorf(mouse_projection.y));
+    Vec2 mouse_cell_pos = Vec2(Floor(game->world_state.mouse_projection.x), Floor(game->world_state.mouse_projection.y));
     DEBUG_VALUE(mouse_cell_pos, "Selected cell");
     DEBUG_VALUE(is_cell_occupied(sim, mouse_cell_pos.x, mouse_cell_pos.y), "Is occupied");
 #define MOUSE_CELL_RAD 10
@@ -310,7 +310,7 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
     SortEntry *sort_a = alloc_arr(&game->frame_arena, sim->entity_count, SortEntry);
     SortEntry *sort_b = alloc_arr(&game->frame_arena, sim->entity_count, SortEntry);
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
-        sort_a[entity_idx].sort_key = dot(game->mvp.get_z(), xz(sim->entities[entity_idx].p) - cam_p);
+        sort_a[entity_idx].sort_key = dot(game->world_state.mvp.get_z(), xz(sim->entities[entity_idx].p) - cam_p);
         sort_a[entity_idx].sort_index = entity_idx;
     }
     radix_sort(sort_a, sort_b, sim->entity_count);
@@ -330,7 +330,7 @@ static void update_and_render_game(Game *game, RendererCommands *commands) {
             } break;
         }
         Vec3 v[4];
-        get_billboard_positions(xz(entity->p), game->mvp.get_x(), game->mvp.get_y(), 1.5f, 1.5f, v);
+        get_billboard_positions(xz(entity->p), game->world_state.mvp.get_x(), game->world_state.mvp.get_y(), 1.5f, 1.5f, v);
         push_quad(&world_render_group, v, texture_id);
     }
     END_BLOCK();

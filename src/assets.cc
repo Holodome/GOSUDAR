@@ -24,7 +24,7 @@ AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *w
              ++tag_idx, ++j) {
             AssetTag *tag = assets->tags + tag_idx;
             f32 diff = matches->tags[tag->id] - tag->value;
-            f32 weighted_diff = weights->tags[tag->id] * fabsf(diff);
+            f32 weighted_diff = weights->tags[tag->id] * Abs(diff);
             total_weigted_diff += weighted_diff;
         }                
         

@@ -13,7 +13,7 @@
 // But this is really a corner case, so see if we can avoid it?
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
 #define DEBUG_MAX_FRAME_COUNT 4
-#define DEBUG_MAX_EVENT_COUNT 65536
+#define DEBUG_MAX_EVENT_COUNT (1 << 16)
 #define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
 CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 

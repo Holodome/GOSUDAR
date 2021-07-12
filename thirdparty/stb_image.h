@@ -4675,7 +4675,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
          // we can allocate enough data that this never writes out of memory, but it
          // could also overwrite the next scanline. can it overwrite non-empty data
          // on the next scanline? yes, consider 1-pixel-wide scanlines with 1-bit-per-pixel.
-         // so we need to explicitly clamp the final ones
+         // so we need to explicitly Clamp the final ones
 
          if (depth == 4) {
             for (k=x*img_n; k >= 2; k-=2, ++in) {

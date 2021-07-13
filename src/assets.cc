@@ -66,7 +66,7 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
     if (asset->file_info.kind == ASSET_KIND_FONT) {
         AssetFont *font = assets_get_font(assets, id);
         result = &font->texture;
-    } else {
+    } else if (asset->file_info.kind == ASSET_KIND_TEXTURE) {
         while (asset->state != ASSET_STATE_LOADED) {
             if (!asset->texture.mipmaps) {
                 void *pixels = alloc(assets->frame_arena, asset->file_info.data_size);
@@ -77,6 +77,8 @@ Texture *assets_get_texture(Assets *assets, AssetID id) {
             asset->state = ASSET_STATE_LOADED;
         }
         result = &asset->texture.texture;
+    } else {
+        INVALID_CODE_PATH;
     }
     return result;
 }

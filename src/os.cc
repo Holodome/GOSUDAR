@@ -641,7 +641,7 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
         }
         else 
         {
-            INVLALID_CODE_PATH;
+            INVALID_CODE_PATH;
         }
     }
 }
@@ -664,7 +664,7 @@ void write_file(FileHandle handle, size_t offset, size_t size, const void *sourc
         }
         else 
         {
-            INVLALID_CODE_PATH;
+            INVALID_CODE_PATH;
         }
     }    
 }

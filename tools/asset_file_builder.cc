@@ -220,7 +220,7 @@ static void add_tag(AssetBuilder *builder, u32 tag_id, f32 value) {
 static void expect_token(Lexer *lexer, u32 expected) {
     if (peek(lexer)->token != expected) {
         printf("Unexpected token %u (expected %u)\n", peek(lexer)->token, expected);
-        INVLALID_CODE_PATH;
+        INVALID_CODE_PATH;
     }
 }
 
@@ -308,7 +308,7 @@ static void parse_asset_file_description(AssetBuilder *builder, Lexer *lexer) {
                     } else if (peek(lexer)->token == TOKEN_REAL) {
                         tag_value = (f32)peek(lexer)->value_real;
                     } else {
-                        INVLALID_CODE_PATH;
+                        INVALID_CODE_PATH;
                     }
                     eat_tok(lexer);
                     add_tag(builder, tag_id, tag_value);

@@ -1,12 +1,11 @@
 #include "world_state.hh"
 
-static EntityID add_player(SimRegion *sim) {
-    Entity *entity = create_new_entity(sim, Vec2(0));
+static EntityID add_player(SimRegion *sim, Vec2 pos) {
+    Entity *entity = create_new_entity(sim, pos);
     entity->kind = ENTITY_KIND_PLAYER;
     entity->flags = ENTITY_FLAG_IS_ANCHOR;
     return entity->id;
 }
-
 
 static EntityID add_tree(SimRegion *sim, Vec2 pos, u32 kind) {
     pos.x = Floor(pos.x) + 0.5f;
@@ -19,6 +18,12 @@ static EntityID add_tree(SimRegion *sim, Vec2 pos, u32 kind) {
     return entity->id;
 }
 
+static EntityID add_pawn(SimRegion *sim, Vec2 pos) {
+    Entity *entity = create_new_entity(sim, pos);
+    entity->kind = ENTITY_KIND_PAWN;
+    return entity->id;
+}
+
 void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena) {    
     world_state->arena = arena;
     world_state->frame_arena = frame_arena;
@@ -28,17 +33,22 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     Entropy gen_entropy { 123456789 };
     SimRegion *creation_sim = alloc_struct(frame_arena, SimRegion);
     begin_sim(creation_sim, frame_arena, world_state->world, 100, 100, 25);
-    world_state->camera_followed_entity = add_player(creation_sim);    
-    for (u32 i = 0; i < 10000; ++i) {
-        for (;;) {
-            f32 x = random_bilateral(&gen_entropy) * CHUNK_SIZE * 15;
-            f32 y = random_bilateral(&gen_entropy) * CHUNK_SIZE * 15;
-            if (!is_cell_occupied(creation_sim, Floor(x), Floor(y))) {
-                add_tree(creation_sim, Vec2(x, y), WORLD_OBJECT_KIND_TREE_FOREST);
-                break;
-            }
-        }
-    }
+    Vec2 player_pos = Vec2(0);
+    world_state->camera_followed_entity = add_player(creation_sim, player_pos);    
+    add_pawn(creation_sim, Vec2(5, 5));
+    add_pawn(creation_sim, Vec2(-5, 5));
+    add_pawn(creation_sim, Vec2(5, -5));
+    add_pawn(creation_sim, Vec2(-5, -5));
+    // for (u32 i = 0; i < 10000; ++i) {
+    //     for (;;) {
+    //         f32 x = random_bilateral(&gen_entropy) * CHUNK_SIZE * 15;
+    //         f32 y = random_bilateral(&gen_entropy) * CHUNK_SIZE * 15;
+    //         if (!is_cell_occupied(creation_sim, Floor(x), Floor(y))) {
+    //             add_tree(creation_sim, Vec2(x, y), WORLD_OBJECT_KIND_TREE_FOREST);
+    //             break;
+    //         }
+    //     }
+    // }
     end_sim(creation_sim, world_state);
 }
 
@@ -61,16 +71,16 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         f32 x_angle_change = input->platform->mdelta.x * x_view_coef;
         f32 y_angle_change = input->platform->mdelta.y * y_view_coef;
         world_state->cam.yaw += x_angle_change;
-        world_state->cam.yaw = unwind_rad(world_state->cam.yaw);
         world_state->cam.pitch += y_angle_change;
 #define MIN_CAM_PITCH (HALF_PI * 0.1f)
 #define MAX_CAM_PITCH (HALF_PI * 0.9f)
-        world_state->cam.pitch = Clamp(world_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
         f32 delta_zoom = input->platform->mwheel;
         world_state->cam.distance_from_player -= delta_zoom;
-        world_state->cam.distance_from_player = Clamp(world_state->cam.distance_from_player, 0.5f, 1000);
     }
-    
+    world_state->cam.yaw = unwind_rad(world_state->cam.yaw);
+    world_state->cam.pitch = Clamp(world_state->cam.pitch, MIN_CAM_PITCH, MAX_CAM_PITCH);
+    world_state->cam.distance_from_player = Clamp(world_state->cam.distance_from_player, 0.5f, 1000);
+
     Entity *camera_controlled_entity = get_entity_by_id(sim, world_state->camera_followed_entity);
     assert(camera_controlled_entity);
     // Calculate player movement
@@ -218,6 +228,10 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
                 weight_tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1.0f;
                 texture_id = assets_get_closest_match(assets, ASSET_TYPE_WORLD_OBJECT, &weight_tags, &match_tags);
             } break;
+            case ENTITY_KIND_PAWN: {
+                texture_id = assets_get_first_of_type(assets, ASSET_TYPE_PAWN);
+            } break;
+            INVALID_DEFAULT_CASE;
         }
         Vec3 v[4];
         get_billboard_positions(xz(entity->p), cam_x, cam_y, 1.5f, 1.5f, v);

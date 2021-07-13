@@ -1,6 +1,9 @@
 [ASSET_TYPE_PLAYER]
 texture "dude.png"
 
+[ASSET_TYPE_PAWN]
+texture "pawn.png"
+
 [ASSET_TYPE_WORLD_OBJECT]
 texture "tree.png" {
     ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_TREE_FOREST
@@ -25,9 +28,6 @@ texture "building1.png" {
 texture "gold.png" {
     ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_GOLD_DEPOSIT
 }
-
-[ASSET_TYPE_PAWN]
-texture "pawn.png"
 
 [ASSET_TYPE_GRASS]
 texture "grass.png"

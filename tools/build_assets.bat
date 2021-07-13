@@ -6,3 +6,5 @@ pushd assets
 popd
 build\simple_timer -end
 del timer.timer
+del game\assets.assets
+copy assets\assets.assets game\

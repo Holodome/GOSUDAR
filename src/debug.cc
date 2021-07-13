@@ -153,14 +153,10 @@ case DEBUG_EVENT_VALUE_##_type: {                               \
     value->name = event->name;                                  \
     LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); \
 } break;
-DEBUG_EVENT_VALUE_DEF(u64)
-DEBUG_EVENT_VALUE_DEF(f32)
-DEBUG_EVENT_VALUE_DEF(Vec2)
-DEBUG_EVENT_VALUE_DEF(Vec3)
-DEBUG_EVENT_VALUE_DEF(Vec2i)
-DEBUG_EVENT_VALUE_DEF(bool)
-DEBUG_EVENT_VALUE_DEF(i32)
-DEBUG_EVENT_VALUE_DEF(u32)
+#define DEBUG_VALUE_TYPE DEBUG_EVENT_VALUE_DEF
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
+#undef DEBUG_EVENT_VALUE_DEF
                 case DEBUG_EVENT_VALUE_SWITCH: {
                     DebugValue *value = get_debug_value(debug_state);                                                
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
@@ -220,9 +216,6 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     } break;
                     case DEBUG_VALUE_Vec2: {
                         snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f)", value->name, value->value_Vec2.x, value->value_Vec2.y);
-                    } break;
-                    case DEBUG_VALUE_Vec2i: {
-                        snprintf(buffer, sizeof(buffer), "%s: (%d %d)", value->name, value->value_Vec2i.x, value->value_Vec2i.y);
                     } break;
                     case DEBUG_VALUE_Vec3: {
                         snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f %.2f)",value->name, value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);

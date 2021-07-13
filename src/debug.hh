@@ -17,6 +17,22 @@
 #define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
 CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 
+#define DEBUG_VALUE_TYPE_LIST() \
+DEBUG_VALUE_TYPE(u8)            \
+DEBUG_VALUE_TYPE(u16)           \
+DEBUG_VALUE_TYPE(u32)           \
+DEBUG_VALUE_TYPE(u64)           \
+DEBUG_VALUE_TYPE(i8)            \
+DEBUG_VALUE_TYPE(i16)           \
+DEBUG_VALUE_TYPE(i32)           \
+DEBUG_VALUE_TYPE(i64)           \
+DEBUG_VALUE_TYPE(Vec2)          \
+DEBUG_VALUE_TYPE(Vec3)          \
+DEBUG_VALUE_TYPE(Vec4)          \
+DEBUG_VALUE_TYPE(bool)          \
+DEBUG_VALUE_TYPE(f32)           \
+DEBUG_VALUE_TYPE(f64)           \
+
 enum {
     DEBUG_EVENT_NONE,
     DEBUG_EVENT_FRAME_MARKER,
@@ -26,14 +42,9 @@ enum {
     DEBUG_EVENT_END_VALUE_BLOCK,
     DEBUG_EVENT_VALUE_SWITCH,
     DEBUG_EVENT_VALUE_DRAG,
-    DEBUG_EVENT_VALUE_u64,
-    DEBUG_EVENT_VALUE_f32,
-    DEBUG_EVENT_VALUE_Vec2,
-    DEBUG_EVENT_VALUE_Vec3,
-    DEBUG_EVENT_VALUE_Vec2i,
-    DEBUG_EVENT_VALUE_bool,
-    DEBUG_EVENT_VALUE_i32,
-    DEBUG_EVENT_VALUE_u32,
+#define DEBUG_VALUE_TYPE(_name) DEBUG_EVENT_VALUE_##_name,
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
 };
 
 struct DebugEvent {
@@ -44,14 +55,9 @@ struct DebugEvent {
     union {
         bool *value_switch;
         f32 *value_drag;
-        u64 value_bool;
-        u64 value_u64;
-        f32 value_f32;
-        Vec2 value_Vec2;
-        Vec3 value_Vec3;
-        Vec2i value_Vec2i;
-        i32 value_i32;
-        u32 value_u32;
+#define DEBUG_VALUE_TYPE(_name) _name value_##_name;
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
     };
 };
 
@@ -102,14 +108,10 @@ inline void DEBUG_VALUE_(const char *debug_name, const char *name, _type value) 
     RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_##_type, debug_name, name);      \
     event->value_##_type = value;                                                  \
 }
-DEBUG_VALUE_PROC_DEF(u64)
-DEBUG_VALUE_PROC_DEF(f32)
-DEBUG_VALUE_PROC_DEF(Vec2)
-DEBUG_VALUE_PROC_DEF(Vec3)
-DEBUG_VALUE_PROC_DEF(Vec2i)
-DEBUG_VALUE_PROC_DEF(bool)
-DEBUG_VALUE_PROC_DEF(i32)
-DEBUG_VALUE_PROC_DEF(u32)
+#define DEBUG_VALUE_TYPE DEBUG_VALUE_PROC_DEF
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
+#undef DEBUG_VALUE_PROC_DEF
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
 #define DEBUG_DRAG(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_DRAG, DEBUG_NAME(), _name); event->value_drag = _value; } while (0);
@@ -176,14 +178,9 @@ enum {
     DEBUG_VALUE_NONE,  
     DEBUG_VALUE_SWITCH,  
     DEBUG_VALUE_DRAG,  
-    DEBUG_VALUE_u64,  
-    DEBUG_VALUE_f32,  
-    DEBUG_VALUE_Vec2,  
-    DEBUG_VALUE_Vec2i, 
-    DEBUG_VALUE_Vec3, 
-    DEBUG_VALUE_bool,
-    DEBUG_VALUE_i32, 
-    DEBUG_VALUE_u32,
+#define DEBUG_VALUE_TYPE(_name) DEBUG_VALUE_##_name,
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
 };
 
 struct DebugValue {
@@ -192,14 +189,9 @@ struct DebugValue {
     union {
         bool *value_switch;
         f32 *value_drag;
-        u64 value_u64;  
-        f32 value_f32;
-        Vec2 value_Vec2;
-        Vec3 value_Vec3;
-        Vec2i value_Vec2i;
-        bool value_bool;
-        i32 value_i32;
-        u32 value_u32;
+#define DEBUG_VALUE_TYPE(_name) _name value_##_name;
+DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
     };
     DebugValue *next;
 };  

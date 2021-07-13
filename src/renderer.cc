@@ -83,8 +83,8 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
         } break;
     }
 
-    fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n",
-			source_str, type_str, severity_str, id, message);
+    // fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n",
+	// 		source_str, type_str, severity_str, id, message);
 }
 
 RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection) {
@@ -125,12 +125,12 @@ static GLuint create_shader(const char *source) {
         char shader_log[4096];
         if (!vertex_compiled) {
             glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
+            // fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
             shader_failed = true;
         }
         if (!fragment_compiled) {
             glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
+            // fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
             shader_failed = true;
         }
     }
@@ -145,7 +145,7 @@ static GLuint create_shader(const char *source) {
     if (!link_success) {
         char program_log[4096];
         glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
-        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
+        // fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
         shader_failed = true;
     }    
     

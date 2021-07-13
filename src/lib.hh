@@ -80,6 +80,14 @@ inline f32 Clamp_i32(f32 value, f32 low, f32 high) {
     return _mm_cvt_ss2si(_mm_min_ss(_mm_set_ss(high), _mm_max_ss(_mm_set_ss(value), _mm_set_ss(low))));
 }
 
+inline f32 Sin(f32 a) {
+    return sinf(a);
+}
+
+inline f32 Cos(f32 a) {
+    return cosf(a);
+}
+
 // @CLEANUP
 void *os_alloc(size_t size);
 
@@ -263,13 +271,6 @@ inline u32 crc32_cstr(const char *cstr, u32 seed = 0) {
 
 #include <math.h>
 
-#ifdef max
-#undef max
-#endif 
-#ifdef min
-#undef min
-#endif 
-
 #define IS_POW2(_x) (!(_x & (_x - 1)))
 
 const f32 HALF_PI = 1.57079632679f;
@@ -298,8 +299,7 @@ inline f32 saturate(f32 a) {
     return Clamp(a, 0, 1);
 }
 
-template <typename T>
-inline T lerp(T a, T b, f32 t) {
+inline f32 lerp(f32 a, f32 b, f32 t) {
     return a * (1.0f - t) + b * t;
 }
 
@@ -630,8 +630,8 @@ struct Mat4x4 {
     }
 
     static Mat4x4 rotation_x(f32 angle) {
-        const f32 c = cosf(angle);
-        const f32 s = sinf(angle);
+        const f32 c = Cos(angle);
+        const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
             Vec4(1, 0, 0, 0),
             Vec4(0, c,-s, 0),
@@ -642,8 +642,8 @@ struct Mat4x4 {
     }
 
     static Mat4x4 rotation_y(f32 angle) {
-        const f32 c = cosf(angle);
-        const f32 s = sinf(angle);
+        const f32 c = Cos(angle);
+        const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
             Vec4( c, 0, s, 0),
             Vec4( 0, 1, 0, 0),
@@ -654,8 +654,8 @@ struct Mat4x4 {
     }
 
     static Mat4x4 rotation_z(f32 angle) {
-        const f32 c = cosf(angle);
-        const f32 s = sinf(angle);
+        const f32 c = Cos(angle);
+        const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
             Vec4(c,-s, 0, 0),
             Vec4(s, c, 0, 0),
@@ -666,8 +666,8 @@ struct Mat4x4 {
     }
 
     static Mat4x4 rotation(f32 angle, Vec3 a) {
-        const f32 c = cosf(angle);
-        const f32 s = sinf(angle);
+        const f32 c = Cos(angle);
+        const f32 s = Sin(angle);
         a = normalize(a);
 
         const f32 tx = (1.0f - c) * a.x;
@@ -1024,12 +1024,12 @@ struct Quat4 {
     }
     
     static Quat4 euler(f32 roll, f32 pitch, f32 yaw) {
-        f32 cy = cosf(yaw * 0.5f);
-        f32 sy = sinf(yaw * 0.5f);
-        f32 cp = cosf(pitch * 0.5f);
-        f32 sp = sinf(pitch * 0.5f);
-        f32 cr = cosf(roll * 0.5f);
-        f32 sr = sinf(roll * 0.5f);
+        f32 cy = Cos(yaw * 0.5f);
+        f32 sy = Sin(yaw * 0.5f);
+        f32 cp = Cos(pitch * 0.5f);
+        f32 sp = Sin(pitch * 0.5f);
+        f32 cr = Cos(roll * 0.5f);
+        f32 sr = Sin(roll * 0.5f);
 
         return Quat4(sr * cp * cy - cr * sp * sy,
                     cr * sp * cy + sr * cp * sy,
@@ -1106,7 +1106,7 @@ inline Quat4 lerp(Quat4 a, Quat4 b, f32 t) {
         f32 theta = acosf(Clamp(cos_theta, -1, 1));
         f32 thetap = theta * t;
         Quat4 qperp = normalize(b - a * cos_theta);
-        result = a * cosf(thetap) + qperp * sinf(thetap);
+        result = a * Cos(thetap) + qperp * Sin(thetap);
     }
     
     return result;

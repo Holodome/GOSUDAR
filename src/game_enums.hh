@@ -48,7 +48,7 @@ inline bool DEBUG_enum_string_lookup_(const EnumString *strings, size_t strings_
 ENTITY_KIND(ENTITY_KIND_NONE,         0x0)              \
 ENTITY_KIND(ENTITY_KIND_PLAYER,       0x1)              \
 ENTITY_KIND(ENTITY_KIND_WORLD_OBJECT, 0x2)              \
-ENTITY_KIND(ENTITY_KIND_RESERVED3,    0x3)              \
+ENTITY_KIND(ENTITY_KIND_PAWN,         0x3)              \
 ENTITY_KIND(ENTITY_KIND_RESERVED4,    0x4)              \
 ENTITY_KIND(ENTITY_KIND_RESERVED5,    0x5)              \
 ENTITY_KIND(ENTITY_KIND_RESERVED6,    0x6)              \
@@ -116,6 +116,7 @@ ASSET_TYPE(ASSET_TYPE_PLAYER)          \
 ASSET_TYPE(ASSET_TYPE_FONT)            \
 ASSET_TYPE(ASSET_TYPE_GRASS)           \
 ASSET_TYPE(ASSET_TYPE_ADDITIONAL)      \
+ASSET_TYPE(ASSET_TYPE_PAWN)            \
 ASSET_TYPE(ASSET_TYPE_SOUND)           \
 ASSET_TYPE(ASSET_TYPE_SENTINEL)        \
 

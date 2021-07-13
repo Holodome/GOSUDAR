@@ -1,11 +1,12 @@
-#include "assets.hh"
-
-#include "game_enums.hh"
-
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+#include <ctype.h>
+
+#include "assets.hh"
+
+#include "game_enums.hh"
 
 #include "wave.hh"
 

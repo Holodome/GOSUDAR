@@ -108,6 +108,18 @@ struct SimRegion {
     u32 missing_entity_space;
 };
 
+#define MAX_ANCHORS 32
+// Anchor is some object in world that has its own simulation region
+// So due to game limitations we want to have different distance parts of the world simulated,
+// but we want only simulate parts that interest us
+// After simulation is ended, all anchor entities are written in world, 
+// so in next simulation begin we know what parts of the world to simulate
+struct Anchor {
+    i32 chunk_x;
+    i32 chunk_y;
+    u32 radius;
+};
+
 void p_to_chunk_coord(Vec2 p, i32 *chunk_x, i32 *chunk_y, Vec2 *chunk_p_dst = 0);
 Vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, Vec2 chunk_p);
 void get_global_space_p(SimRegion *sim, Vec2 p, i32 *chunk_x_dst, i32 *chunx_y_dst, Vec2 *chunk_p_dst);
@@ -149,7 +161,7 @@ bool check_spatial_placement(SimRegion *sim, i32 cell_x, i32 cell_y, u32 radius)
 void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
      u32 center_x, u32 center_y, u32 chunk_radius);
 // Iterates over entities inside region and packs them back to world
-void end_sim(SimRegion *sim);
+void end_sim(SimRegion *sim, struct WorldState *world_state);
 
 struct SimChunkIterator {
     SimRegion *sim;

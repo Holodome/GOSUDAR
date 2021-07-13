@@ -1,4 +1,5 @@
 #include "sim_region.hh"
+#include "world_state.hh"
 
 void p_to_chunk_coord(Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_dst) {
     i32 chunk_x = Floor(p.x / CHUNK_SIZE);
@@ -380,7 +381,7 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
     }
 }
 
-void end_sim(SimRegion *sim) {
+void end_sim(SimRegion *sim, struct WorldState *world_state) {
     TIMED_FUNCTION();
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         Entity *src = sim->entities + entity_idx;
@@ -389,6 +390,14 @@ void end_sim(SimRegion *sim) {
         get_global_space_p(sim, src->p, &chunk_x, &chunk_y, &chunk_p);
         src->p = chunk_p;
         pack_entity_into_world(sim->world, chunk_x, chunk_y, src);   
+        
+        if (src->flags & ENTITY_FLAG_IS_ANCHOR) {
+            Anchor anchor = {};
+            anchor.chunk_x = chunk_x;
+            anchor.chunk_y = chunk_y;
+            anchor.radius = 15;
+            world_state->anchors[world_state->anchor_count++] = anchor;
+        }
     }
 }
 

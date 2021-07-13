@@ -6,16 +6,10 @@
 
 #define CT_ASSERT(_expr) static_assert(_expr, "Assertion " #_expr " failed")
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <stdbool.h>
 #include <math.h>
 #include <string.h>
-#include <float.h>
 #include <stdarg.h>
-#include <ctype.h>
 
 #if INTERNAL_BUILD
 #include <assert.h>
@@ -50,17 +44,33 @@ typedef double f64;
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
 
 // Linked list
+// Linked list entries must have .next field
 #define LLIST_ITER(_list, _name) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
 #define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
 #define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
 #define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { if (*(_list_ptr)) { LLIST_ADD(*(_list_ptr), (_node)); } else { *(_list_ptr) = (_node); } } while (0);
+// Double-linked list entries must have .next and .prev fields
+// Ciricular double-linked list
+#define CDLIST_INIT(_list) do { (_list)->next = (_list); (_list)->prev = (_list); } while (0);
+#define CDLIST_ADD(_list, _node) do { (_node)->next = (_list)->next; (_node)->prev = (_list); (_node)->next->prev = (_node); (_node)->prev->next = (_node); } while (0);
+#define CSLIST_ADD_LAST(_list, _node) do { (_node)->next = (_list); (_node)->prev = (_list)->prev; (_node)->next->prev = (_node); (_node)->prev->next = (_node); } while (0);
 
 // All iterators are defined with 3 functions:
 // next() - used internally (but can actually be made part of api???)
 // is_valid()
 // advance()
 // This API allows use of this macro which saves space writing countless for loops
-#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&_iter_name); advance(&_iter_name) )
+#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); advance(&(_iter_name)) )
+
+#include "stb_sprintf.h"
+#ifdef snprintf 
+#undef snprintf
+#endif 
+#define snprintf stbsp_snprintf
+#ifdef vsnprintf
+#undef vsnprintf
+#endif 
+#define vsnprintf stbsp_vsnprintf
 
 #define GENERAL_H 1
 #endif

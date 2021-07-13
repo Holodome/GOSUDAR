@@ -159,6 +159,8 @@ DEBUG_EVENT_VALUE_DEF(Vec2)
 DEBUG_EVENT_VALUE_DEF(Vec3)
 DEBUG_EVENT_VALUE_DEF(Vec2i)
 DEBUG_EVENT_VALUE_DEF(bool)
+DEBUG_EVENT_VALUE_DEF(i32)
+DEBUG_EVENT_VALUE_DEF(u32)
                 case DEBUG_EVENT_VALUE_SWITCH: {
                     DebugValue *value = get_debug_value(debug_state);                                                
                     value->value_kind = DEBUG_VALUE_SWITCH;                   
@@ -234,6 +236,13 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     case DEBUG_VALUE_bool: {
                         snprintf(buffer, sizeof(buffer), "%s: %s", value->name, value->value_bool ? "true" : "false");
                     } break;
+                    case DEBUG_VALUE_i32: {
+                        snprintf(buffer, sizeof(buffer), "%s: %d", value->name, value->value_i32);
+                    } break;
+                    case DEBUG_VALUE_u32: {
+                        snprintf(buffer, sizeof(buffer), "%s: %u", value->name, value->value_i32);
+                    } break;
+                    INVALID_DEFAULT_CASE;
                 }
                 
                 if (value->value_kind == DEBUG_VALUE_SWITCH) {
@@ -306,7 +315,7 @@ void DEBUG_frame_end(DebugState *debug_state) {
 }
 
 DebugState *DEBUG_init() {
-#define DEBUG_ARENA_SIZE MEGABYTES(256)
+#define DEBUG_ARENA_SIZE MEGABYTES(1024)
     DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena, DEBUG_ARENA_SIZE);
     debug_table = &debug_state->debug_table;
     return debug_state;

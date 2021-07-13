@@ -26,6 +26,9 @@ texture "gold.png" {
     ASSET_TAG_WORLD_OBJECT_KIND WORLD_OBJECT_KIND_GOLD_DEPOSIT
 }
 
+[ASSET_TYPE_PAWN]
+texture "pawn.png"
+
 [ASSET_TYPE_GRASS]
 texture "grass.png"
 

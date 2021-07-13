@@ -11,6 +11,7 @@
 
 #include "world.hh"
 #include "sim_region.hh"
+#include "world_state.hh"
 
 struct PlayingSound {
     AssetID sound_id;
@@ -35,25 +36,6 @@ enum GameState {
     GAME_STATE_SETTINGS,
 };
 
-struct Camera {
-    f32 pitch;
-    f32 yaw;
-    f32 distance_from_player;
-};
-
-struct WorldState {
-    Camera cam;    
-    World *world;
-    EntityID camera_followed_entity;
-    // This can be condiered per-frame data,
-    // but it needs to be saved in order
-    // to render when updating is not done
-    Mat4x4 view;
-    Mat4x4 projection;
-    Mat4x4 mvp;
-    Vec2 mouse_projection;
-    
-};  
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
@@ -105,7 +87,6 @@ struct Game {
     // Game state
     //
     GameState game_state;
-    
     WorldState world_state;
     
     UIElement *pause_interface;

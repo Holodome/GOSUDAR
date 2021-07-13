@@ -13,7 +13,7 @@
 // But this is really a corner case, so see if we can avoid it?
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
 #define DEBUG_MAX_FRAME_COUNT 4
-#define DEBUG_MAX_EVENT_COUNT (1 << 16)
+#define DEBUG_MAX_EVENT_COUNT (1 << 22)
 #define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
 CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 
@@ -32,6 +32,8 @@ enum {
     DEBUG_EVENT_VALUE_Vec3,
     DEBUG_EVENT_VALUE_Vec2i,
     DEBUG_EVENT_VALUE_bool,
+    DEBUG_EVENT_VALUE_i32,
+    DEBUG_EVENT_VALUE_u32,
 };
 
 struct DebugEvent {
@@ -48,6 +50,8 @@ struct DebugEvent {
         Vec2 value_Vec2;
         Vec3 value_Vec3;
         Vec2i value_Vec2i;
+        i32 value_i32;
+        u32 value_u32;
     };
 };
 
@@ -104,6 +108,8 @@ DEBUG_VALUE_PROC_DEF(Vec2)
 DEBUG_VALUE_PROC_DEF(Vec3)
 DEBUG_VALUE_PROC_DEF(Vec2i)
 DEBUG_VALUE_PROC_DEF(bool)
+DEBUG_VALUE_PROC_DEF(i32)
+DEBUG_VALUE_PROC_DEF(u32)
 #define DEBUG_VALUE(_value, _name) DEBUG_VALUE_(DEBUG_NAME(), _name, _value)
 #define DEBUG_SWITCH(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_SWITCH, DEBUG_NAME(), _name); event->value_switch = _value; } while (0);
 #define DEBUG_DRAG(_value, _name) do { RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_DRAG, DEBUG_NAME(), _name); event->value_drag = _value; } while (0);
@@ -175,7 +181,9 @@ enum {
     DEBUG_VALUE_Vec2,  
     DEBUG_VALUE_Vec2i, 
     DEBUG_VALUE_Vec3, 
-    DEBUG_VALUE_bool 
+    DEBUG_VALUE_bool,
+    DEBUG_VALUE_i32, 
+    DEBUG_VALUE_u32,
 };
 
 struct DebugValue {
@@ -190,6 +198,8 @@ struct DebugValue {
         Vec3 value_Vec3;
         Vec2i value_Vec2i;
         bool value_bool;
+        i32 value_i32;
+        u32 value_u32;
     };
     DebugValue *next;
 };  

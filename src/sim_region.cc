@@ -278,7 +278,7 @@ bool is_cell_occupied(SimRegion *sim, i32 cell_x, i32 cell_y) {
     get_chunk_coord_from_cell_coord(cell_x + 15, cell_y + 15, &max_cell_chunk_x, &max_cell_chunk_y);
     bool is_occupied = false;
     ITERATE(chunk_iter, iterate_sim_chunks(sim, min_cell_chunk_x, min_cell_chunk_y, 
-        max_cell_chunk_x, max_cell_chunk_y)) {
+                                           max_cell_chunk_x, max_cell_chunk_y)) {
         SimRegionChunk *chunk = chunk_iter.ptr;
         ITERATE(iter, iterate_chunk_entities(chunk)) {
             Entity *entity = get_entity_by_id(sim, *iter.ptr);
@@ -295,7 +295,7 @@ bool is_cell_occupied(SimRegion *sim, i32 cell_x, i32 cell_y) {
             }
         }
     }
-end: 
+    end: 
     return is_occupied;
 }
 
@@ -336,7 +336,7 @@ bool check_spatial_placement(SimRegion *sim, i32 cell_x, i32 cell_y, u32 width, 
 }
 
 void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
-     i32 center_x, i32 center_y, u32 chunk_radius) {
+               i32 center_x, i32 center_y, u32 chunk_radius) {
     TIMED_FUNCTION();
     sim->arena = arena;
     sim->world = world;
@@ -422,12 +422,12 @@ static void next(SimChunkIterator *iter) {
 }
 
 SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, f32 radius) {
-    SimChunkIterator iter;
+    SimChunkIterator iter = {};
     iter.sim = sim;
     Vec2 top_left = p + Vec2(-radius, -radius);
     Vec2 bottom_right = p + Vec2(radius, radius);
     p_to_chunk_coord(top_left, &iter.min_chunk_x, &iter.min_chunk_y);
-    p_to_chunk_coord(bottom_right, &iter.max_chunk_x, &iter.min_chunk_y);
+    p_to_chunk_coord(bottom_right, &iter.max_chunk_x, &iter.max_chunk_y);
     assert(iter.min_chunk_x <= iter.max_chunk_x);
     assert(iter.min_chunk_y <= iter.max_chunk_y);
     iter.idx = 0;
@@ -488,14 +488,7 @@ void advance(SimChunkEntityIterator *iter) {
     next(iter);
 }
 
-EntityIteratorSettings iter_flag(u32 flag_mask) {
-    EntityIteratorSettings iter = {};
-    iter.flags = ENTITY_ITERATOR_FLAG_BASED;
-    iter.flag_mask = flag_mask;
-    return iter;
-}
-
-EntityIteratorSettings iter_radius(Vec2 origin, Vec2 radius) {
+EntityIteratorSettings iter_radius(Vec2 origin, f32 radius) {
     EntityIteratorSettings iter = {};
     iter.flags = ENTITY_ITERATOR_DISTANCE_BASED;
     iter.origin = origin;
@@ -503,19 +496,46 @@ EntityIteratorSettings iter_radius(Vec2 origin, Vec2 radius) {
     return iter;
 }
 
-EntityIteratorSettings iter_all() {
-    return iter_flag(~ENTITY_FLAG_IS_DELETED);
+void next(EntityIterator *iter) {
+    for (;;) {
+        if (is_valid(&iter->chunk_entity_iterator)) {
+            advance(&iter->chunk_entity_iterator);
+            iter->ptr = iter->chunk_entity_iterator.ptr;
+            if (iter->ptr) {
+                break;
+            }
+        } else if (is_valid(&iter->chunk_iterator)) {
+            advance(&iter->chunk_iterator);
+            if (is_valid(&iter->chunk_iterator)) {
+                iter->chunk_entity_iterator = iterate_chunk_entities(iter->chunk_iterator.ptr);
+            } 
+        } else {
+            iter->ptr = 0;
+            break;
+        }
+    }
 }
 
+EntityIterator iterate_entities(SimRegion *sim, EntityIteratorSettings settings) {
+    EntityIterator iter = {};
+    iter.sim = sim;
+    iter.settings = settings;
+    if (settings.flags & ENTITY_ITERATOR_DISTANCE_BASED) {
+        iter.chunk_iterator = iterate_sim_chunks_in_radius(sim, settings.origin, settings.radius);
+        if (is_valid(&iter.chunk_iterator)) {
+            iter.chunk_entity_iterator = iterate_chunk_entities(iter.chunk_iterator.ptr);
+        }
+    } else {
+        INVALID_CODE_PATH;
+    }
+    next(&iter);
+    return iter;
+}
 
-// EntityIterator iterate(SimRegion *sim, EntityIteratorSettings settings) {
-    
-// }
+bool is_valid(EntityIterator *iter) {
+    return iter->ptr != 0;
+}
 
-// bool is_valid(EntityIterator *iter) {
-    
-// }
-
-// void advance(EntityIterator *iter) {
-    
-// }
+void advance(EntityIterator *iter) {
+    next(iter);
+}

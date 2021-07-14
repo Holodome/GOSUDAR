@@ -31,6 +31,7 @@ typedef float  f32;
 typedef double f64;
 
 #define ARRAY_SIZE(_a) ((size_t)(sizeof(_a) / sizeof(*(_a))))
+#define SQ(_a) ((_a) * (_a))
 
 #define BYTES(_n) ((size_t)_n)
 #define KILOBYTES(_n) (BYTES(_n) << 10) 
@@ -48,12 +49,33 @@ typedef double f64;
 #define LLIST_ITER(_list, _name) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
 #define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
 #define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
-#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { if (*(_list_ptr)) { LLIST_ADD(*(_list_ptr), (_node)); } else { *(_list_ptr) = (_node); } } while (0);
+#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { \
+if (*(_list_ptr)) { \
+LLIST_ADD(*(_list_ptr), (_node)); \
+} else { \
+*(_list_ptr) = (_node); \
+} \
+} while (0);
 // Double-linked list entries must have .next and .prev fields
 // Ciricular double-linked list
+#define CDLIST_ITER(_list, _name) for (auto (_name) = (_list)->next; (_name) != (_list); (_name) = (_name)->next)
 #define CDLIST_INIT(_list) do { (_list)->next = (_list); (_list)->prev = (_list); } while (0);
-#define CDLIST_ADD(_list, _node) do { (_node)->next = (_list)->next; (_node)->prev = (_list); (_node)->next->prev = (_node); (_node)->prev->next = (_node); } while (0);
-#define CSLIST_ADD_LAST(_list, _node) do { (_node)->next = (_list); (_node)->prev = (_list)->prev; (_node)->next->prev = (_node); (_node)->prev->next = (_node); } while (0);
+#define CDLIST_ADD(_list, _node) do { \
+(_node)->next = (_list)->next; \
+(_node)->prev = (_list); \
+(_node)->next->prev = (_node); \
+(_node)->prev->next = (_node); \
+} while (0);
+#define CSLIST_ADD_LAST(_list, _node) do { \
+(_node)->next = (_list); \
+(_node)->prev = (_list)->prev; \
+(_node)->next->prev = (_node); \
+(_node)->prev->next = (_node); \
+} while (0);
+#define CDLIST_REMOVE(_node) do {\
+(_node)->prev->next = (_node)->next;\
+(_node)->next->prev = (_node)->prev;\
+} while (0);
 
 // All iterators are defined with 3 functions:
 // next() - used internally (but can actually be made part of api???)

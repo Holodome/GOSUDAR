@@ -159,7 +159,7 @@ bool check_spatial_placement(SimRegion *sim, i32 cell_x, i32 cell_y, u32 radius)
 // Loads world chunks in given radius around center point
 // All entities from world are decompressed and are made ready for simulation
 void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
-     u32 center_x, u32 center_y, u32 chunk_radius);
+               u32 center_x, u32 center_y, u32 chunk_radius);
 // Iterates over entities inside region and packs them back to world
 void end_sim(SimRegion *sim, struct WorldState *world_state);
 
@@ -209,29 +209,25 @@ enum {
 struct EntityIteratorSettings {
     u8 flags;
     
-    Vec2 origin, radius;
+    Vec2 origin;
+    f32 radius;
     u32 flag_mask;
     i32 kind;
 };  
 
-EntityIteratorSettings iter_flag(u32 flag_mask);
 EntityIteratorSettings iter_radius(Vec2 origin, f32 radius);
-EntityIteratorSettings iter_all();
 
 struct EntityIterator {
     SimRegion *sim;
+    EntityIteratorSettings settings;
+    SimChunkIterator chunk_iterator;
+    SimChunkEntityIterator chunk_entity_iterator;
     
-    u8 iter_kind;
-    Vec2 origin, radius;
-    u32 flag_mask;
-    u32 kind;
-    
-    size_t  idx;
-    Entity *ptr;
+    EntityID *ptr;
 };
 
 // @TODO iterate using chunks
-EntityIterator iterate(SimRegion *sim, EntityIteratorSettings settings);
+EntityIterator iterate_entities(SimRegion *sim, EntityIteratorSettings settings);
 bool is_valid(EntityIterator *iter);
 void advance(EntityIterator *iter);
 

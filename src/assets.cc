@@ -104,7 +104,7 @@ AssetFont *assets_get_font(Assets *assets, AssetID id) {
             }
         }
         asset->font.texture = renderer_create_texture_mipmaps(assets->renderer, asset->font.atlas_mipmaps, 
-            asset->file_info.atlas_width, asset->file_info.atlas_height);
+                                                              asset->file_info.atlas_width, asset->file_info.atlas_height);
         asset->state = ASSET_STATE_LOADED;
     }
     result = &asset->font;

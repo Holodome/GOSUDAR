@@ -17,7 +17,11 @@ inline i32 Floor_i32(f32 value) {
 }
 
 inline f32 Floor(f32 value) {
+#if 0
     return (f32)Floor_i32(value);
+#else 
+    return _mm_cvtss_f32(_mm_floor_ps(_mm_set_ss(value)));
+#endif 
 }
 
 inline i32 Round_i32(f32 value) {
@@ -141,7 +145,7 @@ struct MemoryArena {
     size_t peak_size;
     u32 temp_count;
 };
-    
+
 void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
     memset(arena, 0, sizeof(*arena));
     arena->data = (u8 *)buffer;
@@ -153,7 +157,7 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
 #define alloc_string(_arena, _string) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1)
 void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
     void *result = 0;
-
+    
     if (size) {
         uintptr_t curr_ptr = (uintptr_t)arena->data + arena->data_size;
         uintptr_t offset = align_forward(curr_ptr, align) - (uintptr_t)arena->data;
@@ -316,7 +320,7 @@ struct Vec2G {
     Vec2G(T x, T y) : x(x), y(y) {}
     explicit Vec2G(T s) : x(s), y(s) {}
     template <typename S>
-    explicit Vec2G(Vec2G<S> v) : x((T)v.x), y((T)v.y) {}
+        explicit Vec2G(Vec2G<S> v) : x((T)v.x), y((T)v.y) {}
     
     Vec2G<T> operator-() const {
         return Vec2G<T>(-x, -y);
@@ -408,19 +412,19 @@ struct Vec3G {
     }
     
     template <typename S>
-    Vec3G<T> operator+(Vec3G<S> v) {
+        Vec3G<T> operator+(Vec3G<S> v) {
         return Vec3G<T>(x + v.x, y + v.y, z + v.z);
     }
     template <typename S>
-    Vec3G<T> operator-(Vec3G<S> v) {
+        Vec3G<T> operator-(Vec3G<S> v) {
         return Vec3G<T>(x - v.x, y - v.y, z - v.z);
     }
     template <typename S>
-    Vec3G<T> operator*(Vec3G<S> v) {
+        Vec3G<T> operator*(Vec3G<S> v) {
         return Vec3G<T>(x * v.x, y * v.y, z * v.z);
     }
     template <typename S>
-    Vec3G<T> operator/(Vec3G<S> v) {
+        Vec3G<T> operator/(Vec3G<S> v) {
         return Vec3G<T>(x / v.x, y / v.y, z / v.z);
     }
     Vec3G<T> operator*(T s) {
@@ -431,19 +435,19 @@ struct Vec3G {
     }
     
     template <typename S>
-    Vec3G<T> &operator+=(Vec3G<S> v) {
+        Vec3G<T> &operator+=(Vec3G<S> v) {
         return (*this = *this + v);
     }
     template <typename S>
-    Vec3G<T> &operator-=(Vec3G<S> v) {
+        Vec3G<T> &operator-=(Vec3G<S> v) {
         return (*this = *this - v);
     }
     template <typename S>
-    Vec3G<T> &operator*=(Vec3G<S> v) {
+        Vec3G<T> &operator*=(Vec3G<S> v) {
         return (*this = *this * v);
     }
     template <typename S>
-    Vec3G<T> &operator/=(Vec3G<S> v) {
+        Vec3G<T> &operator/=(Vec3G<S> v) {
         return (*this = *this / v);
     }
     Vec3G<T> &operator*=(T s) {
@@ -486,19 +490,19 @@ struct Vec4G {
     }
     
     template <typename S>
-    Vec4G<T> operator+(Vec4G<S> v) {
+        Vec4G<T> operator+(Vec4G<S> v) {
         return Vec4G<T>(x + v.x, y + v.y, z + v.z, w + v.w);
     }
     template <typename S>
-    Vec4G<T> operator-(Vec4G<S> v) {
+        Vec4G<T> operator-(Vec4G<S> v) {
         return Vec4G<T>(x - v.x, y - v.y, z - v.z, w - v.w);
     }
     template <typename S>
-    Vec4G<T> operator*(Vec4G<S> v) {
+        Vec4G<T> operator*(Vec4G<S> v) {
         return Vec4G<T>(x * v.x, y * v.y, z * v.z, w * v.w);
     }
     template <typename S>
-    Vec4G<T> operator/(Vec4G<S> v) {
+        Vec4G<T> operator/(Vec4G<S> v) {
         return Vec4G<T>(x / v.x, y / v.y, z / v.z, w / v.w);
     }
     Vec4G<T> operator*(T s) {
@@ -509,19 +513,19 @@ struct Vec4G {
     }
     
     template <typename S>
-    Vec4G<T> &operator+=(Vec4G<S> v) {
+        Vec4G<T> &operator+=(Vec4G<S> v) {
         return (*this = *this + v);
     }
     template <typename S>
-    Vec4G<T> &operator-=(Vec4G<S> v) {
+        Vec4G<T> &operator-=(Vec4G<S> v) {
         return (*this = *this - v);
     }
     template <typename S>
-    Vec4G<T> &operator*=(Vec4G<S> v) {
+        Vec4G<T> &operator*=(Vec4G<S> v) {
         return (*this = *this * v);
     }
     template <typename S>
-    Vec4G<T> &operator/=(Vec4G<S> v) {
+        Vec4G<T> &operator/=(Vec4G<S> v) {
         return (*this = *this / v);
     }
     Vec4G<T> &operator*=(T s) {
@@ -618,100 +622,100 @@ struct Mat4x4 {
         result.e[3][2] = t.z;
         return result;
     }
-
+    
     static Mat4x4 scale(Vec3 s) {
         Mat4x4 result = Mat4x4(
-            Vec4(s.x,   0,   0,  0),
-            Vec4(0,   s.y,   0,  0),
-            Vec4(0,     0, s.z,  0),
-            Vec4(0,     0,   0,  1)
-        );
+                               Vec4(s.x,   0,   0,  0),
+                               Vec4(0,   s.y,   0,  0),
+                               Vec4(0,     0, s.z,  0),
+                               Vec4(0,     0,   0,  1)
+                               );
         return result;
     }
-
+    
     static Mat4x4 rotation_x(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
-            Vec4(1, 0, 0, 0),
-            Vec4(0, c,-s, 0),
-            Vec4(0, s, c, 0),
-            Vec4(0, 0, 0, 1)
-        );
+                          Vec4(1, 0, 0, 0),
+                          Vec4(0, c,-s, 0),
+                          Vec4(0, s, c, 0),
+                          Vec4(0, 0, 0, 1)
+                          );
         return(r);
     }
-
+    
     static Mat4x4 rotation_y(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
-            Vec4( c, 0, s, 0),
-            Vec4( 0, 1, 0, 0),
-            Vec4(-s, 0, c, 0),
-            Vec4( 0, 0, 0, 1)
-        );
+                          Vec4( c, 0, s, 0),
+                          Vec4( 0, 1, 0, 0),
+                          Vec4(-s, 0, c, 0),
+                          Vec4( 0, 0, 0, 1)
+                          );
         return(r);
     }
-
+    
     static Mat4x4 rotation_z(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
         Mat4x4 r = Mat4x4(
-            Vec4(c,-s, 0, 0),
-            Vec4(s, c, 0, 0),
-            Vec4(0, 0, 1, 0),
-            Vec4(0, 0, 0, 1)
-        );
+                          Vec4(c,-s, 0, 0),
+                          Vec4(s, c, 0, 0),
+                          Vec4(0, 0, 1, 0),
+                          Vec4(0, 0, 0, 1)
+                          );
         return(r);
     }
-
+    
     static Mat4x4 rotation(f32 angle, Vec3 a) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
         a = normalize(a);
-
+        
         const f32 tx = (1.0f - c) * a.x;
         const f32 ty = (1.0f - c) * a.y;
         const f32 tz = (1.0f - c) * a.z;
-
+        
         Mat4x4 r = Mat4x4(
-            Vec4(c + tx * a.x, 		     tx * a.y - s * a.z, tx * a.z - s * a.y, 0),
-            Vec4(    ty * a.x - a.z * s, ty * a.y + c,       ty * a.z + s * a.x, 0),
-            Vec4(    tz * a.x + s * a.y, tz * a.y - s * a.x, tz * a.z + c,       0),
-            Vec4(0, 0, 0, 1)
-        );
+                          Vec4(c + tx * a.x, 		     tx * a.y - s * a.z, tx * a.z - s * a.y, 0),
+                          Vec4(    ty * a.x - a.z * s, ty * a.y + c,       ty * a.z + s * a.x, 0),
+                          Vec4(    tz * a.x + s * a.y, tz * a.y - s * a.x, tz * a.z + c,       0),
+                          Vec4(0, 0, 0, 1)
+                          );
         return(r);
     }
-
+    
     static Mat4x4 ortographic_2d(f32 l, f32 r, f32 b, f32 t) {
         Mat4x4 result =	Mat4x4(
-            Vec4(2.0f / (r - l),    0,                   0, 0),
-            Vec4(0,                 2.0f / (t - b),      0, 0),
-            Vec4(0,                 0,                  -1, 0),
-            Vec4(-(r + l) / (r - l), -(t + b) / (t - b), 0, 1)
-        );
+                               Vec4(2.0f / (r - l),    0,                   0, 0),
+                               Vec4(0,                 2.0f / (t - b),      0, 0),
+                               Vec4(0,                 0,                  -1, 0),
+                               Vec4(-(r + l) / (r - l), -(t + b) / (t - b), 0, 1)
+                               );
         return result;
     }
-
+    
     static Mat4x4 ortographic_3d(f32 l, f32 r, f32 b, f32 t, f32 n, f32 f) {
         Mat4x4 result =	Mat4x4(
-            Vec4(2.0f / (r - l),    0,                   0,                 0),
-            Vec4(0,                 2.0f / (t - b),      0,                 0),
-            Vec4(0,                 0,                  -2.0f / (f - n),    0),
-            Vec4(-(r + l) / (r - l), -(t + b) / (t - b),-(f + n) / (f - n), 1)
-        );
+                               Vec4(2.0f / (r - l),    0,                   0,                 0),
+                               Vec4(0,                 2.0f / (t - b),      0,                 0),
+                               Vec4(0,                 0,                  -2.0f / (f - n),    0),
+                               Vec4(-(r + l) / (r - l), -(t + b) / (t - b),-(f + n) / (f - n), 1)
+                               );
         return result;
     }
-
+    
     static Mat4x4 perspective(f32 fov, f32 aspect, f32 n, f32 f) {
         const f32 toHf = tanf(fov * 0.5f);
-
+        
         Mat4x4 r = Mat4x4(
-            Vec4(1.0f / (aspect * toHf), 0,           0,                         0),
-            Vec4(0,                      1.0f / toHf, 0,                         0),
-            Vec4(0,                      0,          -       (f + n) / (f - n), -1),
-            Vec4(0,                      0,          -2.0f * (f * n) / (f - n),  0)
-        );
+                          Vec4(1.0f / (aspect * toHf), 0,           0,                         0),
+                          Vec4(0,                      1.0f / toHf, 0,                         0),
+                          Vec4(0,                      0,          -       (f + n) / (f - n), -1),
+                          Vec4(0,                      0,          -2.0f * (f * n) / (f - n),  0)
+                          );
         return(r);
     }
     
@@ -803,14 +807,14 @@ struct Mat4x4 {
         for(int r = 0; r < 4; ++r) {
             for(int c = 0; c < 4; ++c) {
                 result.e[r][c] = a.e[0][c] * b.e[r][0]
-                            + a.e[1][c] * b.e[r][1]
-                            + a.e[2][c] * b.e[r][2]
-                            + a.e[3][c] * b.e[r][3];
+                    + a.e[1][c] * b.e[r][1]
+                    + a.e[2][c] * b.e[r][2]
+                    + a.e[3][c] * b.e[r][3];
             }
         }
         return result;
     }
-
+    
     friend Vec4 operator*(Mat4x4 a, Vec4 v) {
         Vec4 result;
         result.x = a.e[0][0] * v.x + a.e[1][0] * v.y + a.e[2][0] * v.z + a.e[3][0] * v.w;
@@ -827,11 +831,11 @@ struct Mat4x4 {
     Vec3 get_x() {
         return Vec3(e[0][0], e[1][0], e[2][0]);
     }
-
+    
     Vec3 get_y() {
         return Vec3(e[0][1], e[1][1], e[2][1]);
     }
-
+    
     Vec3 get_z() {
         return Vec3(e[0][2], e[1][2], e[2][2]);
     }
@@ -937,13 +941,13 @@ struct Rect {
             (y + h < rect.y || y > rect.y + rect.h)) {
             result = false;
         }
-
+        
         return result;
     }
     
     bool contains(Rect child) {
         return collide(child.top_left()) && collide(child.top_right()) &&
-                collide(child.bottom_left()) && collide(child.bottom_right());
+            collide(child.bottom_left()) && collide(child.bottom_right());
     }
     
     Rect clip(Rect child) {
@@ -1030,11 +1034,11 @@ struct Quat4 {
         f32 sp = Sin(pitch * 0.5f);
         f32 cr = Cos(roll * 0.5f);
         f32 sr = Sin(roll * 0.5f);
-
+        
         return Quat4(sr * cp * cy - cr * sp * sy,
-                    cr * sp * cy + sr * cp * sy,
-                    cr * cp * sy - sr * sp * cy,
-                    cr * cp * cy + sr * sp * sy);
+                     cr * sp * cy + sr * cp * sy,
+                     cr * cp * sy - sr * sp * cy,
+                     cr * cp * cy + sr * sp * sy);
     }
     
     friend Quat4 operator+(Quat4 a, Quat4 b) { 
@@ -1042,26 +1046,26 @@ struct Quat4 {
         result.v = a.v + b.v; 
         return result; 
     }
-
+    
     friend Quat4 operator-(Quat4 a, Quat4 b) { 
         Quat4 result; 
         result.v = a.v - b.v; 
         return result; 
     }
-
+    
     friend Quat4 operator/(Quat4 q, f32 s) { 
         Quat4 result; 
         result.v = q.v / s; 
         return result; 
     }
-
+    
     friend Quat4 operator*(Quat4 q, f32 s) { 
         Quat4 result; 
         result.v = q.v * s; 
         return result; 
     }
     
-static Mat4x4 to_mat4x4(Quat4 q) {
+    static Mat4x4 to_mat4x4(Quat4 q) {
         f32 xx = q.x * q.x;    
         f32 yy = q.y * q.y;    
         f32 zz = q.z * q.z;

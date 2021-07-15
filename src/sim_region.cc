@@ -93,7 +93,7 @@ u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
     u32 corner_offset = 4 * radius + 1;
     u32 corner_size = ((1 + (radius - 1)) * (radius - 1)) >> 1;
     u32 result = (u32)-1;
-    if (radius && abs(dx) + abs(dy) <= radius) {
+    if (radius && Abs(dx) + Abs(dy) <= radius) {
         if (dy == 0) {
             result = dx + radius;
         } else if (dx == 0) {
@@ -115,8 +115,8 @@ u32 chunk_array_index(u32 radius, i32 dx, i32 dy) {
             }
             u32 current_corner_offset = corner_offset + quarter * corner_size;
             
-            u32 local_dx = abs(dx) - 1;
-            u32 local_dy = abs(dy) - 1;
+            u32 local_dx = Abs(dx) - 1;
+            u32 local_dy = Abs(dy) - 1;
             if (local_dy < radius - 1) {
                 u32 row_offset = ((radius - 1) + (radius - 1 - local_dy + 1)) * (local_dy) / 2;
                 if (local_dx < (radius - 1 - local_dy)) {
@@ -528,11 +528,11 @@ EntityIterator iterate_entities(SimRegion *sim, EntityIteratorSettings settings)
         iter.chunk_iterator = iterate_sim_chunks_in_radius(sim, settings.origin, settings.radius);
         if (is_valid(&iter.chunk_iterator)) {
             iter.chunk_entity_iterator = iterate_chunk_entities(iter.chunk_iterator.ptr);
+			iter.ptr = iter.chunk_entity_iterator.ptr;
         }
     } else {
         INVALID_CODE_PATH;
     }
-    next(&iter);
     return iter;
 }
 

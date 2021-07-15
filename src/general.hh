@@ -1,5 +1,10 @@
 #if !defined(GENERAL_H)
 
+// @TODO investigate why we are 4 times slower without crt
+#ifndef BUILD_WITHOUT_CRT
+#define BUILD_WITHOUT_CRT 0
+#endif 
+
 #ifndef INTERNAL_BUILD
 #define INTERNAL_BUILD 1
 #endif
@@ -7,15 +12,7 @@
 #define CT_ASSERT(_expr) static_assert(_expr, "Assertion " #_expr " failed")
 
 #include <stdint.h>
-#include <math.h>
-#include <string.h>
 #include <stdarg.h>
-
-#if INTERNAL_BUILD
-#include <assert.h>
-#else 
-#define assert(_expr) (_expr)
-#endif 
 
 typedef int8_t  i8;
 typedef int16_t i16;
@@ -97,22 +94,41 @@ LLIST_ADD(*(_list_ptr), (_node)); \
 // This API allows use of this macro which saves space writing countless for loops
 #define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); advance(&(_iter_name)) )
 
-#ifndef GOSUDAR_NO_STDIO
-#define GOSUDAR_NO_STDIO 0
-#endif
+#if BUILD_WITHOUT_CRT 
 
-#if GOSUDAR_NO_STDIO
-#include "stb_sprintf.h"
-#ifdef snprintf 
-#undef snprintf
-#endif 
-#define snprintf stbsp_snprintf
-#ifdef vsnprintf
-#undef vsnprintf
-#endif 
-#define vsnprintf stbsp_vsnprintf
+#if INTERNAL_BUILD
+#define assert(_expr) do { if (!(_expr)) { *(u32 *)0 = 0; } } while (0);
 #else 
+#define assert(_expr) (_expr)
+#endif 
+
+#include "cephes.h"
+
+#include "stb_sprintf.h"
+#define snprintf stbsp_snprintf
+#define vsnprintf stbsp_vsnprintf
+
+extern "C" {
+    void *__cdecl memset(void *ptr, int value, size_t num);
+    void *__cdecl memcpy(void *dst_p, const void *src_p, size_t num);
+    int __cdecl memcmp(const void *ptr1, const void *ptr2, size_t num);
+}
+
+extern f32 F32_INFINITY;
+
+#else 
+
+#if INTERNAL_BUILD
+#include <assert.h>
+#else 
+#define assert(_expr) (_expr)
+#endif 
+
+#include <math.h>
+#include <string.h>
 #include <stdio.h>
+
+#define F32_INFINITY INFINITY
 #endif 
 
 #define GENERAL_H 1

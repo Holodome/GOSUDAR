@@ -97,6 +97,7 @@ static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
     Vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
     return ray_world;
 }
+
 void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     TIMED_FUNCTION();
     if (is_key_held(input, KEY_Z)) {
@@ -164,16 +165,19 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         * Mat4x4::translate(-cam_p);
     world_state->mvp = world_state->projection * world_state->view;
     
-    Vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
-                                                                                1.0f - (2.0f * input->platform->mpos.y) / input->platform->display_size.y));
+    Vec2 mouse_uv = Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
+                         1.0f - (2.0f * input->platform->mpos.y) / input->platform->display_size.y);
+    Vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, mouse_uv);
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
     Vec3 mouse_point_xyz = cam_p + ray_dir * t;
     Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+    DEBUG_VALUE(mouse_point, "Mouse point");
+    DEBUG_VALUE(world_state->cam_p, "Cam p");
     world_state->mouse_projection = mouse_point;
     // Find entity to be selected with mouse
     world_state->mouse_selected_entity = NULL_ENTITY_ID;
-    f32 min_distance = INFINITY;
+    f32 min_distance = F32_INFINITY;
     ITERATE(iter, iterate_entities(sim, iter_radius(world_state->mouse_projection, DISTANCE_TO_MOUSE_SELECT))) {
         Entity *entity = get_entity_by_id(sim, *iter.ptr);
         f32 distance_to_mouse_sq = length_sq(world_state->mouse_projection - entity->p);
@@ -199,6 +203,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         }
     }
     
+    DEBUG_VALUE(world_state->mouse_selected_entity.value, "Mouse select entity");
     Vec2 player_pos = camera_controlled_entity->p;
     for (u32 pawn_idx = 0; 
          pawn_idx < world_state->pawn_count;

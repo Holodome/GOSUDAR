@@ -55,9 +55,8 @@ inline f32 Abs(f32 value) {
 }
 
 inline i32 Abs(i32 value) {
-    u32 bits = *(u32 *)&value;
-    bits &= 0x7FFFFFFF;
-    return *(i32 *)&bits;
+    u32 mask = value >> (SIZE_OF(i32) * 8 - 1);
+    return ((value ^ mask) - mask);
 }
 
 inline f32 Max(f32 a, f32 b) {
@@ -280,9 +279,6 @@ inline u32 crc32_cstr(const char *cstr, u32 seed = 0) {
     }
     return ~crc;
 }
-
-
-#include <math.h>
 
 #define IS_POW2(_x) (!(_x & (_x - 1)))
 
@@ -976,7 +972,7 @@ struct Bounds {
     Vec3 min, max;
     
     explicit Bounds()
-        : min(Vec3(INFINITY)), max(Vec3(-INFINITY)) {}
+        : min(Vec3(F32_INFINITY)), max(Vec3(-F32_INFINITY)) {}
     explicit Bounds(Vec3 min, Vec3 max) 
         : min(min), max(max) {}
     explicit Bounds(Vec3 a)
@@ -994,23 +990,23 @@ struct Bounds {
     
     static Bounds join(Bounds a, Bounds b) {
         Bounds result;
-        result.min.x = fminf(a.min.x, b.min.x);
-        result.min.y = fminf(a.min.y, b.min.y);
-        result.min.z = fminf(a.min.z, b.min.z);
-        result.max.x = fmaxf(a.max.x, b.max.x);
-        result.max.y = fmaxf(a.max.y, b.max.y);
-        result.max.z = fmaxf(a.max.z, b.max.z);
+        result.min.x = Min(a.min.x, b.min.x);
+        result.min.y = Min(a.min.y, b.min.y);
+        result.min.z = Min(a.min.z, b.min.z);
+        result.max.x = Max(a.max.x, b.max.x);
+        result.max.y = Max(a.max.y, b.max.y);
+        result.max.z = Max(a.max.z, b.max.z);
         return result;   
     }
     
     static Bounds extend(Bounds a, Vec3 p) {
         Bounds result;
-        result.min.x = fminf(a.min.x, p.x);
-        result.min.y = fminf(a.min.y, p.y);
-        result.min.z = fminf(a.min.z, p.z);
-        result.max.x = fmaxf(a.max.x, p.x);
-        result.max.y = fmaxf(a.max.y, p.y);
-        result.max.z = fmaxf(a.max.z, p.z);
+        result.min.x = Min(a.min.x, p.x);
+        result.min.y = Min(a.min.y, p.y);
+        result.min.z = Min(a.min.z, p.z);
+        result.max.x = Max(a.max.x, p.x);
+        result.max.y = Max(a.max.y, p.y);
+        result.max.z = Max(a.max.z, p.z);
         return result;
     }
 };
@@ -1131,12 +1127,12 @@ inline Vec3 triangle_normal(Vec3 a, Vec3 b, Vec3 c) {
     return cross(ab, ac);
 }
 
-const static Vec4 WHITE = Vec4(1.0f);
-const static Vec4 BLACK = Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-const static Vec4 RED = Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-const static Vec4 GREEN = Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-const static Vec4 BLUE = Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-const static Vec4 PINK = Vec4(1.0f, 0.0f, 1.0f, 1.0f);
+#define WHITE Vec4(1.0f)
+#define BLACK Vec4(0.0f, 0.0f, 0.0f, 1.0f)
+#define RED Vec4(1.0f, 0.0f, 0.0f, 1.0f)
+#define GREEN Vec4(0.0f, 1.0f, 0.0f, 1.0f)
+#define BLUE Vec4(0.0f, 0.0f, 1.0f, 1.0f)
+#define PINK Vec4(1.0f, 0.0f, 1.0f, 1.0f)
 
 inline Vec3 xz(Vec2 xz, f32 y = 0.0f) {
     return Vec3(xz.x, y, xz.y);
@@ -1222,7 +1218,7 @@ inline u32 rgba_pack_4x8_linear1(Vec4 c) {
 
 bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, f32 *t_out) {
     f32 denom = dot(plane_normal, d);
-    if (fabs(denom) > 0.001f) {
+    if (Abs(denom) > 0.001f) {
         f32 t = (-plane_d - dot(plane_normal, o)) / denom;
         *t_out = t;
         return true;

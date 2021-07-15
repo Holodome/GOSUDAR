@@ -6,5 +6,6 @@ int main() {
     while (game.is_running) {
         game_update_and_render(&game);
     }
+    ExitProcess(0);
     return 0;
 }

@@ -8,7 +8,7 @@
 
 static DevUIID id_from_cstr(const char *cstr) {
     DevUIID result;
-    result.v = crc32_cstr(cstr);
+    result.value = crc32_cstr(cstr);
     return result;
 }
 
@@ -28,14 +28,6 @@ void dev_ui_last_line(DevUILayout *layout) {
     layout->p = layout->last_line_p;
 }
 
-static bool is_same(DevUIID a, DevUIID b) {
-    return a.v == b.v;
-}
-
-static bool is_set(DevUIID id) {
-    return id.v != 0;
-}
-
 struct ButtonState {
     bool is_pressed;
     bool is_hot;
@@ -47,17 +39,17 @@ static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, boo
         layout->is_focused = true;
     }
     
-    bool is_hot = !is_set(layout->hot_id) && rect.collide(layout->input->platform->mpos);
+    bool is_hot = IS_NULL(layout->hot_id) && rect.collide(layout->input->platform->mpos);
     if (is_hot) {
         layout->hot_id = id;
-        if (is_key_pressed(layout->input, KEY_MOUSE_LEFT) && !is_set(layout->dev_ui->active_id)) {
+        if (is_key_pressed(layout->input, KEY_MOUSE_LEFT) && IS_NULL(layout->dev_ui->active_id)) {
             layout->dev_ui->active_id = id;
         }
     }
     
     bool is_pressed = false;
     bool is_held = false;
-    if (is_same(layout->dev_ui->active_id, id)) {
+    if (IS_SAME(layout->dev_ui->active_id, id)) {
         if (is_key_held(layout->input, KEY_MOUSE_LEFT)) {
             is_held = true;
             if (repeat_when_held && is_hot) {
@@ -85,7 +77,7 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets, Ren
     layout.assets = assets;
     layout.font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
     RenderGroup interface_render_group = render_group_begin(commands, assets,
-        setup_2d(RENDERER_FRAMEBUFFER_GAME_INTERFACE, Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0)));
+                                                            setup_2d(RENDERER_FRAMEBUFFER_GAME_INTERFACE, Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0)));
     layout.render_group = interface_render_group;
     return layout;
 }
@@ -129,12 +121,12 @@ bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
 }
 
 static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
-    assert(is_set(id));
-    u32 hash_slot_init = id.v % ARRAY_SIZE(ui->view_hash);
+    assert(IS_NOT_NULL(id));
+    u32 hash_slot_init = id.value % ARRAY_SIZE(ui->view_hash);
     u32 hash_slot = hash_slot_init;
     DevUIView *view = ui->view_hash + hash_slot;
     for (;;) {
-        if (is_same(view->id, id)) {
+        if (IS_SAME(view->id, id)) {
             break;
         }
         if (view->next_in_hash) {
@@ -146,7 +138,7 @@ static DevUIView *get_dev_ui_view(DevUI *ui, DevUIID id) {
                 view = 0;
                 break;
             }
-            if (is_same(new_view->id, id_empty())) {
+            if (IS_NULL(new_view->id)) {
                 view->next_in_hash = new_view;
                 view = new_view;
                 view->id = id;

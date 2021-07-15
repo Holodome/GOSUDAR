@@ -2,25 +2,12 @@
 
 #include "lib.hh"
 #include "sim_region.hh"
+#include "orders.hh"
 
 struct Camera {
     f32 pitch;
     f32 yaw;
     f32 distance_from_player;
-};
-
-enum {
-    ORDER_QUEUE_ENTRY_NONE,
-    ORDER_QUEUE_ENTRY_CHOP,
-};
-
-struct OrderQueueEntry {
-    u32 kind;
-    EntityID destination_id;
-    bool is_assigned;
-    
-    OrderQueueEntry *next;
-    OrderQueueEntry *prev;
 };
 
 enum {
@@ -35,7 +22,14 @@ struct WorldObjectSpec {
     u32 default_resource_interactions;
 };
 
+#define DISTANCE_TO_MOUSE_SELECT (1.0f)
+#define DISTANCE_TO_MOUSE_SELECT_SQ (DISTANCE_TO_MOUSE_SELECT * DISTANCE_TO_MOUSE_SELECT)
+#define DISTANCE_TO_INTERACT (0.25f)
+#define DISTANCE_TO_INTERACT_SQ SQ(DISTANCE_TO_INTERACT)
 #define MAX_PLAYER_PAWNS 32
+#define PAWN_DISTANCE_TO_PLAYER 3.0f
+#define PAWN_DISTANCE_TO_PLAYER_SQ SQ(PAWN_DISTANCE_TO_PLAYER)
+#define PAWN_SPEED 3.0f
 
 // Structure that defines all data related to game world - anythting that can or should
 // be saved is placed here
@@ -63,10 +57,7 @@ struct WorldState {
     Vec2 mouse_projection;
     
     bool draw_frames;
-    
-    OrderQueueEntry order_queue;
-    OrderQueueEntry *order_free_list;
-    u32 orders_allocated;
+    OrderSystem order_system;
 };
 
 void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena);

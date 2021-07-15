@@ -49,8 +49,8 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
         debug_state->first_free_value_block = block;
         
         for (DebugValue *value = block->first_value;
-            value;
-            ) {
+             value;
+             ) {
             if (value->next) {
                 value = value->next;
             } else {
@@ -147,14 +147,14 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                 } break;
 #define DEBUG_EVENT_VALUE_DEF(_type)                            \
 case DEBUG_EVENT_VALUE_##_type: {                               \
-    DebugValue *value = get_debug_value(debug_state);           \
-    value->value_kind = DEBUG_VALUE_##_type;                    \
-    value->value_##_type = event->value_##_type;                \
-    value->name = event->name;                                  \
-    LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); \
+DebugValue *value = get_debug_value(debug_state);           \
+value->value_kind = DEBUG_VALUE_##_type;                    \
+value->value_##_type = event->value_##_type;                \
+value->name = event->name;                                  \
+LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value); \
 } break;
 #define DEBUG_VALUE_TYPE DEBUG_EVENT_VALUE_DEF
-DEBUG_VALUE_TYPE_LIST()
+                DEBUG_VALUE_TYPE_LIST()
 #undef DEBUG_VALUE_TYPE
 #undef DEBUG_EVENT_VALUE_DEF
                 case DEBUG_EVENT_VALUE_SWITCH: {
@@ -205,7 +205,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
         value_block_stack[current_value_block_stack_index] = block->next;
         
         if (dev_ui_section(dev_ui, block->name)) {
-            LLIST_ITER(block->first_value, value) {
+            LLIST_ITER(value, block->first_value) {
                 char buffer[64];
                 switch (value->value_kind) {
                     case DEBUG_VALUE_f32: {
@@ -246,7 +246,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     dev_ui_labelf(dev_ui, buffer);
                 }
             }
-        
+            
             value_block_stack[++current_value_block_stack_index] = block->first_child;
         }
     }
@@ -275,7 +275,7 @@ void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands
         for (size_t i = 0; i < Min_i32(frame->records_count, 20); ++i) {
             DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
             dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
-                record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
+                          record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
         }
         dev_ui_end_sizable(&dev_ui);
         end_temp_memory(records_sort_temp);
@@ -297,7 +297,7 @@ void DEBUG_frame_end(DebugState *debug_state) {
     }
     
     u64 event_array_index_event_index = _InterlockedExchange64((volatile i64 *)&debug_table->event_array_index_event_index,
-                                                            (i64)debug_table->current_event_array_index << 32);
+                                                               (i64)debug_table->current_event_array_index << 32);
     u32 event_array_index = event_array_index_event_index >> 32;
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;

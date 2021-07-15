@@ -40,8 +40,10 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
 void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
 void close_file(FileHandle handle);
 
+void DEBUG_out_string(const char *format, ...);
+
 void mkdir(const char *name);
 void sleep(u32 ms);
-    
+
 #define OS_H 1
 #endif

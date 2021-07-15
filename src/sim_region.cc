@@ -147,7 +147,7 @@ bool remove_entity_from_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id
          block && not_found;
          block = block->next) {
         for (size_t entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
-            if (is_same(block->ids[entity_idx], id)) {
+            if (IS_SAME(block->ids[entity_idx], id)) {
                 assert(first_block->entity_count);
                 block->ids[entity_idx] = first_block->ids[--first_block->entity_count];
                 if (first_block->entity_count == 0) {
@@ -191,7 +191,7 @@ SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id) {
     for (size_t offset = 0; offset < sim->entity_count; ++offset) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         SimRegionEntityHash *entry = sim->entity_hash + hash_idx;
-        if (is_null(entry->id) || is_same(entry->id, id)) {
+        if (IS_NULL(entry->id) || IS_SAME(entry->id, id)) {
             result = entry;
             break;
         }
@@ -348,12 +348,15 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
 #define MAX_ENTITIES_PER_CHUNK 512
     sim->max_entity_count = next_highest_pow_2(chunk_count * MAX_ENTITIES_PER_CHUNK);
     sim->entity_count = 0;
-    sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk);
-    sim->entities = alloc_arr(arena, sim->max_entity_count, Entity);
+    BEGIN_BLOCK("Alloc");
+    sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk, false);
+    sim->entities = alloc_arr(arena, sim->max_entity_count, Entity, false);
     sim->entity_hash = alloc_arr(arena, sim->max_entity_count, SimRegionEntityHash);
+    END_BLOCK();
     sim->chunks_count = chunk_count;
     for (u32 chunk_idx = 0; chunk_idx < chunk_count; ++chunk_idx) {
         SimRegionChunk *sim_chunk = sim->chunks + chunk_idx;
+        sim_chunk->first_block = {};
         
         i32 chx, chy;
         chunk_array_index_to_coord(chunk_radius, chunk_idx, &chx, &chy);
@@ -366,7 +369,6 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
             WorldChunkEntityBlock *block = world_chunk->first_entity_block;
             while (block) {
                 for (u32 entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
-                    // Decompression step!
                     Entity *src = (Entity *)block->entity_data  + entity_idx;
                     Vec2 sim_space_p = get_sim_space_p(sim, world_chunk_x, world_chunk_y, src->p);
                     Entity *dst = create_new_entity(sim, sim_space_p, src);
@@ -385,18 +387,20 @@ void end_sim(SimRegion *sim, struct WorldState *world_state) {
     TIMED_FUNCTION();
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         Entity *src = sim->entities + entity_idx;
-        i32 chunk_x, chunk_y;
-        Vec2 chunk_p;
-        get_global_space_p(sim, src->p, &chunk_x, &chunk_y, &chunk_p);
-        src->p = chunk_p;
-        pack_entity_into_world(sim->world, chunk_x, chunk_y, src);   
-        
-        if (src->flags & ENTITY_FLAG_IS_ANCHOR) {
-            Anchor anchor = {};
-            anchor.chunk_x = chunk_x;
-            anchor.chunk_y = chunk_y;
-            anchor.radius = 15;
-            world_state->anchors[world_state->anchor_count++] = anchor;
+        if (!(src->flags & ENTITY_FLAG_IS_DELETED)) {
+            i32 chunk_x, chunk_y;
+            Vec2 chunk_p;
+            get_global_space_p(sim, src->p, &chunk_x, &chunk_y, &chunk_p);
+            src->p = chunk_p;
+            pack_entity_into_world(sim->world, chunk_x, chunk_y, src);   
+            
+            if (src->flags & ENTITY_FLAG_IS_ANCHOR) {
+                Anchor anchor = {};
+                anchor.chunk_x = chunk_x;
+                anchor.chunk_y = chunk_y;
+                anchor.radius = 5;
+                world_state->anchors[world_state->anchor_count++] = anchor;
+            }
         }
     }
 }

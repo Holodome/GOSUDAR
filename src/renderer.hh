@@ -101,6 +101,7 @@ struct RendererSettings {
     bool filtered;
     bool mipmapping;
     bool vsync;
+    u32 sample_count;
 };
 
 #define RENDERER_TEXTURE_DIM   512

@@ -17,17 +17,9 @@ inline EntityID entity_id(u32 value) { return { value }; }
 
 #define NULL_ENTITY_ID (entity_id(0))
 
-bool is_same(EntityID a, EntityID b) {
-    return a.value == b.value;
-}
-
-bool is_null(EntityID a) {
-    return a.value == 0;
-}
-
-bool is_not_null(EntityID id) {
-    return !is_null(id);
-}
+struct OrderID {
+    u32 value;
+};
 
 struct Entity {
     EntityID id;
@@ -41,7 +33,7 @@ struct Entity {
     // building
     f32 build_progress;      
     // pawn
-    bool is_busy;
+    OrderID order;
 };
 
 #define ENTITY_HH 1

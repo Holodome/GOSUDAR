@@ -6,41 +6,6 @@ inline WorldObjectSpec get_spec_for_type(WorldState *world_state, u32 type) {
     return world_state->world_object_specs[type];
 }
 
-inline OrderQueueEntry *get_new_order(WorldState *world_state) {
-    OrderQueueEntry *entry = world_state->order_free_list;
-    if (!entry) {
-        ++world_state->orders_allocated;
-        entry = alloc_struct(world_state->arena, OrderQueueEntry);
-    } else {
-        LLIST_POP(world_state->order_free_list);
-    }
-    CDLIST_ADD(&world_state->order_queue, entry);
-    return entry;
-}
-
-inline void free_order(WorldState *world_state, OrderQueueEntry *entry) {
-    CDLIST_REMOVE(entry);
-    LLIST_ADD(world_state->order_free_list, entry);
-}
-
-OrderQueueEntry *get_pending_order(WorldState *world_state) {
-    OrderQueueEntry *result = 0;
-    CDLIST_ITER(&world_state->order_queue, order) {
-        result = order;
-        break;
-    }
-    return result;
-}
-
-bool is_idle(Entity *entiy) {
-    return false;
-}
-
-void assign_order(WorldState *world_state, Entity *entity, OrderQueueEntry *order) {
-    order->is_assigned = true;
-    free_order(world_state, order);
-}
-
 static EntityID add_player(SimRegion *sim, Vec2 pos) {
     Entity *entity = create_new_entity(sim, pos);
     entity->kind = ENTITY_KIND_PLAYER;
@@ -92,7 +57,7 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     world_state->world_object_specs[WORLD_OBJECT_KIND_TREE_DESERT] = tree_spec(1);
     world_state->world_object_specs[WORLD_OBJECT_KIND_BUILDING1] = building_spec();
     world_state->world_object_specs[WORLD_OBJECT_KIND_BUILDING2] = building_spec();
-    CDLIST_INIT(&world_state->order_queue);
+    init_order_system(&world_state->order_system, world_state->arena);
     
     // Generate world
     Entropy gen_entropy { 123456789 };
@@ -209,8 +174,6 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     // Find entity to be selected with mouse
     world_state->mouse_selected_entity = NULL_ENTITY_ID;
     f32 min_distance = INFINITY;
-#define DISTANCE_TO_MOUSE_SELECT (1.0f)
-#define DISTANCE_TO_MOUSE_SELECT_SQ (DISTANCE_TO_MOUSE_SELECT * DISTANCE_TO_MOUSE_SELECT)
     ITERATE(iter, iterate_entities(sim, iter_radius(world_state->mouse_projection, DISTANCE_TO_MOUSE_SELECT))) {
         Entity *entity = get_entity_by_id(sim, *iter.ptr);
         f32 distance_to_mouse_sq = length_sq(world_state->mouse_projection - entity->p);
@@ -221,14 +184,15 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     }
     // Add selected entity to job queue if it fits
     if (is_key_pressed(input, KEY_MOUSE_LEFT)) {
-        if (is_not_null(world_state->mouse_selected_entity)) {
+        if (IS_NOT_NULL(world_state->mouse_selected_entity)) {
             Entity *entity = get_entity_by_id(sim, world_state->mouse_selected_entity);
             if (entity->kind == ENTITY_KIND_WORLD_OBJECT) {
                 WorldObjectSpec spec = get_spec_for_type(world_state, entity->world_object_kind);
                 if (spec.type == WORLD_OBJECT_TYPE_RESOURCE) {
-                    OrderQueueEntry *entry = get_new_order(world_state);
-                    entry->kind = ORDER_QUEUE_ENTRY_CHOP;
-                    entry->destination_id = world_state->mouse_selected_entity;
+                    Order order = {};
+                    order.kind = ORDER_CHOP;
+                    order.destination_id = world_state->mouse_selected_entity;
+                    try_to_add_order(&world_state->order_system, order);
                 }
             }
             
@@ -241,24 +205,45 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
          ++pawn_idx) {
         EntityID pawn_id = world_state->pawns[pawn_idx];
         Entity *entity = get_entity_by_id(sim, pawn_id);
-#if 0
-        OrderQueueEntry *order = get_pending_order(world_state);
-        if (order && is_idle(entity)) {
-            assign_order(world_state, entity, order);
-        }
-#endif
-#define PAWN_DISTANCE_TO_PLAYER 3.0f
-#define PAWN_DISTANCE_TO_PLAYER_SQ SQ(PAWN_DISTANCE_TO_PLAYER)
-        Vec2 delta = player_pos - entity->p;
-#define PAWN_SPEED 3.0f
-        if (length_sq(delta) > PAWN_DISTANCE_TO_PLAYER_SQ) {
-            Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
-            Vec2 new_pawn_p = entity->p + delta_p;
-            change_entity_position(sim, entity, new_pawn_p);
+        // @TODO maybe we want all pawns to be made anchors with small radius 
+        if (entity) {
+            if (IS_NULL(entity->order)) {
+                OrderID order_id = get_pending_order_id(&world_state->order_system);
+                if (IS_NOT_NULL(order_id)) {
+                    entity->order = order_id;
+                    set_order_assigned(&world_state->order_system, order_id);
+                }
+            }
+            
+            if (IS_NOT_NULL(entity->order)) {
+                Order *order = get_order_by_id(&world_state->order_system, entity->order);
+                if (order->kind == ORDER_CHOP) {
+                    Entity *to_chop = get_entity_by_id(sim, order->destination_id);
+                    assert(to_chop); 
+                    // @TODO what do we do if entity is outside of sim region - 
+                    // set new state for order like out of bounds
+                    Vec2 delta = to_chop->p - entity->p;
+                    if (length_sq(delta) > DISTANCE_TO_INTERACT_SQ) {
+                        Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                        Vec2 new_pawn_p = entity->p + delta_p;
+                        change_entity_position(sim, entity, new_pawn_p);
+                    } else {
+                        to_chop->flags |= ENTITY_FLAG_IS_DELETED;
+                        disband_order(&world_state->order_system, entity->order);
+                        entity->order = {};
+                    }
+                }
+            } else { 
+                Vec2 delta = player_pos - entity->p;
+                if (length_sq(delta) > PAWN_DISTANCE_TO_PLAYER_SQ) {
+                    Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                    Vec2 new_pawn_p = entity->p + delta_p;
+                    change_entity_position(sim, entity, new_pawn_p);
+                }
+            }
         }
     }
     // Assign job to pawn if 
-    DEBUG_VALUE(world_state->orders_allocated, "Orders allocated");
 }
 
 static void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
@@ -324,7 +309,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         }
     }
     
-    if (is_not_null(world_state->mouse_selected_entity)) {
+    if (IS_NOT_NULL(world_state->mouse_selected_entity)) {
         Entity *entity = get_entity_by_id(sim, world_state->mouse_selected_entity);
         assert(entity);
         Vec2 half_size = Vec2(1, 1) * 0.5f;

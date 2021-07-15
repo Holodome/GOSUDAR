@@ -6,7 +6,7 @@
 #include "render_group.hh"
 
 struct DevUIID {
-    u32 v;
+    u32 value;
 };  
 
 struct DevUIView {

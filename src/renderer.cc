@@ -9,11 +9,11 @@ _type _name;
 #undef GLPROC
 
 static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
-    const GLchar* message, const void *_) {
+                                           const GLchar* message, const void *_) {
     (void)_;
     (void)length;
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
-
+    
     char *source_str;
     switch(source) {
         case GL_DEBUG_SOURCE_API_ARB: {
@@ -38,7 +38,7 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 		    source_str = "Unknown"; 
         } break;
     }
-
+    
     char *type_str;
     switch (type) {
         case GL_DEBUG_TYPE_ERROR_ARB: {
@@ -63,7 +63,7 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 		    type_str = "UNKNOWN"; 
         } break;
     }
-
+    
     char *severity_str;
     switch(severity) {
         case GL_DEBUG_SEVERITY_NOTIFICATION: {
@@ -82,7 +82,7 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 		    severity_str = "UNKNOWN"; 
         } break;
     }
-
+    
     // fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n",
 	// 		source_str, type_str, severity_str, id, message);
 }
@@ -231,7 +231,7 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     u32 white_data = 0xFFFFFFFF;
     renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, &white_data, 1, 1);
 #endif   
-      
+    
     // @TODO optimize how we do this - there is probably no need to delete framebuffer handles
     // and its attachment handles
     free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD);
@@ -449,17 +449,17 @@ void main() {
     
     glGenVertexArrays(1, &renderer->vertex_array);
     glBindVertexArray(renderer->vertex_array);
-
+    
     glGenBuffers(1, &renderer->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, renderer->commands.max_vertex_count * sizeof(Vertex), 0, GL_STREAM_DRAW);
     renderer->video_memory_used += renderer->commands.max_vertex_count * sizeof(Vertex);
-
+    
     glGenBuffers(1, &renderer->index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
     renderer->video_memory_used += renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE);
-
+    
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, p));
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, uv));
@@ -470,17 +470,17 @@ void main() {
     glEnableVertexAttribArray(3);
     glVertexAttribIPointer(4, 1, GL_UNSIGNED_SHORT, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, tex));
     glEnableVertexAttribArray(4);
-
+    
     glBindVertexArray(0);
-     
+    
 #define MAX_TEXTURE_COUNT 256
     renderer->max_texture_count = MAX_TEXTURE_COUNT;
     glGenTextures(1, &renderer->texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
     ITERATE(iter, iterate_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM)) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
-            iter.width, iter.height, MAX_TEXTURE_COUNT,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
+                     iter.width, iter.height, MAX_TEXTURE_COUNT,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
         renderer->video_memory_used += iter.width * iter.height * 4;
     }
     init_renderer_for_settings(renderer, settings);
@@ -540,8 +540,8 @@ void renderer_end_frame(Renderer *renderer) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
         glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
-            (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
-            (GLint)quads->vertex_array_offset);
+                                 (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
+                                 (GLint)quads->vertex_array_offset);
         glUseProgram(0);
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -610,7 +610,7 @@ void renderer_end_frame(Renderer *renderer) {
     glUseProgram(0);
     
     {DEBUG_VALUE_BLOCK("Renderer")
-        DEBUG_VALUE(renderer->video_memory_used >> 20, "Video memory used");
+            DEBUG_VALUE(renderer->video_memory_used >> 20, "Video memory used");
         DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
         DEBUG_VALUE(DEBUG_quads_dispatched, "Quads dispatched");
         DEBUG_VALUE(renderer->texture_count, "Texture count");
@@ -630,8 +630,8 @@ Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 widt
     glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
     ITERATE(iter, iterate_mips(width, height)) {
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, iter.level, 0, 0,
-            tex.index, iter.width, iter.height, 1,
-            GL_RGBA, GL_UNSIGNED_BYTE, (u32 *)data + iter.pixel_offset);    
+                        tex.index, iter.width, iter.height, 1,
+                        GL_RGBA, GL_UNSIGNED_BYTE, (u32 *)data + iter.pixel_offset);    
     }
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     return tex;

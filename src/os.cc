@@ -34,7 +34,7 @@ struct OS {
     
     bool old_fullscreen;
     bool old_vsync;    
-        
+    
     Platform platform;
     HINSTANCE instance;
     HWND hwnd;
@@ -95,7 +95,7 @@ static void fill_sound_buffer(OS *os, i16 *samples, u64 samples_to_write) {
 static void set_pixel_format(OS *os, HDC hdc) {
     i32 suggested_pixel_format_index = 0;
     u32 extended_pick = 0;
-
+    
     if (os->wglChoosePixelFormatARB) {
         int attributes[] = {
             WGL_DRAW_TO_WINDOW_ARB,				GL_TRUE,
@@ -107,13 +107,14 @@ static void set_pixel_format(OS *os, HDC hdc) {
 			WGL_COLOR_BITS_ARB,					32,
 			WGL_DEPTH_BITS_ARB,					24,
 			WGL_ALPHA_BITS_ARB,					8,
+            WGL_SAMPLES_ARB, 4,
 			WGL_SAMPLE_BUFFERS_ARB,				true,
 			0
         };
         os->wglChoosePixelFormatARB(hdc, attributes, 0, 1,
-            &suggested_pixel_format_index, &extended_pick);
+                                    &suggested_pixel_format_index, &extended_pick);
     }
-
+    
     if (!extended_pick) {
         PIXELFORMATDESCRIPTOR desired_pixel_format = {};
         desired_pixel_format.nSize = sizeof(desired_pixel_format);
@@ -127,7 +128,7 @@ static void set_pixel_format(OS *os, HDC hdc) {
         
         suggested_pixel_format_index = ChoosePixelFormat(hdc, &desired_pixel_format);
     }
-
+    
     PIXELFORMATDESCRIPTOR suggested_pixel_format;
     DescribePixelFormat(hdc, suggested_pixel_format_index,
                         sizeof(suggested_pixel_format), &suggested_pixel_format);
@@ -153,7 +154,7 @@ static LRESULT WINAPI main_window_proc(HWND window, UINT message, WPARAM wparam,
 
 void go_fullscreen(OS *os, bool fullscreen) {
     static WINDOWPLACEMENT LastWindowPlacement = {sizeof(WINDOWPLACEMENT)};
-
+    
     DWORD WindowStyle = GetWindowLong(os->hwnd, GWL_STYLE);
     // Set fullscreen (actually this is windowed fullscreen!)
     if (fullscreen) {
@@ -162,19 +163,19 @@ void go_fullscreen(OS *os, bool fullscreen) {
             GetMonitorInfo(MonitorFromWindow(os->hwnd, MONITOR_DEFAULTTOPRIMARY),
                            &MonitorInfo)) {
             SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle & ~WS_OVERLAPPEDWINDOW);
-
+            
             SetWindowPos(os->hwnd, HWND_TOP,
-                MonitorInfo.rcMonitor.left,
-                MonitorInfo.rcMonitor.top,
-                MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-                MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                         MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.top,
+                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         }
     } else {
         SetWindowLong(os->hwnd, GWL_STYLE, WindowStyle | WS_OVERLAPPEDWINDOW);
         SetWindowPlacement(os->hwnd, &LastWindowPlacement);
         SetWindowPos(os->hwnd, 0, 0, 0, 0, 0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
 }
 
@@ -212,9 +213,9 @@ OS *os_init(Vec2 *display_size) {
 #define WINDOW_HEIGHT 720
 #define WINDOW_NAME "GOSUDAR"
     os->hwnd = CreateWindowExA(WS_EX_APPWINDOW, wndclss.lpszClassName, WINDOW_NAME, 
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE, 
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
+                               WS_CAPTION | WS_SYSMENU | WS_VISIBLE, 
+                               CW_USEDEFAULT, CW_USEDEFAULT,
+                               WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
     ShowWindow(os->hwnd, SW_SHOW);
     UpdateWindow(os->hwnd);
     SetForegroundWindow(os->hwnd);
@@ -298,12 +299,12 @@ OS *os_init(Vec2 *display_size) {
     os->wglMakeCurrent(hwnd_dc, gl_rc);
     
 #define GLPROC(_name, _type)                                                   \
-    *(void **)&_name = (void *)os->wglGetProcAddress(#_name);                  \
-    if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
-    if (!_name) assert(!"Failed to load " #_name " OGL procedure.");
+*(void **)&_name = (void *)os->wglGetProcAddress(#_name);                  \
+if (!_name) *(void **)&_name = (void *)GetProcAddress(opengl_dll, #_name); \
+if (!_name) assert(!"Failed to load " #_name " OGL procedure.");
 #include "gl_procs.inc"
 #undef GLPROC
-
+    
 #define DEFAULT_VSYNC true 
     os->platform.vsync = DEFAULT_VSYNC;
     os->wglSwapIntervalEXT(DEFAULT_VSYNC);
@@ -347,9 +348,9 @@ OS *os_init(Vec2 *display_size) {
     wave_format.wBitsPerSample = bits_per_sample;
     
     result = os->audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, 
-        AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
-        requested_sound_duration,
-        0, &wave_format, 0);
+                                          AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+                                          requested_sound_duration,
+                                          0, &wave_format, 0);
     assert(result == S_OK);
     
     static GUID IID_IAudioRenderClient = {0xF294ACFC, 0x3146, 0x4483, 0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2};
@@ -412,11 +413,11 @@ Platform *os_begin_frame(OS *os) {
             case WM_SYSKEYUP: {
                 bool is_down = ((msg.lParam & (1 << 31)) == 0);
                 i32  scancode = (HIWORD(msg.lParam) & (KF_EXTENDED | 0xFF));
-
+                
                 if (!scancode) {
                     scancode = MapVirtualKeyW((UINT)msg.wParam, MAPVK_VK_TO_VSC);
                 }
-
+                
                 u32 key = KEY_NONE;
                 switch (scancode) {
                     case 0x011: {
@@ -513,7 +514,7 @@ Platform *os_begin_frame(OS *os) {
                         key = KEY_F12;
                     } break;
                 }
-
+                
                 if ((u32)key) {
                     update_key_state(input, key, is_down);
                 }
@@ -688,4 +689,13 @@ void os_free(void *ptr) {
     if (ptr) {
         VirtualFree(ptr, 0, MEM_RELEASE);
     }
+}
+
+void DEBUG_out_string(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    char buffer[4096];
+    size_t len = vsnprintf(buffer, sizeof(buffer), format, args);
+    WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, 0, 0);
+    va_end(args);
 }

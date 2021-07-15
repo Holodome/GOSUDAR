@@ -152,15 +152,18 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
     arena->data_capacity = buffer_size;
 }
 
-#define alloc_struct(_arena, _type) (_type *)alloc(_arena, sizeof(_type))
-#define alloc_arr(_arena, _count, _type) (_type *)alloc(_arena, _count * sizeof(_type))
-#define alloc_string(_arena, _string) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1)
-void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
+void memset_16(void *dst, u8 value, size_t size) {
+}
+
+#define alloc_struct(_arena, _type, ...) (_type *)alloc(_arena, sizeof(_type), ##__VA_ARGS__)
+#define alloc_arr(_arena, _count, _type, ...) (_type *)alloc(_arena, _count * sizeof(_type), ##__VA_ARGS__)
+#define alloc_string(_arena, _string, ...) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
+void *alloc(MemoryArena *arena, size_t size, bool clear_to_zero = true) {
     void *result = 0;
     
     if (size) {
         uintptr_t curr_ptr = (uintptr_t)arena->data + arena->data_size;
-        uintptr_t offset = align_forward(curr_ptr, align) - (uintptr_t)arena->data;
+        uintptr_t offset = align_forward(curr_ptr, 16) - (uintptr_t)arena->data;
         
         if (offset + size < arena->data_capacity) {
             u8 *ptr = arena->data + offset;
@@ -172,7 +175,13 @@ void *alloc(MemoryArena *arena, size_t size, size_t align = DEFAULT_ALIGNMENT) {
             assert(!"Memory is out of bounds");
         }
         
-        if (result) {
+        if (result && clear_to_zero) {
+            // @TODO we need to adress problem of huge amounth of cycles 
+            // used on memset in this routine.
+            // Basically, memory only needs to be zeroed when we use same block for several
+            // algorithm iterations (ex. sim region)
+            // Maybe it will  even be faster to allocate new pages here - 
+            // or just have single block for simulaion that is zeroed only once per frame
             memset(result, 0, size);
         }
     }
@@ -190,7 +199,7 @@ void *alloc_copy(MemoryArena *arena, const void *src, size_t size) {
     return result;
 }
 
-#define bootstrap_alloc_struct(_type, _field, ...) (_type *)bootstrap_alloc_size(sizeof(_type), offsetof(_type, _field), __VA_ARGS__)
+#define bootstrap_alloc_struct(_type, _field, ...) (_type *)bootstrap_alloc_size(SIZE_OF(_type), STRUCT_OFFSET(_type, _field), __VA_ARGS__)
 inline void *bootstrap_alloc_size(size_t size, size_t arena_offset, size_t minimal_block_size = MEGABYTES(4)) {
     MemoryArena bootstrap;
     arena_init(&bootstrap, os_alloc(minimal_block_size), minimal_block_size);

@@ -179,8 +179,81 @@ void go_fullscreen(OS *os, bool fullscreen) {
     }
 }
 
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 -4
+#endif 
+
+#ifndef PROCESS_PER_MONITOR_DPI_AWARE 
+#define PROCESS_PER_MONITOR_DPI_AWARE 2
+#endif 
+
+#ifndef PROCESS_DPI_AWARENESS
+#define PROCESS_DPI_AWARENESS int 
+#endif 
+
+#define SET_PROCESS_DPI_AWARENESS_CONTEXT(_name) BOOL _name(DPI_AWARENESS_CONTEXT)
+typedef SET_PROCESS_DPI_AWARENESS_CONTEXT(SetProcessDpiAwarenessContext_);
+#define SET_PROCESS_DPI_AWARENESS(_name) HRESULT _name(PROCESS_DPI_AWARENESS)
+typedef SET_PROCESS_DPI_AWARENESS(SetProcessDpiAwareness_);
+
+static bool set_dpi_awareness() {
+    bool result = false;
+    
+    HMODULE user32 = LoadLibraryA("user32.dll");
+    if (user32) {
+        SetProcessDpiAwarenessContext_ *SetProcessDpiAwarenessContext = (SetProcessDpiAwarenessContext_ *)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+        if (SetProcessDpiAwarenessContext) {
+            result = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        } else {
+            outf("WARN: SetProcessDpiAwarenessContext is not found\n");
+        }
+        FreeLibrary(user32);
+    } else {
+        outf("WARN: Failed to load user32.dll\n");
+    }
+    
+    if (!result) {
+        HMODULE shcore = LoadLibraryA("shcore.dll");
+        if (shcore) {
+            SetProcessDpiAwareness_ *SetProcessDpiAwareness = (SetProcessDpiAwareness_ *)GetProcAddress(shcore, "SetProcessDpiAwareness");
+            if (SetProcessDpiAwareness) {
+                result = (SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE) == 0);
+            } else {
+                outf("WARN: Failed to load SetProcessDpiAwareness\n");
+            }
+            FreeLibrary(shcore);
+        } else {
+            outf("WARN: Failed to load shcore.dll\n");
+        }
+    }
+    
+    if (!result) {
+        result = SetProcessDPIAware();
+    }
+    
+    if (!result) {
+        outf("Failed to set DPI awareness\n");
+    }
+    return result;
+}
+
+static void check_for_sse() {
+    int regs[4];
+    __cpuidex(regs, 1, 0);
+#define SSE4_1_BIT (1 << 19)
+#define SSE4_2_BIT (1 << 20)
+    u32 ecx = regs[2];
+    
+    bool has_sse4 = (bool)(ecx & SSE4_1_BIT) && (bool)(ecx & SSE4_2_BIT);
+    if (!has_sse4) {
+        outf("ERROR: SSE4 processor extensions not found\n");
+    }
+}
+
 OS *os_init(Vec2 *display_size) {
     OS *os = bootstrap_alloc_struct(OS, arena);
+    
+    check_for_sse();
     
     // Set working directory
     char executable_directory[MAX_PATH];
@@ -235,6 +308,8 @@ OS *os_init(Vec2 *display_size) {
     LARGE_INTEGER time;
     QueryPerformanceCounter(&time);
     os->last_frame_time = os->game_start_time = time;
+    
+    set_dpi_awareness();
     //
     // Opengl
     //
@@ -691,11 +766,12 @@ void os_free(void *ptr) {
     }
 }
 
-void DEBUG_out_string(const char *format, ...) {
+size_t outf(const char *format, ...) {
     va_list args;
     va_start(args, format);
     char buffer[4096];
     size_t len = vsnprintf(buffer, sizeof(buffer), format, args);
     WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, 0, 0);
     va_end(args);
+    return len;
 }

@@ -131,5 +131,8 @@ extern f32 F32_INFINITY;
 #define F32_INFINITY INFINITY
 #endif 
 
+size_t outf(const char *format, ...);
+size_t outv(const char *format, va_list args);
+
 #define GENERAL_H 1
 #endif

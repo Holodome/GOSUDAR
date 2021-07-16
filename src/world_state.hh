@@ -3,6 +3,7 @@
 #include "lib.hh"
 #include "sim_region.hh"
 #include "orders.hh"
+#include "particle_system.hh"
 
 struct Camera {
     f32 pitch;
@@ -46,6 +47,7 @@ struct WorldState {
     
     bool draw_frames;
     OrderSystem order_system;
+    ParticleSystem particle_system;
     
     u32 wood_count;
 };

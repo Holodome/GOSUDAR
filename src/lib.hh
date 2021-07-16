@@ -1418,5 +1418,7 @@ i64 interlocked_compare_exchange(volatile i64 *dest, i64 exchange, i64 comparand
     return result;
 }
 
+#include "simd_math.hh"
+
 #define LIB_HH 1
 #endif

@@ -29,6 +29,7 @@ typedef double f64;
 
 #define ARRAY_SIZE(_a) ((size_t)(sizeof(_a) / sizeof(*(_a))))
 #define SQ(_a) ((_a) * (_a))
+#define ADD_BY_MODULO(_a, _b, _modulo) (((_a) + (_b)) % _modulo)
 
 #define BYTES(_n) ((size_t)_n)
 #define KILOBYTES(_n) (BYTES(_n) << 10) 
@@ -69,6 +70,7 @@ LLIST_ADD(*(_list_ptr), (_node)); \
 // Ciricular double-linked list
 // It works by defining single statically-allocated element, which serves as sentinel
 // in points to no data but is used to make function calls easier (no need for double pointers)
+// However, in more complex cases we want to first element still be pointer
 #define CDLIST_ITER(_name, _list) for (auto (_name) = (_list)->next; (_name) != (_list); (_name) = (_name)->next)
 #define CDLIST_INIT(_list) do { (_list)->next = (_list); (_list)->prev = (_list); } while (0);
 #define CDLIST_ADD(_list, _node) do { \

@@ -13,9 +13,13 @@ struct EntityID {
     u32 value;
 };
 
-inline EntityID entity_id(u32 value) { return { value }; }
+struct OrderID {
+    u32 value;
+};
 
-#define NULL_ENTITY_ID (entity_id(0))
+struct ParticleEmitterID {
+    u32 value;
+};
 
 enum {
     WORLD_OBJECT_TYPE_NONE,
@@ -41,10 +45,8 @@ struct Interaction {
     EntityID entity;
     f32 time;
     f32 current_time;
-};
-
-struct OrderID {
-    u32 value;
+    
+    ParticleEmitterID particle_emitter;
 };
 
 struct Entity {

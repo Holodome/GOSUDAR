@@ -35,6 +35,7 @@ inline WorldObjectSpec tree_spec(u32 resource_gain) {
     spec.type = WORLD_OBJECT_TYPE_RESOURCE;
     spec.resource_kind = RESOURCE_KIND_WOOD;
     spec.default_resource_interactions = resource_gain;
+    spec.resource_gain = 10;
     return spec;
 }
 
@@ -96,6 +97,75 @@ static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
     ray_eye.w = 0.0f;
     Vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
     return ray_world;
+}
+
+static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *entity, InputManager *input) {
+    assert(IS_NOT_NULL(entity->order));
+    Order *order = get_order_by_id(&world_state->order_system, entity->order);
+    assert(order);
+    
+    if (entity->interaction.kind) {
+        entity->interaction.current_time += input->platform->frame_dt;
+        if (entity->interaction.current_time > entity->interaction.time) {
+            Entity *interactable = get_entity_by_id(sim, entity->interaction.entity);
+            assert(interactable);
+            
+            if (entity->interaction.kind == INTERACTION_KIND_MINE_RESOURCE) {
+                assert(interactable->kind == ENTITY_KIND_WORLD_OBJECT);
+                assert(interactable->resource_interactions_left > 0);
+                interactable->resource_interactions_left -= 1;
+                WorldObjectSpec interactable_spec = get_spec_for_type(world_state, interactable->world_object_kind);
+                assert(interactable_spec.type == WORLD_OBJECT_TYPE_RESOURCE);
+                if (interactable_spec.resource_kind == RESOURCE_KIND_WOOD) {
+                    world_state->wood_count += interactable_spec.resource_gain;
+                } else {
+                    NOT_IMPLEMENTED;
+                } 
+                
+                if (interactable->resource_interactions_left == 0){
+                    interactable->flags |= ENTITY_FLAG_IS_DELETED;
+                    disband_order(&world_state->order_system, entity->order);
+                    entity->order = {};
+                    entity->interaction = {};
+                }
+            } else {
+                NOT_IMPLEMENTED;
+            }
+        }
+    } else {
+        EntityID order_entity_id = order->destination_id;
+        Entity *dest_entity = get_entity_by_id(sim, order_entity_id);
+        assert(dest_entity->kind == ENTITY_KIND_WORLD_OBJECT);
+        assert(length_sq(dest_entity->p - entity->p) < DISTANCE_TO_INTERACT_SQ);
+        WorldObjectSpec dest_spec = get_spec_for_type(world_state, dest_entity->world_object_kind);
+        // Get ineraction settings from order and whatever
+        u32 interaction_kind = 0;
+        f32 interaction_time = 0.0f;
+        bool cancel_interaction = false;
+        if (order->kind == ORDER_CHOP) {
+            if (dest_spec.type == WORLD_OBJECT_TYPE_RESOURCE) {
+                interaction_kind = INTERACTION_KIND_MINE_RESOURCE;
+                assert(dest_entity->resource_interactions_left > 0);
+                if (dest_spec.resource_kind == RESOURCE_KIND_WOOD) {
+                    interaction_time = 1.0f;
+                } else {
+                    NOT_IMPLEMENTED;
+                }
+            } else {
+                NOT_IMPLEMENTED;
+            }
+        } else {
+            NOT_IMPLEMENTED;
+        }
+        
+        if (!cancel_interaction) {
+            assert(interaction_kind);
+            entity->interaction.kind = interaction_kind;
+            entity->interaction.entity = order_entity_id;
+            entity->interaction.time = interaction_time;
+            entity->interaction.current_time = 0.0f;
+        }
+    }
 }
 
 void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
@@ -203,7 +273,6 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         }
     }
     
-    DEBUG_VALUE(world_state->mouse_selected_entity.value, "Mouse select entity");
     Vec2 player_pos = camera_controlled_entity->p;
     for (u32 pawn_idx = 0; 
          pawn_idx < world_state->pawn_count;
@@ -226,16 +295,17 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
                     Entity *to_chop = get_entity_by_id(sim, order->destination_id);
                     assert(to_chop); 
                     // @TODO what do we do if entity is outside of sim region - 
-                    // set new state for order like out of bounds
+                    // set new state for order like out of bounds and request new one
                     Vec2 delta = to_chop->p - entity->p;
                     if (length_sq(delta) > DISTANCE_TO_INTERACT_SQ) {
                         Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
                         Vec2 new_pawn_p = entity->p + delta_p;
                         change_entity_position(sim, entity, new_pawn_p);
                     } else {
-                        to_chop->flags |= ENTITY_FLAG_IS_DELETED;
-                        disband_order(&world_state->order_system, entity->order);
-                        entity->order = {};
+                        update_interaction(world_state, sim, entity, input);
+                        // to_chop->flags |= ENTITY_FLAG_IS_DELETED;
+                        // disband_order(&world_state->order_system, entity->order);
+                        // entity->order = {};
                     }
                 }
             } else { 
@@ -393,5 +463,8 @@ void update_and_render_world_state(WorldState *world_state, InputManager *input,
         DEBUG_VALUE(world_state->world->entity_ids_allocated, "Entity ids allocated");
         DEBUG_VALUE(total_sim_entities, "Total sim entities");
         DEBUG_VALUE(total_sim_chunks, "Total sim chunks");
+        DEBUG_VALUE(world_state->order_system.orders_allocated, "Orders allocated");
+        DEBUG_VALUE(world_state->mouse_selected_entity.value, "Mouse select entity");
+        DEBUG_VALUE(world_state->wood_count, "Wood count");
     }
 }

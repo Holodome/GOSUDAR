@@ -46,8 +46,10 @@ struct OrderSlot {
     u32 state;
     u32 description_hash;
     Order order;
-    // Needed for deletion
-    OrderListEntry *list_entry;
+    // Needed for deletion, we can have it stack allocated since slot exist only while list entry exists
+    OrderListEntry list_entry;
+    // Needed for free list
+    OrderSlot *next;
 };
 
 struct OrderHash {
@@ -66,6 +68,9 @@ struct OrderSystem {
     // Size of hash is not a probles since pointers are used here
     OrderHash order_hash[ORDERS_HASH_SIZE];
     OrderListEntry order_list;
+    
+    u32 orders_allocated;
+    OrderSlot *first_free_slot;
 };
 
 void init_order_system(OrderSystem *order_system, MemoryArena *arena);

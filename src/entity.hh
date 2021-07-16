@@ -17,6 +17,32 @@ inline EntityID entity_id(u32 value) { return { value }; }
 
 #define NULL_ENTITY_ID (entity_id(0))
 
+enum {
+    WORLD_OBJECT_TYPE_NONE,
+    WORLD_OBJECT_TYPE_RESOURCE,
+    WORLD_OBJECT_TYPE_BUILDING,
+};
+
+struct WorldObjectSpec {
+    u32 type;
+    u32 resource_kind;
+    u32 default_resource_interactions;
+    u32 resource_gain;
+};
+
+enum {
+    INTERACTION_KIND_NONE,
+    INTERACTION_KIND_MINE_RESOURCE,
+};
+
+// @TODO see if it is better inlined as entity fields
+struct Interaction {
+    u32 kind; // Used to check if interaction exists
+    EntityID entity;
+    f32 time;
+    f32 current_time;
+};
+
 struct OrderID {
     u32 value;
 };
@@ -26,7 +52,6 @@ struct Entity {
     Vec2 p;
     u32 flags;
     u32 kind;
-    u32 world_object_flags;
     u32 world_object_kind;
     // resource
     u32 resource_interactions_left;
@@ -34,6 +59,7 @@ struct Entity {
     f32 build_progress;      
     // pawn
     OrderID order;
+    Interaction interaction;
 };
 
 #define ENTITY_HH 1

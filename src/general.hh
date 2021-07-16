@@ -42,6 +42,7 @@ typedef double f64;
 #define INVALID_DEFAULT_CASE default: assert(!"Invalid switch default case");
 #define INVALID_CODE_PATH assert(!"Invalid code path")
 #define UNREFERENCED_VARIABLE(_var) ((void)_var)
+#define NOT_IMPLEMENTED assert(!"Not implemented")
 
 // ID stuff
 // In code there are several places where ids of different kinds are used
@@ -132,7 +133,6 @@ extern f32 F32_INFINITY;
 #endif 
 
 size_t outf(const char *format, ...);
-size_t outv(const char *format, va_list args);
 
 #define GENERAL_H 1
 #endif

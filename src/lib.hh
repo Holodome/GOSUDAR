@@ -4,6 +4,12 @@
 
 #include <intrin.h>
 
+//
+// We use SSE4 here for different round functions
+// SSE4 support on modern gaming machines is close to 100% (check steam hardware survey),
+// but nethertheless, this is restriciton that we better have some option to disable
+//
+
 inline i32 Truncate_i32(f32 value) {
     return _mm_cvtt_ss2si(_mm_set_ss(value));
 }

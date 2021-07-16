@@ -10,18 +10,6 @@ struct Camera {
     f32 distance_from_player;
 };
 
-enum {
-    WORLD_OBJECT_TYPE_NONE,
-    WORLD_OBJECT_TYPE_RESOURCE,
-    WORLD_OBJECT_TYPE_BUILDING,
-};
-
-struct WorldObjectSpec {
-    u32 type;
-    u32 resource_kind;
-    u32 default_resource_interactions;
-};
-
 #define DISTANCE_TO_MOUSE_SELECT (1.0f)
 #define DISTANCE_TO_MOUSE_SELECT_SQ (DISTANCE_TO_MOUSE_SELECT * DISTANCE_TO_MOUSE_SELECT)
 #define DISTANCE_TO_INTERACT (0.25f)
@@ -58,6 +46,8 @@ struct WorldState {
     
     bool draw_frames;
     OrderSystem order_system;
+    
+    u32 wood_count;
 };
 
 void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena);

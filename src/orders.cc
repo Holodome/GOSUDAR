@@ -45,13 +45,18 @@ OrderSlot *get_order_slot_by_id(OrderSystem *sys, OrderID id) {
 static OrderSlot *create_order_slot(OrderSystem *sys) {
     OrderID id = { ++sys->last_order_id_value };
     
-    OrderSlot *order = alloc_struct(sys->arena, OrderSlot);
+    OrderSlot *order = sys->first_free_slot;
+    if (!order) {
+        ++sys->orders_allocated;
+        order = alloc_struct(sys->arena, OrderSlot);
+    } else {
+        LLIST_POP(sys->first_free_slot);
+    }
     order->id = id;
     // Add to list
-    OrderListEntry *list_entry = alloc_struct(sys->arena, OrderListEntry);
+    OrderListEntry *list_entry = &order->list_entry;
     list_entry->id = id;
     CDLIST_ADD(&sys->order_list, list_entry);
-    order->list_entry = list_entry;
     
     // Add to hash
     OrderHash *hash = get_order_hash(sys, id);
@@ -125,7 +130,8 @@ void set_order_unassigned(OrderSystem *sys, OrderID id) {
 void disband_order(OrderSystem *sys, OrderID id) {
     OrderHash *hash = get_order_hash(sys, id);
     OrderSlot *slot = hash->ptr;
-    CDLIST_REMOVE(slot->list_entry);
+    CDLIST_REMOVE(&slot->list_entry);
     hash->ptr = 0;
     hash->id = {};
+    LLIST_ADD_OR_CREATE(&sys->first_free_slot, slot);
 }

@@ -37,14 +37,14 @@ static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
     return quads;
 }
 
-void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-               Vec4 c00, Vec4 c01, Vec4 c10, Vec4 c11,
-               Vec2 uv00, Vec2 uv01, Vec2 uv10, Vec2 uv11,
+void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
+               vec4 c00, vec4 c01, vec4 c10, vec4 c11,
+               vec2 uv00, vec2 uv01, vec2 uv10, vec2 uv11,
                Texture texture) {
     TIMED_FUNCTION();
     RenderQuads *quads = get_quads(render_group->commands, render_group->setup);
     if (quads) {
-        Vec2 uv_scale = Vec2(texture.width, texture.height) * RENDERER_RECIPROCAL_TEXTURE_SIZE;
+        vec2 uv_scale = Vec2(texture.width, texture.height) * RENDERER_RECIPROCAL_TEXTURE_SIZE;
         uv00 = uv00 * uv_scale;
         uv01 = uv01 * uv_scale;
         uv10 = uv10 * uv_scale;
@@ -98,34 +98,34 @@ static Texture get_texture(RenderGroup *render_group, AssetID id) {
     return result;
 }
 
-void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-               Vec4 c, AssetID texture_id) {
+void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
+               vec4 c, AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
-void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id) {
+void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v[0], v[1], v[2], v[3], WHITE, WHITE, WHITE, WHITE,
               Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
-void push_quad(RenderGroup *render_group, Vec3 v[4], Vec4 c, AssetID texture_id) {
+void push_quad(RenderGroup *render_group, vec3 v[4], vec4 c, AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v[0], v[1], v[2], v[3], c, c, c, c,
               Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
-void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, AssetID texture_id) {
-    Vec3 v[4]; 
+void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, AssetID texture_id) {
+    vec3 v[4]; 
     rect.store_points(v);
-    Vec2 uvs[4];
+    vec2 uvs[4];
     uv_rect.store_points(uvs);
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
 }
 
-void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *text, AssetID font_id, f32 scale) {
+void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale) {
     if (!text) {
         return;
     }
@@ -139,7 +139,7 @@ void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *
 	f32 rwidth  = 1.0f / (f32)font->texture.width;
 	f32 rheight = 1.0f / (f32)font->texture.height;
     
-	Vec3 offset = Vec3(p, 0);
+	vec3 offset = Vec3(p, 0);
 	offset.y += line_height;
     
 	for (const char *scan = text; *scan; ++scan) {
@@ -167,26 +167,26 @@ void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *
 	}
 }
 
-void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color, f32 thickness) {
+void push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
     // @TODO not behaving properly when ab is close to parallel with cam_z
-    Vec3 cam_z = render_group->setup.mvp.get_z();
-    Vec3 line = (b - a);
+    vec3 cam_z = render_group->setup.mvp.get_z();
+    vec3 line = (b - a);
     line -= cam_z * dot(cam_z, line);
-    Vec3 line_perp = cross(line, cam_z);
+    vec3 line_perp = cross(line, cam_z);
     line_perp = normalize(line_perp);
     line_perp *= thickness;
     push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
 }
 
-void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {
+void push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color, f32 thickness) {
     push_line(render_group, v00, v01, color, thickness);
     push_line(render_group, v01, v11, color, thickness);
     push_line(render_group, v11, v10, color, thickness);
     push_line(render_group, v10, v00, color, thickness);
 }
 
-void push_rect_outline(RenderGroup *render_group, Rect rect, Vec4 color, f32 thickness) {
-    Vec3 v[4]; 
+void push_rect_outline(RenderGroup *render_group, Rect rect, vec4 color, f32 thickness) {
+    vec3 v[4]; 
     rect.store_points(v);
     push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
 }

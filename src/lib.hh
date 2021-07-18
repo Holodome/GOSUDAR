@@ -319,7 +319,7 @@ inline f32 lerp(f32 a, f32 b, f32 t) {
 }
 
 template <typename T>
-struct Vec2G {
+struct vec2G {
     union {
         struct {
             T x, y;
@@ -327,69 +327,69 @@ struct Vec2G {
         T e[2];
     };
     
-    Vec2G() : x(0), y(0) {}
-    explicit Vec2G(T x, T y) : x(x), y(y) {}
-    explicit Vec2G(T s) : x(s), y(s) {}
-    template <typename S>
-        explicit Vec2G(Vec2G<S> v) : x((T)v.x), y((T)v.y) {}
-    
-    Vec2G<T> operator-() const {
-        return Vec2G<T>(-x, -y);
+    vec2G<T> operator-() const {
+        return {-x, -y};
     } 
-    Vec2G<T> operator+() const {
+    vec2G<T> operator+() const {
         return *this;
     }
     
-    Vec2G<T> operator+(Vec2G<T> v) const {
-        return Vec2G<T>(x + v.x, y + v.y);
+    vec2G<T> operator+(vec2G<T> v) const {
+        return {x + v.x, y + v.y};
     }
-    Vec2G<T> operator-(Vec2G<T> v) const {
-        return Vec2G<T>(x - v.x, y - v.y);
+    vec2G<T> operator-(vec2G<T> v) const {
+        return { x - v.x, y - v.y };
     }
-    Vec2G<T> operator*(Vec2G<T> v) const {
-        return Vec2G<T>(x * v.x, y * v.y);
+    vec2G<T> operator*(vec2G<T> v) const {
+        return { x * v.x, y * v.y };
     }
-    Vec2G<T> operator/(Vec2G<T> v) const {
-        return Vec2G<T>(x / v.x, y / v.y);
+    vec2G<T> operator/(vec2G<T> v) const {
+        return { x / v.x, y / v.y };
     }
-    Vec2G<T> operator*(T s) const {
-        return Vec2G<T>(x * s, y * s);
+    vec2G<T> operator*(T s) const {
+        return { x * s, y * s };
     }
-    Vec2G<T> operator/(T s) const {
-        return Vec2G<T>(x / s, y / s);
+    vec2G<T> operator/(T s) const {
+        return { x / s, y / s };
     }
     
-    Vec2G<T> &operator+=(Vec2G<T> v) {
+    vec2G<T> &operator+=(vec2G<T> v) {
         return (*this = *this + v);
     }
-    Vec2G<T> &operator-=(Vec2G<T> v) {
+    vec2G<T> &operator-=(vec2G<T> v) {
         return (*this = *this - v);
     }
-    Vec2G<T> &operator*=(Vec2G<T> v) {
+    vec2G<T> &operator*=(vec2G<T> v) {
         return (*this = *this * v);
     }
-    Vec2G<T> &operator/=(Vec2G<T> v) {
+    vec2G<T> &operator/=(vec2G<T> v) {
         return (*this = *this / v);
     }
-    Vec2G<T> &operator*=(T s) {
+    vec2G<T> &operator*=(T s) {
         return (*this = *this * v);
     }
-    Vec2G<T> &operator/=(T s) {
+    vec2G<T> &operator/=(T s) {
         return (*this = *this / v);
     }
     
-    bool operator==(Vec2G<T> other) {
+    bool operator==(vec2G<T> other) {
         return this->x == other.x && this->y == other.y;
     }
-    bool operator!=(Vec2G<T> other) {
+    bool operator!=(vec2G<T> other) {
         return !(*this == other);
     }
 };
 
-using Vec2 = Vec2G<f32>;
+using vec2 = vec2G<f32>;
+inline vec2 Vec2(f32 s) {
+    return { s, s };
+}
+inline vec2 Vec2(f32 x, f32 y) {
+    return { x, y };
+}
 
 template <typename T>
-struct Vec3G {
+struct vec3G {
     union {
         struct {
             T x, y, z;
@@ -397,67 +397,69 @@ struct Vec3G {
         struct {
             T r, g, b;
         };
-        Vec2G<T> xy;
+        vec2G<T> xy;
         T e[3];
     };
     
-    Vec3G() : x(0), y(0), z(0) {}
-    explicit Vec3G(T x, T y, T z) : x(x), y(y), z(z) {}
-    explicit Vec3G(T s) : x(s), y(s), z(s) {}
-    explicit Vec3G(Vec2G<T> xy, T z = 0) : x(xy.x), y(xy.y), z(z) {}
-    template <typename S>
-        explicit Vec3G(Vec3G<S> xyz) : x((T)xyz.x), y((T)xyz.y), z((T)xyz.z) {}
-    
-    Vec3G<T> operator-() {
-        return Vec3G(-x, -y, -z);
+    vec3G<T> operator-() {
+        return { -x, -y, -z };
     } 
-    Vec3G<T> operator+() {
+    vec3G<T> operator+() {
         return *this;
     }
     
-    Vec3G<T> operator+(Vec3G<T> v) {
-        return Vec3G<T>(x + v.x, y + v.y, z + v.z);
+    vec3G<T> operator+(vec3G<T> v) {
+        return { x + v.x, y + v.y, z + v.z };
     }
-    Vec3G<T> operator-(Vec3G<T> v) {
-        return Vec3G<T>(x - v.x, y - v.y, z - v.z);
+    vec3G<T> operator-(vec3G<T> v) {
+        return { x - v.x, y - v.y, z - v.z };
     }
-    Vec3G<T> operator*(Vec3G<T> v) {
-        return Vec3G<T>(x * v.x, y * v.y, z * v.z);
+    vec3G<T> operator*(vec3G<T> v) {
+        return { x * v.x, y * v.y, z * v.z };
     }
-    Vec3G<T> operator/(Vec3G<T> v) {
-        return Vec3G<T>(x / v.x, y / v.y, z / v.z);
+    vec3G<T> operator/(vec3G<T> v) {
+        return { x / v.x, y / v.y, z / v.z };
     }
-    Vec3G<T> operator*(T s) {
-        return Vec3G<T>(x * s, y * s, z * s);
+    vec3G<T> operator*(T s) {
+        return { x * s, y * s, z * s };
     }
-    Vec3G<T> operator/(T s) {
-        return Vec3G<T>(x / s, y / s, z / s);
+    vec3G<T> operator/(T s) {
+        return { x / s, y / s, z / s };
     }
     
-    Vec3G<T> &operator+=(Vec3G<T> v) {
+    vec3G<T> &operator+=(vec3G<T> v) {
         return (*this = *this + v);
     }
-    Vec3G<T> &operator-=(Vec3G<T> v) {
+    vec3G<T> &operator-=(vec3G<T> v) {
         return (*this = *this - v);
     }
-    Vec3G<T> &operator*=(Vec3G<T> v) {
+    vec3G<T> &operator*=(vec3G<T> v) {
         return (*this = *this * v);
     }
-    Vec3G<T> &operator/=(Vec3G<T> v) {
+    vec3G<T> &operator/=(vec3G<T> v) {
         return (*this = *this / v);
     }
-    Vec3G<T> &operator*=(T s) {
+    vec3G<T> &operator*=(T s) {
         return (*this = *this * s);
     }
-    Vec3G<T> &operator/=(T s) {
+    vec3G<T> &operator/=(T s) {
         return (*this = *this / s);
     }
 };
 
-using Vec3 = Vec3G<f32>;
+using vec3 = vec3G<f32>;
+inline vec3 Vec3(f32 s) {
+    return { s, s, s };
+}
+inline vec3 Vec3(f32 x, f32 y, f32 z) {
+    return { x, y, z};
+}
+inline vec3 Vec3(vec2 xy, f32 z = 0.0f) {
+    return { xy.x, xy.y, z };
+}
 
 template <typename T>
-struct Vec4G {
+struct vec4G {
     union {
         struct {
             T x, y, z, w;
@@ -466,93 +468,99 @@ struct Vec4G {
             T r, g, b, a;
         };
         struct {
-            Vec3G<T> xyz;
+            vec3G<T> xyz;
         };
         T e[4];
     };
     
-    Vec4G() : x(0), y(0), z(0), w(0) {};
-    Vec4G(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
-    explicit Vec4G(T s) : x(s), y(s), z(s), w(s) {}
-    explicit Vec4G(Vec2G<T> xy, T z = 0, T w = 1) : x(xy.x), y(xy.y), z(z), w(w) {}
-    explicit Vec4G(Vec3G<T> xyz, T w = 1) : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
-    
-    Vec4G<T> operator-() {
-        return Vec4G(-x, -y, -z, -w);
+    vec4G<T> operator-() {
+        return vec4G(-x, -y, -z, -w);
     } 
-    Vec4G<T> operator+() {
+    vec4G<T> operator+() {
         return *this;
     }
     
     template <typename S>
-        Vec4G<T> operator+(Vec4G<S> v) {
-        return Vec4G<T>(x + v.x, y + v.y, z + v.z, w + v.w);
+        vec4G<T> operator+(vec4G<S> v) {
+        return {x + v.x, y + v.y, z + v.z, w + v.w};
     }
     template <typename S>
-        Vec4G<T> operator-(Vec4G<S> v) {
-        return Vec4G<T>(x - v.x, y - v.y, z - v.z, w - v.w);
+        vec4G<T> operator-(vec4G<S> v) {
+        return {x - v.x, y - v.y, z - v.z, w - v.w};
     }
     template <typename S>
-        Vec4G<T> operator*(Vec4G<S> v) {
-        return Vec4G<T>(x * v.x, y * v.y, z * v.z, w * v.w);
+        vec4G<T> operator*(vec4G<S> v) {
+        return {x * v.x, y * v.y, z * v.z, w * v.w};
     }
     template <typename S>
-        Vec4G<T> operator/(Vec4G<S> v) {
-        return Vec4G<T>(x / v.x, y / v.y, z / v.z, w / v.w);
+        vec4G<T> operator/(vec4G<S> v) {
+        return {x / v.x, y / v.y, z / v.z, w / v.w};
     }
-    Vec4G<T> operator*(T s) {
-        return Vec4G<T>(x * s, y * s, z * s, w * s);
+    vec4G<T> operator*(T s) {
+        return {x * s, y * s, z * s, w * s};
     }
-    Vec4G<T> operator/(T s) {
-        return Vec4G<T>(x / s, y / s, z / s, w / s);
+    vec4G<T> operator/(T s) {
+        return {x / s, y / s, z / s, w / s};
     }
     
     template <typename S>
-        Vec4G<T> &operator+=(Vec4G<S> v) {
+        vec4G<T> &operator+=(vec4G<S> v) {
         return (*this = *this + v);
     }
     template <typename S>
-        Vec4G<T> &operator-=(Vec4G<S> v) {
+        vec4G<T> &operator-=(vec4G<S> v) {
         return (*this = *this - v);
     }
     template <typename S>
-        Vec4G<T> &operator*=(Vec4G<S> v) {
+        vec4G<T> &operator*=(vec4G<S> v) {
         return (*this = *this * v);
     }
     template <typename S>
-        Vec4G<T> &operator/=(Vec4G<S> v) {
+        vec4G<T> &operator/=(vec4G<S> v) {
         return (*this = *this / v);
     }
-    Vec4G<T> &operator*=(T s) {
+    vec4G<T> &operator*=(T s) {
         return (*this = *this * v);
     }
-    Vec4G<T> &operator/=(T s) {
+    vec4G<T> &operator/=(T s) {
         return (*this = *this / v);
     }
 };
 
-using Vec4 = Vec4G<f32>;
+using vec4 = vec4G<f32>;
+inline vec4 Vec4(f32 s) {
+    return { s, s, s, s };
+}
+inline vec4 Vec4(f32 x, f32 y, f32 z, f32 w) {
+    return { x, y, z, w };
+}
+inline vec4 Vec4(vec3 xyz, f32 w = 1.0f) {
+    return { xyz.x, xyz.y, xyz.z, w };
+}
+inline vec4 Vec4(vec2 xy, f32 z = 0.0f, f32 w = 1.0f) {
+    return { xy.x, xy.y, z, w };
+}
 
 // Design decision for vectors was that functions related to them should not be members of structs
 // because there are integer vectors and there is no point in adding stuff like cross product into them
 
-inline f32 dot(Vec2 a, Vec2 b) {
+inline f32 dot(vec2 a, vec2 b) {
     f32 result = a.x * b.x + a.y * b.y;
     return result;
 }
 
-inline f32 dot(Vec3 a, Vec3 b) {
+inline f32 dot(vec3 a, vec3 b) {
     f32 result = a.x * b.x + a.y * b.y + a.z * b.z;
     return result;
 }
 
-inline f32 dot(Vec4 a, Vec4 b) {
+inline f32 dot(vec4 a, vec4 b) {
     f32 result = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
     return result;
 }
 
-inline Vec3 cross(Vec3 a, Vec3 b) {
-    Vec3 result;
+inline vec3 cross(vec3 a, vec3 b) {
+    vec3 result;
     result.x = a.y * b.z - a.z * b.y;
     result.y = a.z * b.x - a.x * b.z;
     result.z = a.x * b.y - a.y * b.x;
@@ -580,7 +588,7 @@ inline T normalize(T a) {
 struct Mat4x4 {
     union {
         f32  e[4][4];
-        Vec4 v[4];
+        vec4 v[4];
         f32  i[16];
         struct {
             f32 m00; f32 m01; f32 m02; f32 m03;
@@ -595,7 +603,7 @@ struct Mat4x4 {
     }
     
     Mat4x4()  {};
-    explicit Mat4x4(Vec4 v0, Vec4 v1, Vec4 v2, Vec4 v3) {
+    explicit Mat4x4(vec4 v0, vec4 v1, vec4 v2, vec4 v3) {
         v[0] = v0;
         v[1] = v1;
         v[2] = v2;
@@ -609,7 +617,7 @@ struct Mat4x4 {
         return result;
     }       
     
-    static Mat4x4 translate(Vec3 t) {
+    static Mat4x4 translate(vec3 t) {
         Mat4x4 result = Mat4x4::identity();
         result.e[3][0] = t.x;
         result.e[3][1] = t.y;
@@ -617,9 +625,8 @@ struct Mat4x4 {
         return result;
     }
     
-    static Mat4x4 scale(Vec3 s) {
-        Mat4x4 result = Mat4x4(
-                               Vec4(s.x,   0,   0,  0),
+    static Mat4x4 scale(vec3 s) {
+        Mat4x4 result = Mat4x4(Vec4(s.x,   0,   0,  0),
                                Vec4(0,   s.y,   0,  0),
                                Vec4(0,     0, s.z,  0),
                                Vec4(0,     0,   0,  1)
@@ -630,40 +637,34 @@ struct Mat4x4 {
     static Mat4x4 rotation_x(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
-        Mat4x4 r = Mat4x4(
-                          Vec4(1, 0, 0, 0),
+        Mat4x4 r = Mat4x4(Vec4(1, 0, 0, 0),
                           Vec4(0, c,-s, 0),
                           Vec4(0, s, c, 0),
-                          Vec4(0, 0, 0, 1)
-                          );
+                          Vec4(0, 0, 0, 1));
         return(r);
     }
     
     static Mat4x4 rotation_y(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
-        Mat4x4 r = Mat4x4(
-                          Vec4( c, 0, s, 0),
+        Mat4x4 r = Mat4x4(Vec4( c, 0, s, 0),
                           Vec4( 0, 1, 0, 0),
                           Vec4(-s, 0, c, 0),
-                          Vec4( 0, 0, 0, 1)
-                          );
+                          Vec4( 0, 0, 0, 1));
         return(r);
     }
     
     static Mat4x4 rotation_z(f32 angle) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
-        Mat4x4 r = Mat4x4(
-                          Vec4(c,-s, 0, 0),
+        Mat4x4 r = Mat4x4(Vec4(c,-s, 0, 0),
                           Vec4(s, c, 0, 0),
                           Vec4(0, 0, 1, 0),
-                          Vec4(0, 0, 0, 1)
-                          );
+                          Vec4(0, 0, 0, 1));
         return(r);
     }
     
-    static Mat4x4 rotation(f32 angle, Vec3 a) {
+    static Mat4x4 rotation(f32 angle, vec3 a) {
         const f32 c = Cos(angle);
         const f32 s = Sin(angle);
         a = normalize(a);
@@ -672,12 +673,10 @@ struct Mat4x4 {
         const f32 ty = (1.0f - c) * a.y;
         const f32 tz = (1.0f - c) * a.z;
         
-        Mat4x4 r = Mat4x4(
-                          Vec4(c + tx * a.x, 		     tx * a.y - s * a.z, tx * a.z - s * a.y, 0),
+        Mat4x4 r = Mat4x4(Vec4(c + tx * a.x, 		     tx * a.y - s * a.z, tx * a.z - s * a.y, 0),
                           Vec4(    ty * a.x - a.z * s, ty * a.y + c,       ty * a.z + s * a.x, 0),
                           Vec4(    tz * a.x + s * a.y, tz * a.y - s * a.x, tz * a.z + c,       0),
-                          Vec4(0, 0, 0, 1)
-                          );
+                          Vec4(0, 0, 0, 1));
         return(r);
     }
     
@@ -733,25 +732,25 @@ struct Mat4x4 {
         f32 coef22 = m.e[1][0] * m.e[3][1] - m.e[3][0] * m.e[1][1];
         f32 coef23 = m.e[1][0] * m.e[2][1] - m.e[2][0] * m.e[1][1];
         
-        Vec4 fac0 = Vec4(coef00, coef00, coef02, coef03);
-        Vec4 fac1 = Vec4(coef04, coef04, coef06, coef07);
-        Vec4 fac2 = Vec4(coef08, coef08, coef10, coef11);
-        Vec4 fac3 = Vec4(coef12, coef12, coef14, coef15);
-        Vec4 fac4 = Vec4(coef16, coef16, coef18, coef19);
-        Vec4 fac5 = Vec4(coef20, coef20, coef22, coef23);
+        vec4 fac0 = Vec4(coef00, coef00, coef02, coef03);
+        vec4 fac1 = Vec4(coef04, coef04, coef06, coef07);
+        vec4 fac2 = Vec4(coef08, coef08, coef10, coef11);
+        vec4 fac3 = Vec4(coef12, coef12, coef14, coef15);
+        vec4 fac4 = Vec4(coef16, coef16, coef18, coef19);
+        vec4 fac5 = Vec4(coef20, coef20, coef22, coef23);
         
-        Vec4 vec0 = Vec4(m.e[1][0], m.e[0][0], m.e[0][0], m.e[0][0]);
-        Vec4 vec1 = Vec4(m.e[1][1], m.e[0][1], m.e[0][1], m.e[0][1]);
-        Vec4 vec2 = Vec4(m.e[1][2], m.e[0][2], m.e[0][2], m.e[0][2]);
-        Vec4 vec3 = Vec4(m.e[1][3], m.e[0][3], m.e[0][3], m.e[0][3]);
+        vec4 vec0 = Vec4(m.e[1][0], m.e[0][0], m.e[0][0], m.e[0][0]);
+        vec4 vec1 = Vec4(m.e[1][1], m.e[0][1], m.e[0][1], m.e[0][1]);
+        vec4 vec2 = Vec4(m.e[1][2], m.e[0][2], m.e[0][2], m.e[0][2]);
+        vec4 vec3 = Vec4(m.e[1][3], m.e[0][3], m.e[0][3], m.e[0][3]);
         
-        Vec4 inv0 = (vec1 * fac0) - (vec2 * fac1) + (vec3 * fac2);
-        Vec4 inv1 = (vec0 * fac0) - (vec2 * fac3) + (vec3 * fac4);
-        Vec4 inv2 = (vec0 * fac1) - (vec1 * fac3) + (vec3 * fac5);
-        Vec4 inv3 = (vec0 * fac2) - (vec1 * fac4) + (vec2 * fac5);
+        vec4 inv0 = (vec1 * fac0) - (vec2 * fac1) + (vec3 * fac2);
+        vec4 inv1 = (vec0 * fac0) - (vec2 * fac3) + (vec3 * fac4);
+        vec4 inv2 = (vec0 * fac1) - (vec1 * fac3) + (vec3 * fac5);
+        vec4 inv3 = (vec0 * fac2) - (vec1 * fac4) + (vec2 * fac5);
         
-        const Vec4 sign_a = Vec4(1, -1,  1, -1);
-        const Vec4 sign_b = Vec4(-1,  1, -1,  1);
+        const vec4 sign_a = Vec4(1, -1,  1, -1);
+        const vec4 sign_b = Vec4(-1,  1, -1,  1);
         
         Mat4x4 inverse;
         for(u32 i = 0; 
@@ -763,9 +762,9 @@ struct Mat4x4 {
             inverse.e[3][i] = inv3.e[i] * sign_b.e[i];
         }
         
-        Vec4 row0 = Vec4(inverse.e[0][0], inverse.e[1][0], inverse.e[2][0], inverse.e[3][0]);
-        Vec4 m0   = Vec4(m.e[0][0],       m.e[0][1],       m.e[0][2],       m.e[0][3]      );
-        Vec4 dot0 = m0 * row0;
+        vec4 row0 = Vec4(inverse.e[0][0], inverse.e[1][0], inverse.e[2][0], inverse.e[3][0]);
+        vec4 m0   = Vec4(m.e[0][0],       m.e[0][1],       m.e[0][2],       m.e[0][3]      );
+        vec4 dot0 = m0 * row0;
         f32 dot1 = (dot0.x + dot0.y) + (dot0.z + dot0.w);
         
         f32 one_over_det = 1.0f / dot1;
@@ -776,10 +775,10 @@ struct Mat4x4 {
         return inverse;
     }
     
-    static Mat4x4 look_at(Vec3 from, Vec3 to) {
-        Vec3 z = normalize(to - from);
-        Vec3 x = normalize(cross(Vec3(0, 1, 0), z));
-        Vec3 y = cross(z, x);
+    static Mat4x4 look_at(vec3 from, vec3 to) {
+        vec3 z = normalize(to - from);
+        vec3 x = normalize(cross(Vec3(0, 1, 0), z));
+        vec3 y = cross(z, x);
         Mat4x4 result = identity();
         result.e[0][0] = x.x;
         result.e[1][0] = x.y;
@@ -809,8 +808,8 @@ struct Mat4x4 {
         return result;
     }
     
-    friend Vec4 operator*(Mat4x4 a, Vec4 v) {
-        Vec4 result;
+    friend vec4 operator*(Mat4x4 a, vec4 v) {
+        vec4 result;
         result.x = a.e[0][0] * v.x + a.e[1][0] * v.y + a.e[2][0] * v.z + a.e[3][0] * v.w;
         result.y = a.e[0][1] * v.x + a.e[1][1] * v.y + a.e[2][1] * v.z + a.e[3][1] * v.w;
         result.z = a.e[0][2] * v.x + a.e[1][2] * v.y + a.e[2][2] * v.z + a.e[3][2] * v.w;
@@ -822,15 +821,15 @@ struct Mat4x4 {
         return (*this = *this * b);
     }
     
-    Vec3 get_x() {
+    vec3 get_x() {
         return Vec3(e[0][0], e[1][0], e[2][0]);
     }
     
-    Vec3 get_y() {
+    vec3 get_y() {
         return Vec3(e[0][1], e[1][1], e[2][1]);
     }
     
-    Vec3 get_z() {
+    vec3 get_z() {
         return Vec3(e[0][2], e[1][2], e[2][2]);
     }
 };
@@ -838,7 +837,7 @@ struct Mat4x4 {
 struct Rect {
     union {
         struct {
-            Vec2 p, s;
+            vec2 p, s;
         };
         struct {
             f32 x, y, w, h;  
@@ -848,9 +847,9 @@ struct Rect {
     Rect() {}
     explicit Rect(f32 x, f32 y, f32 w, f32 h)
         : x(x), y(y), w(w), h(h) {}
-    explicit Rect(Vec2 p, Vec2 size)
+    explicit Rect(vec2 p, vec2 size)
         : p(p), s(size) {}
-    static Rect minmax(Vec2 min, Vec2 max) {
+    static Rect minmax(vec2 min, vec2 max) {
         return Rect(min, max - min);
     }
     static Rect empty() {
@@ -864,11 +863,11 @@ struct Rect {
         return y + h;
     }
     
-    Vec2 size() const {
+    vec2 size() const {
         return Vec2(w, h);
     }
     
-    Vec2 middle() const {
+    vec2 middle() const {
         return p + s * 0.5f;
     }
     
@@ -880,16 +879,16 @@ struct Rect {
         return y + h * 0.5f;
     }
     
-    Vec2 top_left() const {
+    vec2 top_left() const {
         return p;
     }
-    Vec2 bottom_left() const {
+    vec2 bottom_left() const {
         return p + Vec2(0, h);
     }
-    Vec2 top_right() const {
+    vec2 top_right() const {
         return p + Vec2(w, 0);
     }
-    Vec2 bottom_right() const {
+    vec2 bottom_right() const {
         return p + s;
     }
     
@@ -904,13 +903,13 @@ struct Rect {
         }
     }
     
-    void store_points(Vec2 *pts) {
+    void store_points(vec2 *pts) {
         pts[0] = top_left();
         pts[1] = bottom_left();
         pts[2] = top_right();
         pts[3] = bottom_right();
     }
-    void store_points(Vec3 *pts) {
+    void store_points(vec3 *pts) {
         pts[0].xy = top_left();
         pts[1].xy = bottom_left();
         pts[2].xy = top_right();
@@ -921,11 +920,11 @@ struct Rect {
         pts[3].z = 0;
     }
     
-    static Rect move(Rect r, Vec2 d) {
+    static Rect move(Rect r, vec2 d) {
         return Rect::minmax(r.top_left() + d, r.bottom_right() + d);
     }
     
-    bool collide(Vec2 other) {
+    bool collide(vec2 other) {
         return x < other.x && y < other.y && other.x < x + w && other.y < y + h;
     }
     
@@ -945,35 +944,35 @@ struct Rect {
     }
     
     Rect clip(Rect child) {
-        Vec2 rmin = Vec2(Max(x, child.x), Max(y, child.y));
-        Vec2 rmax = Vec2(Min(x + w, child.x + child.w), Min(y + h, child.y + child.h));
+        vec2 rmin = Vec2(Max(x, child.x), Max(y, child.y));
+        vec2 rmax = Vec2(Min(x + w, child.x + child.w), Min(y + h, child.y + child.h));
         return Rect::minmax(rmin, rmax);
     }
     
     Rect join(Rect other) {
-        Vec2 rmin = Vec2(Min(x, other.x), Min(y, other.y));
-        Vec2 rmax = Vec2(Max(x + w, other.x + other.w), Max(y + h, other.y + other.h));
+        vec2 rmin = Vec2(Min(x, other.x), Min(y, other.y));
+        vec2 rmax = Vec2(Max(x + w, other.x + other.w), Max(y + h, other.y + other.h));
         return Rect::minmax(rmin, rmax);
     }
 };
 
 struct Bounds {
-    Vec3 min, max;
+    vec3 min, max;
     
     explicit Bounds()
         : min(Vec3(F32_INFINITY)), max(Vec3(-F32_INFINITY)) {}
-    explicit Bounds(Vec3 min, Vec3 max) 
+    explicit Bounds(vec3 min, vec3 max) 
         : min(min), max(max) {}
-    explicit Bounds(Vec3 a)
+    explicit Bounds(vec3 a)
         : min(a), max(a) {}
     
     f32 surface_area() {
-        Vec3 d = max - min;
+        vec3 d = max - min;
         return 2 * (d.x * d.y + d.y * d.z + d.z * d.z);
     }
     
     u32 longest_axis() {
-        Vec3 d = max - min;
+        vec3 d = max - min;
         return (d.x > d.y && d.x > d.z) ? 0 : (d.y > d.x && d.y > d.z) ? 1 : 2;
     }
     
@@ -988,7 +987,7 @@ struct Bounds {
         return result;   
     }
     
-    static Bounds extend(Bounds a, Vec3 p) {
+    static Bounds extend(Bounds a, vec3 p) {
         Bounds result;
         result.min.x = Min(a.min.x, p.x);
         result.min.y = Min(a.min.y, p.y);
@@ -1005,7 +1004,7 @@ struct Quat4 {
         struct {
             f32 x, y, z, w;
         };
-        Vec4 v;
+        vec4 v;
         f32 e[4];
     };
     
@@ -1110,9 +1109,9 @@ inline Quat4 lerp(Quat4 a, Quat4 b, f32 t) {
     return result;
 }
 
-inline Vec3 triangle_normal(Vec3 a, Vec3 b, Vec3 c) {
-    Vec3 ab = b - a;
-    Vec3 ac = c - a;
+inline vec3 triangle_normal(vec3 a, vec3 b, vec3 c) {
+    vec3 ab = b - a;
+    vec3 ac = c - a;
     return cross(ab, ac);
 }
 
@@ -1123,11 +1122,11 @@ inline Vec3 triangle_normal(Vec3 a, Vec3 b, Vec3 c) {
 #define BLUE Vec4(0.0f, 0.0f, 1.0f, 1.0f)
 #define PINK Vec4(1.0f, 0.0f, 1.0f, 1.0f)
 
-inline Vec3 xz(Vec2 xz, f32 y = 0.0f) {
+inline vec3 xz(vec2 xz, f32 y = 0.0f) {
     return Vec3(xz.x, y, xz.y);
 }
 
-inline Vec2 floor(Vec2 v) {
+inline vec2 Floor(vec2 v) {
     return Vec2(Floor(v.x), Floor(v.y));
 }
 
@@ -1183,7 +1182,7 @@ inline u32 utf8_decode(const u8 *src, const u8 **new_dst) {
     return utf32;
 }
 
-inline Vec4 rgba_unpack_linear1(u32 rgba) {
+inline vec4 rgba_unpack_linear1(u32 rgba) {
     f32 r = (f32)((rgba & 0x000000FF) >> 0 ) * (1.0f / 255.0f);
     f32 g = (f32)((rgba & 0x0000FF00) >> 8 ) * (1.0f / 255.0f);
     f32 b = (f32)((rgba & 0x00FF0000) >> 16) * (1.0f / 255.0f);
@@ -1197,7 +1196,7 @@ inline u32 rgba_pack_linear256(u32 r, u32 g, u32 b, u32 a) {
     return r << 0 | g << 8 | b << 16 | a << 24;
 }
 
-inline u32 rgba_pack_4x8_linear1(Vec4 c) {
+inline u32 rgba_pack_4x8_linear1(vec4 c) {
     u32 ru = (u32)Round_i32(Clamp(c.r, 0, 0.999f) * 255.0f);
     u32 gu = (u32)Round_i32(Clamp(c.g, 0, 0.999f) * 255.0f);
     u32 bu = (u32)Round_i32(Clamp(c.b, 0, 0.999f) * 255.0f);
@@ -1205,7 +1204,7 @@ inline u32 rgba_pack_4x8_linear1(Vec4 c) {
     return rgba_pack_linear256(ru, gu, bu, au);
 }
 
-bool ray_intersect_plane(Vec3 plane_normal, f32 plane_d, Vec3 o, Vec3 d, f32 *t_out) {
+bool ray_intersect_plane(vec3 plane_normal, f32 plane_d, vec3 o, vec3 d, f32 *t_out) {
     f32 denom = dot(plane_normal, d);
     if (Abs(denom) > 0.001f) {
         f32 t = (-plane_d - dot(plane_normal, o)) / denom;
@@ -1404,11 +1403,11 @@ i64 interlocked_compare_exchange(volatile i64 *dest, i64 exchange, i64 comparand
 #include "simd_math.hh"
 
 
-void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
-    Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
-    Vec3 bottom_left = top_left - up * height;
-    Vec3 top_right = top_left + right * width;
-    Vec3 bottom_right = top_right - up * height;
+void get_billboard_positions(vec3 mid_bottom, vec3 right, vec3 up, f32 width, f32 height, vec3 out[4]) {
+    vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
+    vec3 bottom_left = top_left - up * height;
+    vec3 top_right = top_left + right * width;
+    vec3 bottom_right = top_right - up * height;
     out[0] = top_left;
     out[1] = bottom_left;
     out[2] = top_right;

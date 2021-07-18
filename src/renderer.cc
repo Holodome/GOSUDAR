@@ -153,7 +153,7 @@ static GLuint create_shader(const char *source) {
     return id;
 }
 
-static RendererFramebuffer create_framebuffer(Renderer *renderer, Vec2 size, bool has_depth, bool filtered) {
+static RendererFramebuffer create_framebuffer(Renderer *renderer, vec2 size, bool has_depth, bool filtered) {
     RendererFramebuffer result = {};
     result.has_depth = has_depth;
     result.size = size;

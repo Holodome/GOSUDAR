@@ -20,14 +20,14 @@ void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group,
         emitter->particle_cursor = INC_MODULO(emitter->particle_cursor, ARRAY_SIZE(emitter->particles));
         Particle_4x *dest = emitter->particles + cursor;
         dest->p = Vec3_4x(emitter->spec.p);
-        dest->e = f32_4x(4.0f);
+        dest->e = F32_4x(4.0f);
     }
     
-    Vec3 cam_x = render_group->setup.mvp.get_x();
-    Vec3 cam_y = render_group->setup.mvp.get_y();
-    f32_4x lower_e = f32_4x(0);
-    f32_4x de = f32_4x(dt);
-    Vec3_4x dp = Vec3_4x(Vec3(0, 1.0, 0) * dt);
+    vec3 cam_x = render_group->setup.mvp.get_x();
+    vec3 cam_y = render_group->setup.mvp.get_y();
+    f32_4x lower_e = F32_4x(0);
+    f32_4x de = F32_4x(dt);
+    vec3_4x dp = Vec3_4x(Vec3(0, 1.0, 0) * dt);
     u32 DEBUG_number_drawed = 0;
     for (size_t particle4_idx = 0; particle4_idx < ARRAY_SIZE(emitter->particles); ++particle4_idx) {
         Particle_4x *particle = emitter->particles + particle4_idx;
@@ -36,11 +36,11 @@ void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group,
             particle->p += dp;
             
             for (u32 local_idx = 0; local_idx < 4; ++local_idx) {
-                Vec3 p = get_component(particle->p, local_idx);
+                vec3 p = get_component(particle->p, local_idx);
                 f32 e = particle->e.e[local_idx];
                 
                 if (e > 0.0) {
-                    Vec3 billboard[4];
+                    vec3 billboard[4];
                     get_billboard_positions(p, cam_x, cam_y, 0.05, 0.05, billboard);
                     push_quad(render_group, billboard[0], billboard[1], billboard[2], billboard[3], RED);
                     ++DEBUG_number_drawed;

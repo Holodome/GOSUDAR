@@ -250,7 +250,7 @@ static void check_for_sse() {
     }
 }
 
-OS *os_init(Vec2 *display_size) {
+OS *os_init(vec2 *display_size) {
     OS *os = bootstrap_alloc_struct(OS, arena);
     
     check_for_sse();
@@ -605,14 +605,14 @@ Platform *os_begin_frame(OS *os) {
     POINT mp;
     GetCursorPos(&mp);
     ScreenToClient(os->hwnd, &mp);
-    Vec2 mouse = Vec2((f32)mp.x, (f32)mp.y);
+    vec2 mouse = Vec2((f32)mp.x, (f32)mp.y);
     
     input->mdelta = mouse - input->mpos;
     input->mpos = mouse;
     
     RECT wr;
     GetClientRect(os->hwnd, &wr);
-    Vec2 display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
+    vec2 display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
     input->window_size_changed = display_size != input->display_size;
     input->display_size = display_size;
     

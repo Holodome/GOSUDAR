@@ -22,7 +22,7 @@ struct FileHandle {
 struct OS;
 
 // @CLEANUP do we really have to do this ugly display_size passing?
-OS *os_init(Vec2 *display_size);
+OS *os_init(vec2 *display_size);
 
 void init_renderer_backend(OS *os);
 Platform *os_begin_frame(OS *os);

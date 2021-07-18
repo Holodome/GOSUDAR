@@ -38,8 +38,8 @@ struct DevUILayout {
     bool is_focused;
     
     f32 horizontal_offset;
-    Vec2 p;
-    Vec2 last_line_p;
+    vec2 p;
+    vec2 last_line_p;
 };  
 
 DevUILayout dev_ui_begin(DevUI *dev_ui, struct InputManager *input, struct Assets *assets, RendererCommands *commands);

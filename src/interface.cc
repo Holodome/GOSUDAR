@@ -11,14 +11,14 @@ UIElement *new_ui_element(MemoryArena *arena, UIElement **ll_elements, UIElement
     return element;    
 }
 
-UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color) {
+UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color) {
     UIElement *element = new_ui_element(arena, ll_elements, UI_ELEMENT_BLOCK);
     element->rect = rect;
     element->block.color = color;    
     return element;
 }
 
-UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color, const char *text) {
+UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color, const char *text) {
     UIElement *element = new_ui_element(arena, ll_elements, UI_ELEMENT_LABEL);
     element->rect = rect;
     element->label.color = color;
@@ -27,7 +27,7 @@ UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rec
 }
 
 UIElement *create_ui_button(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    Vec4 color_inactive, Vec4 color_active, const char *text) {
+    vec4 color_inactive, vec4 color_active, const char *text) {
     UIElement *element = new_ui_element(arena, ll_elements, UI_ELEMENT_BUTTON);
     element->rect = rect;
     element->button.color_inactive = color_inactive;
@@ -37,14 +37,14 @@ UIElement *create_ui_button(MemoryArena *arena, UIElement **ll_elements, Rect re
 }
 
 UIElement *create_ui_button_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-     Vec4 color_inactive, Vec4 color_active, const char *text, Vec4 background) {
+     vec4 color_inactive, vec4 color_active, const char *text, vec4 background) {
     UIElement *result = create_ui_button(arena, ll_elements, rect, color_inactive, color_active, text);
     create_ui_block(arena, ll_elements, rect, background);
     return result;    
 }
 
 UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value) {
+    vec4 color_inactive, vec4 color_active, const char *text, bool *value) {
     UIElement *element = new_ui_element(arena, ll_elements, UI_ELEMENT_CHECKBOX);
     element->rect = rect;
     element->checkbox.color_inactive = color_inactive;
@@ -55,7 +55,7 @@ UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect 
 }
 
 UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value, Vec4 background) {
+    vec4 color_inactive, vec4 color_active, const char *text, bool *value, vec4 background) {
     UIElement *result = create_ui_checkbox(arena, ll_elements, rect, color_inactive, color_active, text, value);
     create_ui_block(arena, ll_elements, rect, background);
     return result;
@@ -107,10 +107,10 @@ void update_and_render_interface(UIElement *first_element, InputManager *input, 
                 }
                 
                 AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                Vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
                     element->button.text);
-                Vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
-                Vec4 color = element->button.is_held ? element->button.color_active : element->button.color_inactive;
+                vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
+                vec4 color = element->button.is_held ? element->button.color_active : element->button.color_inactive;
                 DEBUG_push_text(&ui_render_group, position, color, element->button.text, font_id, 1.0f);
             } break;
             case UI_ELEMENT_CHECKBOX: {
@@ -127,17 +127,17 @@ void update_and_render_interface(UIElement *first_element, InputManager *input, 
                 }
                 
                 AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                Vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
                     element->button.text);
-                Vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
-                Vec4 color = *element->checkbox.value ? element->checkbox.color_active : element->checkbox.color_inactive;
+                vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
+                vec4 color = *element->checkbox.value ? element->checkbox.color_active : element->checkbox.color_inactive;
                 DEBUG_push_text(&ui_render_group, position, color, element->checkbox.text, font_id, 1.0f);
             } break;
             case UI_ELEMENT_LABEL: {
                 AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                Vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
                     element->label.text);
-                Vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
+                vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
                 DEBUG_push_text(&ui_render_group, position, element->label.color, element->label.text, font_id, 1.0f);
             } break;
         }

@@ -1,7 +1,7 @@
 #include "mips.hh"
 
 static void downsample2x(u32 src_width, u32 src_height, u32 *src_px,
-    u32 dest_width, u32 dest_height, u32 *dest_px) {
+                         u32 dest_width, u32 dest_height, u32 *dest_px) {
     size_t DEBUG_n_written = 0;
     for (size_t y = 0; y < dest_height; ++y) {
         u32 *src_px0 = src_px;
@@ -11,22 +11,22 @@ static void downsample2x(u32 src_width, u32 src_height, u32 *src_px,
         }
         
         for (size_t x = 0; x < dest_width; ++x) {
-            Vec4 p00 = rgba_unpack_linear1(*src_px0++);
-            Vec4 p01 = rgba_unpack_linear1(*src_px1++);
-            Vec4 p10 = p00;
-            Vec4 p11 = p01;
+            vec4 p00 = rgba_unpack_linear1(*src_px0++);
+            vec4 p01 = rgba_unpack_linear1(*src_px1++);
+            vec4 p10 = p00;
+            vec4 p11 = p01;
             if (x + 1 < src_width) {
                 p10 = rgba_unpack_linear1(*src_px0++);
                 p11 = rgba_unpack_linear1(*src_px1++);
             }
 #if 0
             // Straigt averags
-            Vec4 c = (p00 + p10 + p01 + p11) * 0.25f;
+            vec4 c = (p00 + p10 + p01 + p11) * 0.25f;
 #else 
             // Weighted based on alpha average
             f32 alpha_sum = p00.a + p01.a + p10.a + p11.a;
-            Vec4 c = Vec4((p00.xyz * p00.a + p01.xyz * p01.a + p10.xyz * p10.a + p11.xyz * p11.a) / alpha_sum,
-                alpha_sum * 0.25f);
+            vec4 c = Vec4((p00.xyz * p00.a + p01.xyz * p01.a + p10.xyz * p10.a + p11.xyz * p11.a) / alpha_sum,
+                          alpha_sum * 0.25f);
 #endif 
             *dest_px++ = rgba_pack_4x8_linear1(c);
             ++DEBUG_n_written;

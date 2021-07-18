@@ -104,7 +104,7 @@ void assets_purge_textures(Assets *assets);
 // Currently it is used in the dev ui, but more sophisticated ui system probably will
 // not render use this, as it may want to do dynamic wrapping or something
 // And furthermore, this function is not related to assets sytem in any way
-Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text);
+vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text);
 
 #define ASSETS_HH 1
 #endif

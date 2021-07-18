@@ -63,23 +63,23 @@ struct UIElement {
             UIElement *first_child;
         } container;
         struct {
-            Vec4 color;
+            vec4 color;
         } block;
         struct {
-            Vec4 color_inactive;
-            Vec4 color_active;
+            vec4 color_inactive;
+            vec4 color_active;
             const char *text;
             
             bool is_held;
             bool is_pressed;
         } button;
         struct {
-            Vec4 color;
+            vec4 color;
             const char *text;
         } label;
         struct {
-            Vec4 color_active;
-            Vec4 color_inactive;
+            vec4 color_active;
+            vec4 color_inactive;
             const char *text;
             
             bool is_held;
@@ -91,16 +91,16 @@ struct UIElement {
 };
 
 UIElement *new_ui_element(MemoryArena *arena, UIElement **ll_elements, UIElementKind kind);
-UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color);
-UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, Vec4 color, const char *text);
+UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color);
+UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color, const char *text);
 UIElement *create_ui_button(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-     Vec4 color_inactive, Vec4 color_active, const char *text);
+     vec4 color_inactive, vec4 color_active, const char *text);
 UIElement *create_ui_button_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-     Vec4 color_inactive, Vec4 color_active, const char *text, Vec4 background);
+     vec4 color_inactive, vec4 color_active, const char *text, vec4 background);
 UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value);
+    vec4 color_inactive, vec4 color_active, const char *text, bool *value);
 UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    Vec4 color_inactive, Vec4 color_active, const char *text, bool *value, Vec4 background);
+    vec4 color_inactive, vec4 color_active, const char *text, bool *value, vec4 background);
 UIListener *get_listener(UIElement *element);
 void interface_recalculate_rects(UIElement *first_element, InputManager *input);
 void update_and_render_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);

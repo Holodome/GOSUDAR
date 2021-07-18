@@ -26,9 +26,9 @@ DEBUG_VALUE_TYPE(i8)            \
 DEBUG_VALUE_TYPE(i16)           \
 DEBUG_VALUE_TYPE(i32)           \
 DEBUG_VALUE_TYPE(i64)           \
-DEBUG_VALUE_TYPE(Vec2)          \
-DEBUG_VALUE_TYPE(Vec3)          \
-DEBUG_VALUE_TYPE(Vec4)          \
+DEBUG_VALUE_TYPE(vec2)          \
+DEBUG_VALUE_TYPE(vec3)          \
+DEBUG_VALUE_TYPE(vec4)          \
 DEBUG_VALUE_TYPE(bool)          \
 DEBUG_VALUE_TYPE(f32)           \
 DEBUG_VALUE_TYPE(f64)           \

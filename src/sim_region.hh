@@ -120,9 +120,9 @@ struct Anchor {
     u32 radius;
 };
 
-void p_to_chunk_coord(Vec2 p, i32 *chunk_x, i32 *chunk_y, Vec2 *chunk_p_dst = 0);
-Vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, Vec2 chunk_p);
-void get_global_space_p(SimRegion *sim, Vec2 p, i32 *chunk_x_dst, i32 *chunx_y_dst, Vec2 *chunk_p_dst);
+void p_to_chunk_coord(vec2 p, i32 *chunk_x, i32 *chunk_y, vec2 *chunk_p_dst = 0);
+vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, vec2 chunk_p);
+void get_global_space_p(SimRegion *sim, vec2 p, i32 *chunk_x_dst, i32 *chunx_y_dst, vec2 *chunk_p_dst);
 void get_chunk_coord_from_cell_coord(i32 cell_x, i32 cell_y, i32 *chunk_x_dst, i32 *chunk_y_dst);
 u32 get_chunk_count_for_radius(u32 radius);
 // This is related to how we store chunks in sim region
@@ -139,12 +139,12 @@ void add_entity_to_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id);
 SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id);
 Entity *get_entity_by_id(SimRegion *sim, EntityID id);
 // Allocates storage for new entity and puts it into chunk inside sim
-Entity *create_new_entity(SimRegion *sim, Vec2 p, Entity *src = 0);
+Entity *create_new_entity(SimRegion *sim, vec2 p, Entity *src = 0);
 // Sets entity position to p and moves it into new chunk
 // This is somewhat slow to modify position in that way, 
 // but it is more expensive not to use chunks either way
 // So position modifications during frame should be of minimal count
-void change_entity_position(SimRegion *sim, Entity *entity, Vec2 p);
+void change_entity_position(SimRegion *sim, Entity *entity, vec2 p);
 // All cell coordinates are sim space, basically floored position
 // @TODO this is very slow function - we can cache its results or 
 // create some structure to accelerate checking
@@ -177,7 +177,7 @@ struct SimChunkIterator {
 // Internally it does rect-based iteration, calculating points that define outer rect
 // of given circle
 // This will return some unwanted chunks if radius gets big
-SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, f32 radius);
+SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, vec2 p, f32 radius);
 SimChunkIterator iterate_sim_chunks(SimRegion *sim, i32 min_chunk_x, i32 min_chunk_y, i32 max_chunk_x, i32 max_chunk_y);
 
 // @TODO we way want to add chunk-based circle iteration,
@@ -209,13 +209,13 @@ enum {
 struct EntityIteratorSettings {
     u8 flags;
     
-    Vec2 origin;
+    vec2 origin;
     f32 radius;
     u32 flag_mask;
     i32 kind;
 };  
 
-EntityIteratorSettings iter_radius(Vec2 origin, f32 radius);
+EntityIteratorSettings iter_radius(vec2 origin, f32 radius);
 
 struct EntityIterator {
     SimRegion *sim;

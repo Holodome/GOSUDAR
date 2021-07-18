@@ -124,12 +124,12 @@ AssetSound *assets_get_sound(Assets *assets, AssetID id) {
     return result;
 }
 
-Vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
+vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
     AssetInfo *info = assets_get_info(assets, id);
     AssetFont *font = assets_get_font(assets, id);
     assert(info->kind == ASSET_KIND_FONT);
     size_t count = strlen(text);
-    Vec2 result = {};
+    vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         u8 codepoint = text[i];
         if (codepoint >= info->first_codepoint) {

@@ -63,11 +63,11 @@ enum {
 struct ParticleEmitterSpec {
     u32 kind;
     f32 spawn_rate;
-    Vec3 p;
+    vec3 p;
 };
 
 struct Particle_4x {
-    Vec3_4x p;
+    vec3_4x p;
     f32_4x e;
 };
 
@@ -92,7 +92,7 @@ struct ParticleSystem {
 };
 
 void init_particle_system(ParticleSystem *sys, MemoryArena *arena);
-// ParticleEmitterID add_particle_emitter(ParticleSystem *sys, u32 kind, Vec4 color);
+// ParticleEmitterID add_particle_emitter(ParticleSystem *sys, u32 kind, vec4 color);
 // void delete_particle_emitter(ParticleSystem *sys, ParticleEmitterID id);
 void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group, f32 dt);
 

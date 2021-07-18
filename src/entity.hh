@@ -51,7 +51,7 @@ struct Interaction {
 
 struct Entity {
     EntityID id;
-    Vec2 p;
+    vec2 p;
     u32 flags;
     u32 kind;
     u32 world_object_kind;

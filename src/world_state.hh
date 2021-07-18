@@ -42,8 +42,8 @@ struct WorldState {
     Mat4x4 view;
     Mat4x4 projection;
     Mat4x4 mvp;
-    Vec3 cam_p;
-    Vec2 mouse_projection;
+    vec3 cam_p;
+    vec2 mouse_projection;
     
     bool draw_frames;
     OrderSystem order_system;

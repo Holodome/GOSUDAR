@@ -6,14 +6,14 @@ inline WorldObjectSpec get_spec_for_type(WorldState *world_state, u32 type) {
     return world_state->world_object_specs[type];
 }
 
-static EntityID add_player(SimRegion *sim, Vec2 pos) {
+static EntityID add_player(SimRegion *sim, vec2 pos) {
     Entity *entity = create_new_entity(sim, pos);
     entity->kind = ENTITY_KIND_PLAYER;
     entity->flags = ENTITY_FLAG_IS_ANCHOR;
     return entity->id;
 }
 
-static EntityID add_tree(SimRegion *sim, Vec2 pos, u32 kind) {
+static EntityID add_tree(SimRegion *sim, vec2 pos, u32 kind) {
     pos.x = Floor(pos.x) + 0.5f;
     pos.y = Floor(pos.y) + 0.5f;
     Entity *entity = create_new_entity(sim, pos);
@@ -24,7 +24,7 @@ static EntityID add_tree(SimRegion *sim, Vec2 pos, u32 kind) {
     return entity->id;
 }
 
-static EntityID add_pawn(SimRegion *sim, Vec2 pos) {
+static EntityID add_pawn(SimRegion *sim, vec2 pos) {
     Entity *entity = create_new_entity(sim, pos);
     entity->kind = ENTITY_KIND_PAWN;
     return entity->id;
@@ -67,7 +67,7 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     Entropy gen_entropy { 123456789 };
     SimRegion *creation_sim = alloc_struct(frame_arena, SimRegion);
     begin_sim(creation_sim, frame_arena, world_state->world, 100, 100, 25);
-    Vec2 player_pos = Vec2(0);
+    vec2 player_pos = Vec2(0);
     world_state->camera_followed_entity = add_player(creation_sim, player_pos);    
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(5, 5));
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(-5, 5));
@@ -90,15 +90,15 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     end_sim(creation_sim, world_state);
 }
 
-static Vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, Vec2 uv) {
+static vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, vec2 uv) {
     f32 x = uv.x;
     f32 y = uv.y;
-    Vec3 ray_dc = Vec3(x, y, 1.0f);
-    Vec4 ray_clip = Vec4(ray_dc.xy, -1.0f, 1.0f);
-    Vec4 ray_eye = Mat4x4::inverse(projection) * ray_clip;
+    vec3 ray_dc = Vec3(x, y, 1.0f);
+    vec4 ray_clip = Vec4(ray_dc.xy, -1.0f, 1.0f);
+    vec4 ray_eye = Mat4x4::inverse(projection) * ray_clip;
     ray_eye.z = -1.0f;
     ray_eye.w = 0.0f;
-    Vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
+    vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
     return ray_world;
 }
 
@@ -106,7 +106,7 @@ static void init_particles_for_interaction(WorldState *world_state, SimRegion *s
     if (interaction->kind == INTERACTION_KIND_MINE_RESOURCE) {
         Entity *interactable = get_entity_by_id(sim, interaction->entity);
         assert(interactable);
-        // interaction->particle_emitter = add_particle_emitter(&world_state->particle_system, PARTICLE_EMITTER_KIND_FOUNTAIN, Vec4(1, 0, 0, 1));
+        // interaction->particle_emitter = add_particle_emitter(&world_state->particle_system, PARTICLE_EMITTER_KIND_FOUNTAIN, vec4(1, 0, 0, 1));
     } else {
         NOT_IMPLEMENTED;
     }
@@ -204,7 +204,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     Entity *camera_controlled_entity = get_entity_by_id(sim, world_state->camera_followed_entity);
     assert(camera_controlled_entity);
     // Calculate player movement
-    Vec2 player_delta = Vec2(0);
+    vec2 player_delta = Vec2(0);
     f32 move_coef = 16.0f * input->platform->frame_dt;
     f32 z_speed = 0;
     if (is_key_held(input, KEY_W)) {
@@ -223,7 +223,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     }
     player_delta.x += x_speed * Cos(world_state->cam.yaw);
     player_delta.y += x_speed * Sin(world_state->cam.yaw);     
-    Vec2 new_p = camera_controlled_entity->p + player_delta;
+    vec2 new_p = camera_controlled_entity->p + player_delta;
     change_entity_position(sim, camera_controlled_entity, new_p);
     {DEBUG_VALUE_BLOCK("Player")
             DEBUG_VALUE(camera_controlled_entity->p, "Position");
@@ -231,12 +231,12 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         DEBUG_VALUE(sim->center_chunk_y, "Center chunk y");
     }
     
-    Vec3 center_pos = xz(camera_controlled_entity->p);
+    vec3 center_pos = xz(camera_controlled_entity->p);
     f32 horiz_distance = world_state->cam.distance_from_player * Cos(world_state->cam.pitch);
     f32 vert_distance = world_state->cam.distance_from_player * Sin(world_state->cam.pitch);
     f32 offsetx = horiz_distance * Sin(-world_state->cam.yaw);
     f32 offsetz = horiz_distance * Cos(-world_state->cam.yaw);
-    Vec3 cam_p;
+    vec3 cam_p;
     cam_p.x = offsetx + center_pos.x;
     cam_p.z = offsetz + center_pos.z;
     cam_p.y = vert_distance;
@@ -251,13 +251,13 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         * Mat4x4::translate(-cam_p);
     world_state->mvp = world_state->projection * world_state->view;
     
-    Vec2 mouse_uv = Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
+    vec2 mouse_uv = Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
                          1.0f - (2.0f * input->platform->mpos.y) / input->platform->display_size.y);
-    Vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, mouse_uv);
+    vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, mouse_uv);
     f32 t = 0;
     ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
-    Vec3 mouse_point_xyz = cam_p + ray_dir * t;
-    Vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+    vec3 mouse_point_xyz = cam_p + ray_dir * t;
+    vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
     DEBUG_VALUE(mouse_point, "Mouse point");
     DEBUG_VALUE(world_state->cam_p, "Cam p");
     world_state->mouse_projection = mouse_point;
@@ -289,7 +289,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         }
     }
     
-    Vec2 player_pos = camera_controlled_entity->p;
+    vec2 player_pos = camera_controlled_entity->p;
     for (u32 pawn_idx = 0; 
          pawn_idx < world_state->pawn_count;
          ++pawn_idx) {
@@ -312,10 +312,10 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
                     assert(to_chop); 
                     // @TODO what do we do if entity is outside of sim region - 
                     // set new state for order like out of bounds and request new one
-                    Vec2 delta = to_chop->p - entity->p;
+                    vec2 delta = to_chop->p - entity->p;
                     if (length_sq(delta) > DISTANCE_TO_INTERACT_SQ) {
-                        Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
-                        Vec2 new_pawn_p = entity->p + delta_p;
+                        vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                        vec2 new_pawn_p = entity->p + delta_p;
                         change_entity_position(sim, entity, new_pawn_p);
                     } else {
                         update_interaction(world_state, sim, entity, input);
@@ -325,10 +325,10 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
                     }
                 }
             } else { 
-                Vec2 delta = player_pos - entity->p;
+                vec2 delta = player_pos - entity->p;
                 if (length_sq(delta) > PAWN_DISTANCE_TO_PLAYER_SQ) {
-                    Vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
-                    Vec2 new_pawn_p = entity->p + delta_p;
+                    vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                    vec2 new_pawn_p = entity->p + delta_p;
                     change_entity_position(sim, entity, new_pawn_p);
                 }
             }
@@ -349,13 +349,13 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     for (u32 i = 0; i < chunk_count; ++i) {
         SimRegionChunk *chunk = sim->chunks + i;
 #define WORLD_EPSILON 0.01f
-        Vec3 p[4] = {
+        vec3 p[4] = {
             Vec3(chunk->chunk_x, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
         };
-        Vec3 p1[4];
+        vec3 p1[4];
         memcpy(p1, p, sizeof(p));
         p1[0].y = WORLD_EPSILON;
         p1[1].y = WORLD_EPSILON;
@@ -366,7 +366,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
             push_quad_outline(&world_render_group, p1[0], p1[1], p1[2], p1[3], BLACK, 0.05f);
         }
     }
-    Vec2 mouse_cell_pos = Vec2(Floor(world_state->mouse_projection.x), Floor(world_state->mouse_projection.y));
+    vec2 mouse_cell_pos = Vec2(Floor(world_state->mouse_projection.x), Floor(world_state->mouse_projection.y));
     DEBUG_VALUE(mouse_cell_pos, "Selected cell");
     DEBUG_VALUE(is_cell_occupied(sim, mouse_cell_pos.x, mouse_cell_pos.y), "Is occupied");
     if (world_state->draw_frames) {
@@ -375,16 +375,16 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
             for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
                 bool is_occupied = is_cell_occupied(sim, mouse_cell_pos.x + dx, mouse_cell_pos.y + dy);
                 if (!is_occupied) {
-                    Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                    Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                    Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                    vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
+                    vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
                     push_quad_outline(&world_render_group, v0, v1, v2, v3, BLACK, 0.05f);
                 } else {
-                    Vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                    Vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    Vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                    Vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                    vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
+                    vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
+                    vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
                     push_quad_outline(&world_render_group, v0, v1, v2, v3, RED, 0.05f);
                 }
             }
@@ -394,8 +394,8 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     if (IS_NOT_NULL(world_state->mouse_selected_entity)) {
         Entity *entity = get_entity_by_id(sim, world_state->mouse_selected_entity);
         assert(entity);
-        Vec2 half_size = Vec2(1, 1) * 0.5f;
-        Vec3 v[4];
+        vec2 half_size = Vec2(1, 1) * 0.5f;
+        vec3 v[4];
         v[0] = xz(entity->p + Vec2(-half_size.x, -half_size.y), WORLD_EPSILON);
         v[1] = xz(entity->p + Vec2(-half_size.x, half_size.y),  WORLD_EPSILON);
         v[2] = xz(entity->p + Vec2(half_size.x, -half_size.y),  WORLD_EPSILON);
@@ -411,14 +411,14 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     BEGIN_BLOCK("Render entities");
     SortEntry *sort_a = alloc_arr(world_state->frame_arena, sim->entity_count, SortEntry);
     SortEntry *sort_b = alloc_arr(world_state->frame_arena, sim->entity_count, SortEntry);
-    Vec3 cam_z = world_state->mvp.get_z();
+    vec3 cam_z = world_state->mvp.get_z();
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         sort_a[entity_idx].sort_key = dot(cam_z, xz(sim->entities[entity_idx].p) - world_state->cam_p);
         sort_a[entity_idx].sort_index = entity_idx;
     }
     radix_sort(sort_a, sort_b, sim->entity_count);
-    Vec3 cam_x = world_state->mvp.get_x();
-    Vec3 cam_y = world_state->mvp.get_y();
+    vec3 cam_x = world_state->mvp.get_x();
+    vec3 cam_y = world_state->mvp.get_y();
     for (size_t sorted_idx = 0; sorted_idx < sim->entity_count; ++sorted_idx) {
         Entity *entity = sim->entities + sort_a[sim->entity_count - sorted_idx - 1].sort_index;
         AssetID texture_id;
@@ -438,7 +438,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
             } break;
             INVALID_DEFAULT_CASE;
         }
-        Vec3 v[4];
+        vec3 v[4];
         get_billboard_positions(xz(entity->p), cam_x, cam_y, 1.5f, 1.5f, v);
         push_quad(&world_render_group, v, texture_id);
     }

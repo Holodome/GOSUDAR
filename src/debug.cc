@@ -214,11 +214,11 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                     case DEBUG_VALUE_u64: {
                         snprintf(buffer, sizeof(buffer), "%s: %llu", value->name, value->value_u64);
                     } break;
-                    case DEBUG_VALUE_Vec2: {
-                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f)", value->name, value->value_Vec2.x, value->value_Vec2.y);
+                    case DEBUG_VALUE_vec2: {
+                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f)", value->name, value->value_vec2.x, value->value_vec2.y);
                     } break;
-                    case DEBUG_VALUE_Vec3: {
-                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f %.2f)",value->name, value->value_Vec3.x, value->value_Vec3.y, value->value_Vec3.z);
+                    case DEBUG_VALUE_vec3: {
+                        snprintf(buffer, sizeof(buffer), "%s: (%.2f %.2f %.2f)",value->name, value->value_vec3.x, value->value_vec3.y, value->value_vec3.z);
                     } break;
                     case DEBUG_VALUE_SWITCH: {
                         snprintf(buffer, sizeof(buffer), "%s: %s", value->name, *value->value_switch ? "true" : "false");       

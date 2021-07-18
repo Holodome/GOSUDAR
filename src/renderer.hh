@@ -20,10 +20,10 @@ extern _type _name;
 #define GL_INDEX_TYPE  (sizeof(RENDERER_INDEX_TYPE) == 4 ? GL_UNSIGNED_INT : sizeof(RENDERER_INDEX_TYPE) == 2 ? GL_UNSIGNED_SHORT : sizeof(RENDERER_INDEX_TYPE) == 1 ? GL_UNSIGNED_BYTE : 0)
 
 struct Vertex {
-    Vec3 p;
-    Vec2 uv;
-    Vec3 n;
-    Vec4 c;  
+    vec3 p;
+    vec2 uv;
+    vec3 n;
+    vec4 c;  
     u16 tex;
 };
 
@@ -99,7 +99,7 @@ struct RendererCommands {
 };
 
 struct RendererSettings {
-    Vec2 display_size;  
+    vec2 display_size;  
     bool filtered;
     bool mipmapping;
     bool vsync;
@@ -111,7 +111,7 @@ struct RendererSettings {
 #define RENDERER_RECIPROCAL_TEXTURE_SIZE Vec2(1.0f / RENDERER_TEXTURE_DIM, 1.0f / RENDERER_TEXTURE_DIM)
 
 struct RendererFramebuffer {
-    Vec2 size;
+    vec2 size;
     GLuint id;
     GLuint texture_id;  
     GLuint depth_id;

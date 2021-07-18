@@ -1,7 +1,7 @@
 #include "sim_region.hh"
 #include "world_state.hh"
 
-void p_to_chunk_coord(Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_dst) {
+void p_to_chunk_coord(vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, vec2 *chunk_p_dst) {
     i32 chunk_x = Floor(p.x / CHUNK_SIZE);
     i32 chunk_y = Floor(p.y / CHUNK_SIZE);
     *chunk_x_dst = chunk_x;
@@ -11,14 +11,14 @@ void p_to_chunk_coord(Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_
     }
 }
 
-Vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, Vec2 chunk_p) {
+vec2 get_sim_space_p(SimRegion *sim, i32 chunk_x, i32 chunk_y, vec2 chunk_p) {
     i32 dchx = chunk_x - sim->center_chunk_x;
     i32 dchy = chunk_y - sim->center_chunk_y;
-    Vec2 result = Vec2(dchx, dchy) * CHUNK_SIZE + chunk_p;   
+    vec2 result = Vec2(dchx, dchy) * CHUNK_SIZE + chunk_p;   
     return result;
 }
 
-void get_global_space_p(SimRegion *sim, Vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, Vec2 *chunk_p_dst) {
+void get_global_space_p(SimRegion *sim, vec2 p, i32 *chunk_x_dst, i32 *chunk_y_dst, vec2 *chunk_p_dst) {
     i32 local_chunk_x, local_chunk_y;
     p_to_chunk_coord(p, &local_chunk_x, &local_chunk_y, chunk_p_dst);
     *chunk_x_dst = sim->center_chunk_x + local_chunk_x;
@@ -219,7 +219,7 @@ Entity *create_new_entity_internal(SimRegion *sim, EntityID id) {
     return result;
 }
 
-Entity *create_new_entity(SimRegion *sim, Vec2 p, Entity *src) {
+Entity *create_new_entity(SimRegion *sim, vec2 p, Entity *src) {
     Entity *result = 0;
     if (sim->entity_count + 1 < sim->max_entity_count) {
         Entity *entity = sim->entities + sim->entity_count++;
@@ -250,7 +250,7 @@ Entity *create_new_entity(SimRegion *sim, Vec2 p, Entity *src) {
     return result;
 }
 
-void change_entity_position(SimRegion *sim, Entity *entity, Vec2 p) {
+void change_entity_position(SimRegion *sim, Entity *entity, vec2 p) {
     TIMED_FUNCTION();
     i32 old_chunk_x, old_chunk_y;
     p_to_chunk_coord(entity->p, &old_chunk_x, &old_chunk_y);
@@ -370,7 +370,7 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
             while (block) {
                 for (u32 entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
                     Entity *src = (Entity *)block->entity_data  + entity_idx;
-                    Vec2 sim_space_p = get_sim_space_p(sim, world_chunk_x, world_chunk_y, src->p);
+                    vec2 sim_space_p = get_sim_space_p(sim, world_chunk_x, world_chunk_y, src->p);
                     Entity *dst = create_new_entity(sim, sim_space_p, src);
                 }
                 
@@ -389,7 +389,7 @@ void end_sim(SimRegion *sim, struct WorldState *world_state) {
         Entity *src = sim->entities + entity_idx;
         if (!(src->flags & ENTITY_FLAG_IS_DELETED)) {
             i32 chunk_x, chunk_y;
-            Vec2 chunk_p;
+            vec2 chunk_p;
             get_global_space_p(sim, src->p, &chunk_x, &chunk_y, &chunk_p);
             src->p = chunk_p;
             pack_entity_into_world(sim->world, chunk_x, chunk_y, src);   
@@ -425,11 +425,11 @@ static void next(SimChunkIterator *iter) {
     }
 }
 
-SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, Vec2 p, f32 radius) {
+SimChunkIterator iterate_sim_chunks_in_radius(SimRegion *sim, vec2 p, f32 radius) {
     SimChunkIterator iter = {};
     iter.sim = sim;
-    Vec2 top_left = p + Vec2(-radius, -radius);
-    Vec2 bottom_right = p + Vec2(radius, radius);
+    vec2 top_left = p + Vec2(-radius, -radius);
+    vec2 bottom_right = p + Vec2(radius, radius);
     p_to_chunk_coord(top_left, &iter.min_chunk_x, &iter.min_chunk_y);
     p_to_chunk_coord(bottom_right, &iter.max_chunk_x, &iter.max_chunk_y);
     assert(iter.min_chunk_x <= iter.max_chunk_x);
@@ -492,7 +492,7 @@ void advance(SimChunkEntityIterator *iter) {
     next(iter);
 }
 
-EntityIteratorSettings iter_radius(Vec2 origin, f32 radius) {
+EntityIteratorSettings iter_radius(vec2 origin, f32 radius) {
     EntityIteratorSettings iter = {};
     iter.flags = ENTITY_ITERATOR_DISTANCE_BASED;
     iter.origin = origin;

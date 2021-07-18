@@ -16,7 +16,7 @@ static DevUIID id_empty() {
     return {};
 }
 
-static void element_size(DevUILayout *layout, Vec2 size) {
+static void element_size(DevUILayout *layout, vec2 size) {
     layout->p.x += size.x + DEV_UI_HORIZ_PADDING;
     layout->last_line_p = layout->p;
     
@@ -98,23 +98,23 @@ void dev_ui_labelf(DevUILayout *layout, const char *format, ...) {
 }
 
 bool dev_ui_button(DevUILayout *layout, const char *label) {
-    Vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
+    vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
     Rect button_rect = Rect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
-    Vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
+    vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);  
     element_size(layout, button_rect.size());
     return bstate.is_pressed;    
 }
 
 bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
-    Vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
+    vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
     Rect button_rect = Rect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     if (bstate.is_pressed) {
         *value = !*value;
     }
-    Vec4 color = (*value ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
+    vec4 color = (*value ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
     element_size(layout, button_rect.size());
     return bstate.is_pressed;    
@@ -153,7 +153,7 @@ bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value) {
     bool result = false;
     char value_buffer[128];
     snprintf(value_buffer, sizeof(value_buffer), "%s: %.2f", label, *value);
-    Vec2 value_rect_size = DEBUG_get_text_size(layout->assets, layout->font_id, value_buffer);
+    vec2 value_rect_size = DEBUG_get_text_size(layout->assets, layout->font_id, value_buffer);
     Rect whole_rect = Rect(layout->p, value_rect_size);
     
     ButtonState bstate = update_button(layout, whole_rect, id_from_cstr(label));
@@ -165,14 +165,14 @@ bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value) {
             result = true;
         }
     }
-    Vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) :  Vec4(1, 1, 1, 1));    
+    vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, value_buffer, layout->font_id, 1.0f);
     element_size(layout, whole_rect.size());
     return result;
 }
 
 bool dev_ui_section(DevUILayout *layout, const char *label) {
-    Vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
+    vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
     Rect button_rect = Rect(layout->p, text_size);
     DevUIID id = id_from_cstr(label);
     ButtonState bstate = update_button(layout, button_rect, id);
@@ -180,7 +180,7 @@ bool dev_ui_section(DevUILayout *layout, const char *label) {
     if (bstate.is_pressed) {
         view->is_opened = !view->is_opened;
     }
-    Vec4 color = (view->is_opened ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
+    vec4 color = (view->is_opened ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
     element_size(layout, button_rect.size());
     if (view->is_opened) {

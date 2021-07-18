@@ -9,21 +9,26 @@ struct f32_4x {
         f32 e[4];
     };
     
-    f32_4x() {}
-    f32_4x(f32 all) {
-        p =_mm_set1_ps(all);
-    }
-    
-    f32_4x(f32 a, f32 b, f32 c, f32 d) {
-        p = _mm_set_ps(a, b, c, d);
-    }
-    
-    static f32_4x zero() {
-        f32_4x result;
-        result.p = _mm_setzero_ps();
-        return result;
-    }
 };
+
+inline f32_4x F32_4x(f32 all) {
+    f32_4x result;
+    result.p =_mm_set1_ps(all);
+    return result;
+}
+
+inline f32_4x F32_4x(f32 a, f32 b, f32 c, f32 d) {
+    f32_4x result;
+    result.p = _mm_set_ps(a, b, c, d);
+    return result;
+}
+
+inline f32_4x F32_4x_zero() {
+    f32_4x result;
+    result.p = _mm_setzero_ps();
+    return result;
+}
+
 
 inline f32_4x operator+(f32_4x a, f32_4x b) {
     f32_4x result;
@@ -152,11 +157,18 @@ inline f32_4x operator^(f32_4x a, f32_4x b) {
     return result;
 }
 
-typedef Vec3G<f32_4x> Vec3_4x;
-typedef Vec4G<f32_4x> Vec4_4x;
+typedef vec3G<f32_4x> vec3_4x;
+typedef vec4G<f32_4x> vec4_4x;
 
-Vec3 get_component(Vec3_4x vec, u32 idx) {
-    Vec3 result = Vec3(vec.x.e[idx], vec.y.e[idx], vec.z.e[idx]);
+inline vec3_4x Vec3_4x(f32 s) {
+    return { F32_4x(s), F32_4x(s), F32_4x(s) }; 
+}
+inline vec3_4x Vec3_4x(vec3 v) {
+    return { F32_4x(v.x), F32_4x(v.y), F32_4x(v.z) };
+}
+
+vec3 get_component(vec3_4x vec, u32 idx) {
+    vec3 result = Vec3(vec.x.e[idx], vec.y.e[idx], vec.z.e[idx]);
     return result;
 }
 

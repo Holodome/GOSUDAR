@@ -50,9 +50,9 @@ inline bool is_mouse_keycode(u32 keycode) {
 // platform layer, like go fullscreen or switch vsync
 // The idea of this structure is not to provide api, but simply pass data between modules
 struct Platform {
-    Vec2 display_size;
-    Vec2 mpos;
-    Vec2 mdelta;
+    vec2 display_size;
+    vec2 mpos;
+    vec2 mdelta;
     f32 mwheel; 
     bool is_keys_down[KEY_COUNT];
     u8 keys_transition_count[KEY_COUNT];

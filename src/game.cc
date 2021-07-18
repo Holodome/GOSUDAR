@@ -16,13 +16,13 @@ static void build_interface_for_window_size(Game *game) {
     // This should be loaded from file for current interface mode - we want to support both light and dark
     // also displayed text needs to be loaded from some localization file
     // 
-    Vec2 text_box_size = Vec2(100, 50);
+    vec2 text_box_size = Vec2(100, 50);
     f32 text_box_x = (game->renderer_settings.display_size.x - text_box_size.x) * 0.5f;
-    Vec4 text_box_background = Vec4(0.4, 0.4, 0.4, 1.0);
-    Vec4 button_color0 = Vec4(0.6, 0.6, 0.6, 1.0);
-    Vec4 button_color1 = Vec4(0.8, 0.8, 0.8, 1.0);
-    Vec4 button_color2 = Vec4(0.8, 0.8, 0.0, 1.0);
-    Vec4 title_color = Vec4(0.8, 0.2, 0.3, 1.0);
+    vec4 text_box_background = Vec4(0.4, 0.4, 0.4, 1.0);
+    vec4 button_color0 = Vec4(0.6, 0.6, 0.6, 1.0);
+    vec4 button_color1 = Vec4(0.8, 0.8, 0.8, 1.0);
+    vec4 button_color2 = Vec4(0.8, 0.8, 0.0, 1.0);
+    vec4 title_color = Vec4(0.8, 0.2, 0.3, 1.0);
     
     arena_clear(&game->interface_arena);
     game->main_menu_interface = 0;

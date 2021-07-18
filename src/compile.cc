@@ -58,6 +58,7 @@ extern "C" {
 #include "sim_region.cc"
 #include "world_state.cc"
 #include "orders.cc"
+#include "particle_system.cc"
 #include "game.cc"
 #include "interface.cc"
 #include "main.cc"

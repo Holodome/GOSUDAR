@@ -60,6 +60,8 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     world_state->world_object_specs[WORLD_OBJECT_KIND_BUILDING2] = building_spec();
     init_order_system(&world_state->order_system, world_state->arena);
     init_particle_system(&world_state->particle_system, world_state->arena);
+    world_state->particle_system.emitter.spec.p = Vec3(0);
+    world_state->particle_system.emitter.spec.spawn_rate = 10;
     
     // Generate world
     Entropy gen_entropy { 123456789 };
@@ -104,8 +106,7 @@ static void init_particles_for_interaction(WorldState *world_state, SimRegion *s
     if (interaction->kind == INTERACTION_KIND_MINE_RESOURCE) {
         Entity *interactable = get_entity_by_id(sim, interaction->entity);
         assert(interactable);
-        interaction->particle_emitter = add_particle_emitter(&world_state->particle_system, PARTICLE_EMITTER_KIND_FOUNTAIN,
-                                                             Vec4(1, 0, 0, 1));
+        // interaction->particle_emitter = add_particle_emitter(&world_state->particle_system, PARTICLE_EMITTER_KIND_FOUNTAIN, Vec4(1, 0, 0, 1));
     } else {
         NOT_IMPLEMENTED;
     }
@@ -138,7 +139,7 @@ static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *
                     interactable->flags |= ENTITY_FLAG_IS_DELETED;
                     disband_order(&world_state->order_system, entity->order);
                     entity->order = {};
-                    delete_particle_emitter(&world_state->particle_system, entity->interaction.particle_emitter);
+                    // delete_particle_emitter(&world_state->particle_system, entity->interaction.particle_emitter);
                     entity->interaction = {};
                 }
             } else {
@@ -244,7 +245,8 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
 #define CAMERA_FOV rad(60)
 #define CAMERA_NEAR_PLANE 0.001f
 #define CAMERA_FAR_PLANE  10000.0f
-    world_state->projection = Mat4x4::perspective(CAMERA_FOV, input->platform->display_size.aspect_ratio(), CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    f32 aspect_ratio = input->platform->display_size.x / input->platform->display_size.y;
+    world_state->projection = Mat4x4::perspective(CAMERA_FOV, aspect_ratio, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     world_state->view = Mat4x4::identity() * Mat4x4::rotation(world_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(world_state->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-cam_p);
     world_state->mvp = world_state->projection * world_state->view;
@@ -333,17 +335,6 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
         }
     }
     // Assign job to pawn if 
-}
-
-static void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
-    Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
-    Vec3 bottom_left = top_left - up * height;
-    Vec3 top_right = top_left + right * width;
-    Vec3 bottom_right = top_right - up * height;
-    out[0] = top_left;
-    out[1] = bottom_left;
-    out[2] = top_right;
-    out[3] = bottom_right;
 }
 
 void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *commands, Assets *assets, InputManager *input) {
@@ -456,29 +447,8 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     //
     // Particles
     //
+    update_and_render_particles(&world_state->particle_system, &world_render_group, input->platform->frame_dt);
     
-    LLIST_ITER(iter, world_state->particle_system.emitter_list) {
-        for (u32 particle_idx = 0; particle_idx < iter->particle_count; ++particle_idx) {
-            Particle *particle = iter->particles + particle_idx;
-            if (!particle->is_alive) {
-                continue;
-            }
-            
-#define PARTICLE_SPEED 0.05f
-            particle->p += Vec3(1) * PARTICLE_SPEED;
-            
-            particle->life += input->platform->frame_dt;
-            if (particle->life > PARTICLE_LIFE_TIME_S) {
-                particle->is_alive = false;
-            }
-            
-            if (particle->is_alive) {
-                Vec3 v[4];
-                get_billboard_positions(particle->p, cam_x, cam_y, 0.1, 0.1, v);
-                push_quad(&world_render_group, v[0], v[1], v[2], v[3], Vec4(particle->c, 1), INVALID_ASSET_ID);
-            }
-        }
-    }
     
     render_group_end(&world_render_group);
 }

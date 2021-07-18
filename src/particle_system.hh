@@ -37,52 +37,45 @@
 // Particles should preferable have collision detection. Due to the nature of the game
 // it can be detection of collisions with ground, but who knows what will be next
 // For now we can just delete particle if its y goes below zero
+//
+// It was decided that particle systems can have different number of particles depending on their size
+// each use case knows size in advance, so it will not be a problem
+// However, to avoid using dynamic size list updating of any kind
+// all particles will be updated each frame, even ones that don't exist
+// they won't be rendered however
 #if !defined(PARTICLE_SYSTEM_HH)
 
 #include "lib.hh"
 
-#define MAX_PARTICLES_PER_EMITTER 4096
+#define MAX_PARTICLES_PER_EMITTER 256
+
+enum {
+    PARTICLE_SYSTEM_SIZE_SMALL,
+    PARTICLE_SYSTEM_SIZE_MEDIUM,
+    PARTICLE_SYSTEM_SIZE_BIG,
+};
 
 enum { 
     PARTICLE_EMITTER_KIND_NONE,
     PARTICLE_EMITTER_KIND_FOUNTAIN,
 };
 
-struct ParticleEmtitterSpec {
+struct ParticleEmitterSpec {
     u32 kind;
-    // In what range settings of particles are uniformly choosed
-    // Settings for position values contain length of vector since direction 
-    // is determined by emitter itself
-    f32 ddp_range_low;
-    f32 ddp_range_high;
-    f32 dp_range_low;
-    f32 dp_range_high;
-    // @TODO it is not clear how colors should be chosed - 
-    // should there each individual component by chosen randomly or all color lerped uniformly
-    Vec4 c_range_low;
-    Vec4 c_range_high;
-    Vec4 dc_range_low;
-    Vec4 dc_range_high;
-    f32 e_range_low;
-    f32 e_range_high;
-    f32 de_range_low;
-    f32 de_range_high;
-    
+    f32 spawn_rate;
+    Vec3 p;
 };
 
-struct Particle {
-    Vec3 p;
-    Vec3 dp;
-    Vec3 ddp;
-    Vec4 c;
-    Vec4 dc;
-    f32 e;
-    f32 de;
+struct Particle_4x {
+    Vec3_4x p;
+    f32_4x e;
 };
 
 struct ParticleEmitter {
-    u32 particle_count;
-    Particle particles[MAX_PARTICLES_PER_EMITTER];
+    ParticleEmitterSpec spec;
+    f32 spawn_cursor;
+    u32 particle_cursor;
+    Particle_4x particles[MAX_PARTICLES_PER_EMITTER / 4];
     
     ParticleEmitter *next;
 };
@@ -92,14 +85,16 @@ struct ParticleSystem {
     Entropy entropy;
     u32 max_emitter_id;
     
-    ParticleEmitter *emitter_list;
+    ParticleEmitter emitter;
+    //ParticleEmitter *emitter_list;
     
     ParticleEmitter *first_free_emitter;
 };
 
 void init_particle_system(ParticleSystem *sys, MemoryArena *arena);
-ParticleEmitterID add_particle_emitter(ParticleSystem *sys, u32 kind, Vec4 color);
-void delete_particle_emitter(ParticleSystem *sys, ParticleEmitterID id);
+// ParticleEmitterID add_particle_emitter(ParticleSystem *sys, u32 kind, Vec4 color);
+// void delete_particle_emitter(ParticleSystem *sys, ParticleEmitterID id);
+void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group, f32 dt);
 
 #define PARTICLE_SYSTEM_HH 1
 #endif 

@@ -49,7 +49,7 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
         uv01 = uv01 * uv_scale;
         uv10 = uv10 * uv_scale;
         uv11 = uv11 * uv_scale;
-
+        
         u16 texture_index = (u16)texture.index;
         // Vertex buffer
         assert(render_group->commands->vertex_count + 4 <= render_group->commands->max_vertex_count);
@@ -70,7 +70,7 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
         vertex_buffer[3].uv  = uv11;
         vertex_buffer[3].c = c11;
         vertex_buffer[3].tex = texture_index;
-
+        
         // Index buffer
         assert(render_group->commands->index_count + 6 <= render_group->commands->max_index_count);
         RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
@@ -81,7 +81,7 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
         index_buffer[3] = base_index + 0;
         index_buffer[4] = base_index + 1;
         index_buffer[5] = base_index + 3;
-
+        
         // Update buffer sizes after we are finished.
         render_group->commands->vertex_count += 4;
         render_group->commands->index_count  += 6;
@@ -99,7 +99,7 @@ static Texture get_texture(RenderGroup *render_group, AssetID id) {
 }
 
 void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11,
-                             Vec4 c, AssetID texture_id) {
+               Vec4 c, AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
@@ -107,13 +107,13 @@ void push_quad(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11
 void push_quad(RenderGroup *render_group, Vec3 v[4], AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v[0], v[1], v[2], v[3], WHITE, WHITE, WHITE, WHITE,
-        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
+              Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
 void push_quad(RenderGroup *render_group, Vec3 v[4], Vec4 c, AssetID texture_id) {
     Texture tex = get_texture(render_group, texture_id);
     push_quad(render_group, v[0], v[1], v[2], v[3], c, c, c, c,
-        Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
+              Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
 }
 
 void push_rect(RenderGroup *render_group, Rect rect, Vec4 color, Rect uv_rect, AssetID texture_id) {
@@ -135,10 +135,10 @@ void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *
     f32 font_height = info->size;
     f32 line_height = font_height * scale;
     AssetID texture_id = font_id;
-
+    
 	f32 rwidth  = 1.0f / (f32)font->texture.width;
 	f32 rheight = 1.0f / (f32)font->texture.height;
-
+    
 	Vec3 offset = Vec3(p, 0);
 	offset.y += line_height;
     
@@ -146,15 +146,15 @@ void DEBUG_push_text(RenderGroup *render_group, Vec2 p, Vec4 color, const char *
 		u8 symbol = *scan;
 		if ((symbol >= info->first_codepoint)) {
 			FontGlyph *glyph = &font->glyphs[symbol - info->first_codepoint];
-
+            
 			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
 			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
-
+            
 			f32 y1 = offset.y + glyph->offset1_y * scale;
 			f32 y2 = y1 + glyph_height;
 			f32 x1 = offset.x + glyph->offset1_x * scale;
 			f32 x2 = x1 + glyph_width;
-
+            
 			f32 s1 = glyph->min_x * rwidth;
 			f32 t1 = glyph->min_y * rheight;
 			f32 s2 = glyph->max_x * rwidth;
@@ -176,7 +176,6 @@ void push_line(RenderGroup *render_group, Vec3 a, Vec3 b, Vec4 color, f32 thickn
     line_perp = normalize(line_perp);
     line_perp *= thickness;
     push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
-    
 }
 
 void push_quad_outline(RenderGroup *render_group, Vec3 v00, Vec3 v01, Vec3 v10, Vec3 v11, Vec4 color, f32 thickness) {

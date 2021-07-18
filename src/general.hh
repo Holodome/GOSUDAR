@@ -29,7 +29,8 @@ typedef double f64;
 
 #define ARRAY_SIZE(_a) ((size_t)(sizeof(_a) / sizeof(*(_a))))
 #define SQ(_a) ((_a) * (_a))
-#define ADD_BY_MODULO(_a, _b, _modulo) (((_a) + (_b)) % _modulo)
+#define ADD_MODULO(_a, _b, _modulo) (((_a) + (_b)) % _modulo)
+#define INC_MODULO(_a, _modulo) ADD_MODULO(_a, 1, _modulo)
 
 #define BYTES(_n) ((size_t)_n)
 #define KILOBYTES(_n) (BYTES(_n) << 10) 

@@ -327,8 +327,8 @@ struct Vec2G {
         T e[2];
     };
     
-    Vec2G() : x(0), y(0) {}; 
-    Vec2G(T x, T y) : x(x), y(y) {}
+    Vec2G() : x(0), y(0) {}
+    explicit Vec2G(T x, T y) : x(x), y(y) {}
     explicit Vec2G(T s) : x(s), y(s) {}
     template <typename S>
         explicit Vec2G(Vec2G<S> v) : x((T)v.x), y((T)v.y) {}
@@ -384,18 +384,9 @@ struct Vec2G {
     bool operator!=(Vec2G<T> other) {
         return !(*this == other);
     }
-    
-    f32 aspect_ratio() const {
-        return (f32)x / (f32)y;
-    }
-    
-    T product() const {
-        return x * y;
-    }
 };
 
 using Vec2 = Vec2G<f32>;
-using Vec2i = Vec2G<i32>;
 
 template <typename T>
 struct Vec3G {
@@ -410,10 +401,12 @@ struct Vec3G {
         T e[3];
     };
     
-    Vec3G() : x(0), y(0), z(0) {};
-    Vec3G(T x, T y, T z) : x(x), y(y), z(z) {}
+    Vec3G() : x(0), y(0), z(0) {}
+    explicit Vec3G(T x, T y, T z) : x(x), y(y), z(z) {}
     explicit Vec3G(T s) : x(s), y(s), z(s) {}
     explicit Vec3G(Vec2G<T> xy, T z = 0) : x(xy.x), y(xy.y), z(z) {}
+    template <typename S>
+        explicit Vec3G(Vec3G<S> xyz) : x((T)xyz.x), y((T)xyz.y), z((T)xyz.z) {}
     
     Vec3G<T> operator-() {
         return Vec3G(-x, -y, -z);
@@ -422,20 +415,16 @@ struct Vec3G {
         return *this;
     }
     
-    template <typename S>
-        Vec3G<T> operator+(Vec3G<S> v) {
+    Vec3G<T> operator+(Vec3G<T> v) {
         return Vec3G<T>(x + v.x, y + v.y, z + v.z);
     }
-    template <typename S>
-        Vec3G<T> operator-(Vec3G<S> v) {
+    Vec3G<T> operator-(Vec3G<T> v) {
         return Vec3G<T>(x - v.x, y - v.y, z - v.z);
     }
-    template <typename S>
-        Vec3G<T> operator*(Vec3G<S> v) {
+    Vec3G<T> operator*(Vec3G<T> v) {
         return Vec3G<T>(x * v.x, y * v.y, z * v.z);
     }
-    template <typename S>
-        Vec3G<T> operator/(Vec3G<S> v) {
+    Vec3G<T> operator/(Vec3G<T> v) {
         return Vec3G<T>(x / v.x, y / v.y, z / v.z);
     }
     Vec3G<T> operator*(T s) {
@@ -445,20 +434,16 @@ struct Vec3G {
         return Vec3G<T>(x / s, y / s, z / s);
     }
     
-    template <typename S>
-        Vec3G<T> &operator+=(Vec3G<S> v) {
+    Vec3G<T> &operator+=(Vec3G<T> v) {
         return (*this = *this + v);
     }
-    template <typename S>
-        Vec3G<T> &operator-=(Vec3G<S> v) {
+    Vec3G<T> &operator-=(Vec3G<T> v) {
         return (*this = *this - v);
     }
-    template <typename S>
-        Vec3G<T> &operator*=(Vec3G<S> v) {
+    Vec3G<T> &operator*=(Vec3G<T> v) {
         return (*this = *this * v);
     }
-    template <typename S>
-        Vec3G<T> &operator/=(Vec3G<S> v) {
+    Vec3G<T> &operator/=(Vec3G<T> v) {
         return (*this = *this / v);
     }
     Vec3G<T> &operator*=(T s) {
@@ -470,7 +455,6 @@ struct Vec3G {
 };
 
 using Vec3 = Vec3G<f32>;
-using Vec3i = Vec3G<i32>;
 
 template <typename T>
 struct Vec4G {
@@ -548,7 +532,6 @@ struct Vec4G {
 };
 
 using Vec4 = Vec4G<f32>;
-using Vec4i = Vec4G<i32>;
 
 // Design decision for vectors was that functions related to them should not be members of structs
 // because there are integer vectors and there is no point in adding stuff like cross product into them
@@ -1419,6 +1402,18 @@ i64 interlocked_compare_exchange(volatile i64 *dest, i64 exchange, i64 comparand
 }
 
 #include "simd_math.hh"
+
+
+void get_billboard_positions(Vec3 mid_bottom, Vec3 right, Vec3 up, f32 width, f32 height, Vec3 out[4]) {
+    Vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
+    Vec3 bottom_left = top_left - up * height;
+    Vec3 top_right = top_left + right * width;
+    Vec3 bottom_right = top_right - up * height;
+    out[0] = top_left;
+    out[1] = bottom_left;
+    out[2] = top_right;
+    out[3] = bottom_right;
+}
 
 #define LIB_HH 1
 #endif

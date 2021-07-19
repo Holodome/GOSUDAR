@@ -8,6 +8,280 @@ _type _name;
 #include "gl_procs.inc"
 #undef GLPROC
 
+static GLuint create_shader(const char *source) {
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source };
+    const char *const fragment_source[] = { "#version 330\n", "", source };
+    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
+    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
+    glCompileShader(vertex_shader);
+    glCompileShader(fragment_shader);
+    
+    GLint vertex_compiled, fragment_compiled;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
+    
+    bool shader_failed = false;
+    if (!(vertex_compiled && fragment_compiled)) {
+        char shader_log[4096];
+        if (!vertex_compiled) {
+            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+        if (!fragment_compiled) {
+            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
+            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
+            shader_failed = true;
+        }
+    }
+    
+    GLuint id = glCreateProgram();
+    glAttachShader(id, vertex_shader);
+    glAttachShader(id, fragment_shader);
+    glLinkProgram(id);
+    
+    GLint link_success;
+    glGetProgramiv(id, GL_LINK_STATUS, &link_success);
+    if (!link_success) {
+        char program_log[4096];
+        glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
+        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
+        shader_failed = true;
+    }    
+    
+    assert(!shader_failed);
+    return id;
+}
+
+static GLuint get_uniform(GLuint shader, const char *name) {
+    GLuint result = glGetUniformLocation(shader, name);
+    assert(result != (GLuint)-1);
+    return result;
+}
+
+struct OpenGLQuadShader {
+    GLuint id;
+    GLuint view_location;
+    GLuint projection_location;
+    GLuint tex_location;
+};
+
+OpenGLQuadShader compile_quad_shader() {
+    const char *standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
+layout(location = 0) in vec4 position;     
+layout(location = 1) in vec2 uv;       
+layout(location = 2) in vec3 n;        
+layout(location = 3) in vec4 color;        
+layout(location = 4) in int texture_index;     
+       
+out vec4 rect_color;       
+out vec2 frag_uv;      
+       
+flat out int frag_texture_index;       
+
+uniform mat4 view_matrix = mat4(1);     
+uniform mat4 projection_matrix = mat4(1);
+
+void main() {             
+    vec4 world_space = position;       
+    vec4 cam_space = view_matrix * world_space;
+    vec4 clip_space = projection_matrix * cam_space;        
+    gl_Position = clip_space;      
+       
+    rect_color = color;        
+    frag_uv = uv;      
+    frag_texture_index = texture_index;        
+    
+    float d = length(cam_space.xyz);
+}      
+#else 
+
+in vec4 rect_color;        
+in vec2 frag_uv;       
+flat in int frag_texture_index;        
+uniform sampler2DArray tex;        
+out vec4 out_color;        
+void main()        
+{      
+    vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
+    vec4 texture_sample = texture(tex, array_uv);      
+    
+    out_color = texture_sample * rect_color;       
+}      
+#endif)FOO";
+    
+    OpenGLQuadShader result = {};
+    result.id = create_shader(standard_shader_code);
+    result.projection_location = get_uniform(result.id, "projection_matrix");
+    result.view_location = get_uniform(result.id, "view_matrix");
+    result.tex_location = get_uniform(result.id, "tex");
+    return result;
+}
+
+static void bind_shader(OpenGLQuadShader *shader, Mat4x4 *view, Mat4x4 *projection, u32 tex) {
+    glUseProgram(shader->id);
+    glUniformMatrix4fv(shader->view_location, 1, false, view->value_ptr());
+    glUniformMatrix4fv(shader->projection_location, 1, false, projection->value_ptr());
+    glUniform1i(shader->tex_location, tex);
+}
+
+struct OpenGLBlitFramebufferShader {
+    GLuint id;
+    GLuint tex_location;
+};
+
+static OpenGLBlitFramebufferShader compile_blit_framebuffer_shader() {
+    const char *render_framebuffer_shader_code = R"FOO(#ifdef VERTEX_SHADER
+        layout(location = 0) in vec2 position;
+        
+        out vec2 frag_uv;
+        
+        void main() {
+            gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+            frag_uv = (position + vec2(1)) * 0.5;
+        }
+        #else     
+        
+        in vec2 frag_uv;
+        out vec4 out_color;
+        
+        uniform sampler2D tex;
+        
+        void main() {
+            out_color = texture(tex, frag_uv);
+        }
+        
+        #endif)FOO";
+    OpenGLBlitFramebufferShader result = {};
+    result.id = create_shader(render_framebuffer_shader_code);
+    result.tex_location = get_uniform(result.id, "tex");
+    return result;
+}
+
+static void bind_shader(OpenGLBlitFramebufferShader *shader, u32 tex) {
+    glUseProgram(shader->id);
+    glUniform1i(shader->tex_location, tex);
+}
+
+struct OpenGLHorizontalBlurShader {
+    GLuint id;
+    GLuint tex_location;
+    GLuint target_width_location;
+};
+
+static OpenGLHorizontalBlurShader compile_horizontal_blur_shader() {
+    const char *horizontal_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
+layout(location = 0) in vec2 position;
+
+out vec2 blur_uvs[11];
+uniform float target_width;
+
+void main() {
+    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+    vec2 center_uv = (position + vec2(1)) * 0.5;
+    float px_size = 1.0 / target_width;
+    for (int i = -5; i <= 5; ++i) {
+        blur_uvs[i + 5] = center_uv + vec2(px_size * i, 0);
+    }
+}
+
+#else 
+
+out vec4 out_color;
+in vec2 blur_uvs[11];
+
+uniform sampler2D tex;
+
+void main() {
+    out_color = vec4(0);
+    out_color += texture(tex, blur_uvs[0]) * 0.0093;
+    out_color += texture(tex, blur_uvs[1]) * 0.028002;
+    out_color += texture(tex, blur_uvs[2]) * 0.065984;
+    out_color += texture(tex, blur_uvs[3]) * 0.121703;
+    out_color += texture(tex, blur_uvs[4]) * 0.175713;
+    out_color += texture(tex, blur_uvs[5]) * 0.198596;
+    out_color += texture(tex, blur_uvs[6]) * 0.175713;
+    out_color += texture(tex, blur_uvs[7]) * 0.121703;
+    out_color += texture(tex, blur_uvs[8]) * 0.065984;
+    out_color += texture(tex, blur_uvs[9]) * 0.028002;
+    out_color += texture(tex, blur_uvs[10]) * 0.0093;
+}
+
+#endif)FOO";
+    OpenGLHorizontalBlurShader result = {};
+    result.id = create_shader(horizontal_gaussian_blur_shader_code);
+    result.tex_location = get_uniform(result.id, "tex");
+    result.target_width_location = get_uniform(result.id, "target_width");
+    return result;
+}
+
+static void bind_shader(OpenGLHorizontalBlurShader *shader, f32 target_width, u32 tex) {
+    glUseProgram(shader->id);
+    glUniform1i(shader->tex_location, tex);
+    glUniform1f(shader->target_width_location, target_width);
+}
+
+struct OpenGLVerticalBlurShader {
+    GLuint id;
+    GLuint tex_location;
+    GLuint target_height_location;
+};
+
+static OpenGLVerticalBlurShader compile_vertical_blur_shader() {
+    const char *vertical_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
+layout(location = 0) in vec2 position;
+
+out vec2 blur_uvs[11];
+uniform float target_height;
+
+void main() {
+    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+    vec2 center_uv = (position + vec2(1)) * 0.5;
+    float px_size = 1.0 / target_height;
+    for (int i = -5; i <= 5; ++i) {
+        blur_uvs[i + 5] = center_uv + vec2(0, px_size * i);
+    }
+}
+
+#else 
+
+out vec4 out_color;
+in vec2 blur_uvs[11];
+
+uniform sampler2D tex;
+
+void main() {
+    out_color = vec4(0);
+    out_color += texture(tex, blur_uvs[0]) * 0.0093;
+    out_color += texture(tex, blur_uvs[1]) * 0.028002;
+    out_color += texture(tex, blur_uvs[2]) * 0.065984;
+    out_color += texture(tex, blur_uvs[3]) * 0.121703;
+    out_color += texture(tex, blur_uvs[4]) * 0.175713;
+    out_color += texture(tex, blur_uvs[5]) * 0.198596;
+    out_color += texture(tex, blur_uvs[6]) * 0.175713;
+    out_color += texture(tex, blur_uvs[7]) * 0.121703;
+    out_color += texture(tex, blur_uvs[8]) * 0.065984;
+    out_color += texture(tex, blur_uvs[9]) * 0.028002;
+    out_color += texture(tex, blur_uvs[10]) * 0.0093;
+}
+
+#endif)FOO";
+    OpenGLVerticalBlurShader result = {};
+    result.id = create_shader(vertical_gaussian_blur_shader_code);
+    result.tex_location = get_uniform(result.id, "tex");
+    result.target_height_location = get_uniform(result.id, "target_height");
+    return result;
+}
+
+static void bind_shader(OpenGLVerticalBlurShader *shader, f32 target_height, u32 tex) {
+    glUseProgram(shader->id);
+    glUniform1i(shader->tex_location, tex);
+    glUniform1f(shader->target_height_location, target_height);
+}
+
+// This is more like description
 struct RendererFramebuffer {
     vec2 size;
     u32 video_memory;
@@ -26,27 +300,15 @@ enum {
 
 struct Renderer {
     MemoryArena arena;
-    
     RendererSettings settings;
-    
-    GLuint standard_shader;
-    GLuint view_location;
-    GLuint projection_location;
-    GLuint tex_location;
-    
-    GLuint render_framebuffer_shader;
-    GLuint render_framebuffer_tex_location;
-    GLuint render_framebuffer_vao;
-    
-    GLuint horizontal_gaussian_blur_shader;
-    GLuint horizontal_gaussian_blur_tex_location;
-    GLuint horizontal_gaussian_blur_target_width;
-    GLuint vertical_gaussian_blur_shader;
-    GLuint vertical_gaussian_blur_tex_location;
-    GLuint vertical_gaussian_blur_target_height;
-    
     RendererCommands commands;
     
+    OpenGLQuadShader quad_shader;
+    OpenGLBlitFramebufferShader blit_framebuffer_shader;
+    OpenGLVerticalBlurShader vertical_blur_shader;
+    OpenGLHorizontalBlurShader horizontal_blur_shader;
+    
+    GLuint render_framebuffer_vao;
     GLuint vertex_array;
     GLuint vertex_buffer;
     GLuint index_buffer;
@@ -64,8 +326,6 @@ struct Renderer {
 
 static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                                            const GLchar* message, const void *_) {
-    (void)_;
-    (void)length;
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
     
     char *source_str;
@@ -139,55 +399,8 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
     fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n", source_str, type_str, severity_str, id, message);
 }
 
-static GLuint create_shader(const char *source) {
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source };
-    const char *const fragment_source[] = { "#version 330\n", "", source };
-    glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
-    glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
-    glCompileShader(vertex_shader);
-    glCompileShader(fragment_shader);
-    
-    GLint vertex_compiled, fragment_compiled;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compiled);
-    
-    bool shader_failed = false;
-    if (!(vertex_compiled && fragment_compiled)) {
-        char shader_log[4096];
-        if (!vertex_compiled) {
-            glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
-            // fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
-            shader_failed = true;
-        }
-        if (!fragment_compiled) {
-            glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
-            // fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
-            shader_failed = true;
-        }
-    }
-    
-    GLuint id = glCreateProgram();
-    glAttachShader(id, vertex_shader);
-    glAttachShader(id, fragment_shader);
-    glLinkProgram(id);
-    
-    GLint link_success;
-    glGetProgramiv(id, GL_LINK_STATUS, &link_success);
-    if (!link_success) {
-        char program_log[4096];
-        glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
-        // fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
-        shader_failed = true;
-    }    
-    
-    assert(!shader_failed);
-    return id;
-}
-
-static void create_framebuffer(Renderer *renderer, u32 idx,
-                               vec2 size, bool has_depth, bool filtered) {
+static void init_framebuffer(Renderer *renderer, u32 idx,
+                             vec2 size, bool has_depth, bool filtered) {
     RendererFramebuffer result = {};
     result.has_depth = has_depth;
     result.size = size;
@@ -264,20 +477,15 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     for (u32 i = 0; i < RENDERER_FRAMEBUFFER_SENTINEL; ++i) {
         renderer->video_memory_used -= renderer->framebuffers[i].video_memory;
     }
-    glDeleteTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
-    glDeleteRenderbuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_depths);
-    glDeleteFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
-    glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
-    glGenFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
     
     vec2 size = settings.display_size;
     vec2 blur_size = size * 0.25f;
     b32 filter = settings.filtered;
-    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter);
-    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter);
-    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter);
-    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter);
-    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, blur_size, false, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, blur_size, false, filter);
     
     renderer->settings = settings;
 }
@@ -305,167 +513,10 @@ Renderer *renderer_init(RendererSettings settings) {
     renderer->commands.max_index_count = MAX_INDEX_COUNT;
     renderer->commands.indices = alloc_arr(&renderer->arena, MAX_INDEX_COUNT, RENDERER_INDEX_TYPE);
     
-    const char *standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
-layout(location = 0) in vec4 position;     
-layout(location = 1) in vec2 uv;       
-layout(location = 2) in vec3 n;        
-layout(location = 3) in vec4 color;        
-layout(location = 4) in int texture_index;     
-       
-out vec4 rect_color;       
-out vec2 frag_uv;      
-       
-flat out int frag_texture_index;       
-
-uniform mat4 view_matrix = mat4(1);     
-uniform mat4 projection_matrix = mat4(1);
-
-void main() {             
-    vec4 world_space = position;       
-    vec4 cam_space = view_matrix * world_space;
-    vec4 clip_space = projection_matrix * cam_space;        
-    gl_Position = clip_space;      
-       
-    rect_color = color;        
-    frag_uv = uv;      
-    frag_texture_index = texture_index;        
-    
-    float d = length(cam_space.xyz);
-}      
-#else 
-
-in vec4 rect_color;        
-in vec2 frag_uv;       
-flat in int frag_texture_index;        
-uniform sampler2DArray tex;        
-out vec4 out_color;        
-void main()        
-{      
-    vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
-    vec4 texture_sample = texture(tex, array_uv);      
-    
-    out_color = texture_sample * rect_color;       
-}      
-#endif)FOO";
-    renderer->standard_shader = create_shader(standard_shader_code);
-    renderer->projection_location = glGetUniformLocation(renderer->standard_shader, "projection_matrix");
-    assert(renderer->projection_location != (GLuint)-1);
-    renderer->tex_location = glGetUniformLocation(renderer->standard_shader, "tex");
-    assert(renderer->tex_location != (GLuint)-1);
-    renderer->view_location = glGetUniformLocation(renderer->standard_shader, "view_matrix");
-    assert(renderer->view_location != (GLuint)-1);
-    const char *render_framebuffer_shader_code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-
-out vec2 frag_uv;
-
-void main() {
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    frag_uv = (position + vec2(1)) * 0.5;
-}
-#else     
-
-in vec2 frag_uv;
-out vec4 out_color;
-
-uniform sampler2D tex;
-
-void main() {
-    out_color = texture(tex, frag_uv);
-}
-
-#endif)FOO";
-    renderer->render_framebuffer_shader = create_shader(render_framebuffer_shader_code);
-    renderer->render_framebuffer_tex_location = glGetUniformLocation(renderer->render_framebuffer_shader, "tex");
-    assert(renderer->render_framebuffer_tex_location != (GLuint)-1);
-    
-    const char *horizontal_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-
-out vec2 blur_uvs[11];
-uniform float target_width;
-
-void main() {
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    vec2 center_uv = (position + vec2(1)) * 0.5;
-    float px_size = 1.0 / target_width;
-    for (int i = -5; i <= 5; ++i) {
-        blur_uvs[i + 5] = center_uv + vec2(px_size * i, 0);
-    }
-}
-
-#else 
-
-out vec4 out_color;
-in vec2 blur_uvs[11];
-
-uniform sampler2D tex;
-
-void main() {
-    out_color = vec4(0);
-    out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    out_color += texture(tex, blur_uvs[10]) * 0.0093;
-}
-
-#endif)FOO";
-    renderer->horizontal_gaussian_blur_shader = create_shader(horizontal_gaussian_blur_shader_code);
-    renderer->horizontal_gaussian_blur_tex_location = glGetUniformLocation(renderer->horizontal_gaussian_blur_shader, "tex");
-    renderer->horizontal_gaussian_blur_target_width = glGetUniformLocation(renderer->horizontal_gaussian_blur_shader, "target_width");
-    assert(renderer->horizontal_gaussian_blur_tex_location != (GLuint)-1);
-    assert(renderer->horizontal_gaussian_blur_target_width != (GLuint)-1);
-    
-    const char *vertical_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-
-out vec2 blur_uvs[11];
-uniform float target_height;
-
-void main() {
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    vec2 center_uv = (position + vec2(1)) * 0.5;
-    float px_size = 1.0 / target_height;
-    for (int i = -5; i <= 5; ++i) {
-        blur_uvs[i + 5] = center_uv + vec2(0, px_size * i);
-    }
-}
-
-#else 
-
-out vec4 out_color;
-in vec2 blur_uvs[11];
-
-uniform sampler2D tex;
-
-void main() {
-    out_color = vec4(0);
-    out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    out_color += texture(tex, blur_uvs[10]) * 0.0093;
-}
-
-#endif)FOO";
-    renderer->vertical_gaussian_blur_shader = create_shader(vertical_gaussian_blur_shader_code);
-    renderer->vertical_gaussian_blur_tex_location = glGetUniformLocation(renderer->vertical_gaussian_blur_shader, "tex");
-    renderer->vertical_gaussian_blur_target_height = glGetUniformLocation(renderer->vertical_gaussian_blur_shader, "target_height");
-    assert(renderer->vertical_gaussian_blur_tex_location != (GLuint)-1);
-    assert(renderer->vertical_gaussian_blur_target_height != (GLuint)-1);
+    renderer->quad_shader = compile_quad_shader();
+    renderer->blit_framebuffer_shader = compile_blit_framebuffer_shader();
+    renderer->horizontal_blur_shader = compile_horizontal_blur_shader();
+    renderer->vertical_blur_shader = compile_vertical_blur_shader();
     
     // Generate vertex arrays
     glGenVertexArrays(1, &renderer->render_framebuffer_vao);
@@ -520,6 +571,13 @@ void main() {
                      0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
         renderer->video_memory_used += iter.width * iter.height * 4;
     }
+    
+    glGenFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
+    glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
+    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_SEPARATED);
+    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL1);
+    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL2);
+    
     init_renderer_for_settings(renderer, settings);
     return renderer;
 }
@@ -563,7 +621,7 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     
     glDisable(GL_DEPTH_TEST);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(renderer->render_framebuffer_shader);
+    bind_shader(&renderer->blit_framebuffer_shader, 0);
     glBindVertexArray(renderer->render_framebuffer_vao);
     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[from]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -605,10 +663,8 @@ void renderer_end_frame(Renderer *renderer) {
                 cursor += sizeof(*quads);
                 
                 assert(current_setup);
-                glUseProgram(renderer->standard_shader);
+                bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
                 glBindVertexArray(renderer->vertex_array);
-                glUniformMatrix4fv(renderer->view_location, 1, false, current_setup->view.value_ptr());
-                glUniformMatrix4fv(renderer->projection_location, 1, false, current_setup->projection.value_ptr());
                 glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
                 glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE, (void *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset), quads->vertex_array_offset);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
@@ -621,10 +677,8 @@ void renderer_end_frame(Renderer *renderer) {
                 assert(current_framebuffer == RENDERER_FRAMEBUFFER_SEPARATED);
                 
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
-                
-                glUseProgram(renderer->horizontal_gaussian_blur_shader);
+                bind_shader(&renderer->horizontal_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
-                glUniform1f(renderer->horizontal_gaussian_blur_target_width, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_SEPARATED]);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
@@ -632,10 +686,8 @@ void renderer_end_frame(Renderer *renderer) {
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, true);
-                
-                glUseProgram(renderer->vertical_gaussian_blur_shader);
+                bind_shader(&renderer->vertical_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
-                glUniform1f(renderer->vertical_gaussian_blur_target_height, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_BLUR1]);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);

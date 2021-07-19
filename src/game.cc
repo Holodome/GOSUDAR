@@ -127,6 +127,8 @@ void game_init(Game *game) {
 
 
 static void update_game_state(Game *game, RendererCommands *commands) {
+    // @TODO think more about separated rendering - here we render interface during it, 
+    // should that be the norm?
     begin_separated_rendering(commands);
     update_and_render_world_state(&game->world_state, &game->input, commands, game->assets);
     
@@ -135,7 +137,6 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->game_state = GAME_STATE_PLAYING;
         }
         
-        //commands->perform_blur = true;
         do_blur(commands);
         update_and_render_interface(game->pause_interface, &game->input, commands, game->assets);
         if (game->pause_continue->is_pressed) {
@@ -156,7 +157,6 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        // commands->perform_blur = true;
         do_blur(commands);
         update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
         if (game->settings_back->is_pressed) {

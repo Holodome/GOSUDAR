@@ -20,6 +20,8 @@ enum {
     // @TODO API is not clear - just because it forces use of separated framebuffer
     // Also what if we want to control the amounth of blur or whatever
     RENDERER_COMMAND_BLUR,
+    RENDERER_COMMAND_BEGIN_DEPTH_PEELING,
+    RENDERER_COMMAND_END_DEPTH_PEELING,
     RENDERER_COMMAND_SENTINEL,
 };
 
@@ -55,6 +57,8 @@ void push_quad(RendererCommands *commands, vec3 v00, vec3 v01, vec3 v10, vec3 v1
                Texture texture = INVALID_TEXTURE);
 // Perfoms blurring and renders it on same framebuffer
 void do_blur(RendererCommands *commands);
+void begin_depth_peel(RendererCommands *commands);
+void end_depth_peel(RendererCommands *commands);
 
 //
 // Additional rendering helpers

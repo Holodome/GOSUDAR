@@ -81,6 +81,15 @@ void set_setup(RendererCommands *commands, RendererSetup *src) {
     commands->last_setup = dst;
 }
 
+
+void begin_depth_peel(RendererCommands *commands) {
+    push_command_no_storage(commands, RENDERER_COMMAND_BEGIN_DEPTH_PEELING);
+}
+
+void end_depth_peel(RendererCommands *commands) {
+    push_command_no_storage(commands, RENDERER_COMMAND_END_DEPTH_PEELING);
+}
+
 void push_quad(RendererCommands *commands, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
                vec4 c00, vec4 c01, vec4 c10, vec4 c11,
                vec2 uv00, vec2 uv01, vec2 uv10, vec2 uv11,

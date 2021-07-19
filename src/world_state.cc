@@ -340,6 +340,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
 void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *commands, Assets *assets, InputManager *input) {
     RendererSetup setup = setup_3d(world_state->view, world_state->projection);
     set_setup(commands, &setup);
+    begin_depth_peel(commands);
     RenderGroup render_group = create_render_group(commands, assets);
     // 
     // Ground
@@ -453,7 +454,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     // Particles
     //
     update_and_render_particles(&world_state->particle_system, &render_group, input->platform->frame_dt);
-    
+    end_depth_peel(commands);
 }
 
 void update_and_render_world_state(WorldState *world_state, InputManager *input, RendererCommands *commands, Assets *assets) {

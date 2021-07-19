@@ -8,11 +8,11 @@ _type _name;
 #include "gl_procs.inc"
 #undef GLPROC
 
-static GLuint create_shader(const char *source) {
+static GLuint create_shader(const char *source, const char *defines = "") {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", source };
-    const char *const fragment_source[] = { "#version 330\n", "", source };
+    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", defines, source };
+    const char *const fragment_source[] = { "#version 330\n", defines, source };
     glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
     glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
     glCompileShader(vertex_shader);
@@ -66,9 +66,12 @@ struct OpenGLQuadShader {
     GLuint view_location;
     GLuint projection_location;
     GLuint tex_location;
+    
+    bool is_depth_peeling;
+    GLuint depth_location;
 };
 
-OpenGLQuadShader compile_quad_shader() {
+OpenGLQuadShader compile_quad_shader(bool depth_peel) {
     const char *standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
 layout(location = 0) in vec4 position;     
 layout(location = 1) in vec2 uv;       
@@ -101,30 +104,58 @@ void main() {
 in vec4 rect_color;        
 in vec2 frag_uv;       
 flat in int frag_texture_index;        
+
 uniform sampler2DArray tex;        
+#if DEPTH_PEEL
+uniform sampler2D depth;
+#endif 
 out vec4 out_color;        
+
 void main()        
 {      
-    vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
-    vec4 texture_sample = texture(tex, array_uv);      
+#if DEPTH_PEEL
+float clip_depth = texelFetch(depth, ivec2(gl_FragCoord.xy), 0).x;
+float frag_z = gl_FragCoord.z;
+if (frag_z <= clip_depth) {
+discard;
+}
+#endif 
     
-    out_color = texture_sample * rect_color;       
-}      
+vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
+    vec4 texture_sample = texture(tex, array_uv, 0);      
+
+if (texture_sample.a > 0) {
+out_color = texture_sample * rect_color;       
+} else {
+discard;
+}
+}    
+  
 #endif)FOO";
     
+    char defines[256];
+    snprintf(defines, sizeof(defines), "#define DEPTH_PEEL %u\n", (u32)TO_BOOL(depth_peel));
+    
     OpenGLQuadShader result = {};
-    result.id = create_shader(standard_shader_code);
+    result.is_depth_peeling = depth_peel;
+    result.id = create_shader(standard_shader_code, defines);
     result.projection_location = get_uniform(result.id, "projection_matrix");
     result.view_location = get_uniform(result.id, "view_matrix");
     result.tex_location = get_uniform(result.id, "tex");
+    if (depth_peel) {
+        result.depth_location = get_uniform(result.id, "depth");
+    }
     return result;
 }
 
-static void bind_shader(OpenGLQuadShader *shader, Mat4x4 *view, Mat4x4 *projection, u32 tex) {
+static void bind_shader(OpenGLQuadShader *shader, Mat4x4 *view, Mat4x4 *projection, u32 tex, u32 depth = 1) {
     glUseProgram(shader->id);
     glUniformMatrix4fv(shader->view_location, 1, false, view->value_ptr());
     glUniformMatrix4fv(shader->projection_location, 1, false, projection->value_ptr());
     glUniform1i(shader->tex_location, tex);
+    if (shader->is_depth_peeling) {
+        glUniform1i(shader->depth_location, depth);
+    }
 }
 
 struct OpenGLBlitFramebufferShader {
@@ -281,6 +312,50 @@ static void bind_shader(OpenGLVerticalBlurShader *shader, f32 target_height, u32
     glUniform1f(shader->target_height_location, target_height);
 }
 
+struct OpenGLDepthPeelCompositeShader {
+    GLuint id;
+    GLuint peel0_location;
+    GLuint peel1_location;
+};
+
+static OpenGLDepthPeelCompositeShader compile_depth_peel_composite() {
+    const char *code = R"FOO(#ifdef VERTEX_SHADER
+layout(location = 0) in vec2 position;
+        
+        out vec2 frag_uv;
+        
+        void main() {
+            gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+            frag_uv = (position + vec2(1)) * 0.5;
+        }
+#else 
+
+uniform sampler2D peel0_tex;
+uniform sampler2D peel1_tex;
+
+in vec2 frag_uv;
+out vec4 out_color;
+
+void main() {
+vec4 peel0 = texture(peel0_tex, frag_uv);
+vec4 peel1 = texture(peel1_tex, frag_uv);
+out_color.rgb = peel0.rgb + (1.0 - peel0.a) * peel1.rgb;
+
+}
+#endif)FOO";
+    OpenGLDepthPeelCompositeShader result = {};
+    result.id = create_shader(code);
+    result.peel0_location = get_uniform(result.id, "peel0_tex");
+    result.peel1_location = get_uniform(result.id, "peel1_tex");
+    return result;
+}
+
+void bind_shader(OpenGLDepthPeelCompositeShader *shader, u32 peel0, u32 peel1) {
+    glUseProgram(shader->id);
+    glUniform1i(shader->peel0_location, peel0);
+    glUniform1i(shader->peel1_location, peel1);
+}
+
 // This is more like description
 struct RendererFramebuffer {
     vec2 size;
@@ -304,9 +379,11 @@ struct Renderer {
     RendererCommands commands;
     
     OpenGLQuadShader quad_shader;
+    OpenGLQuadShader depth_peel_shader;
     OpenGLBlitFramebufferShader blit_framebuffer_shader;
     OpenGLVerticalBlurShader vertical_blur_shader;
     OpenGLHorizontalBlurShader horizontal_blur_shader;
+    OpenGLDepthPeelCompositeShader depth_peel_composite_shader;
     
     GLuint render_framebuffer_vao;
     GLuint vertex_array;
@@ -331,69 +408,69 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
     char *source_str;
     switch(source) {
         case GL_DEBUG_SOURCE_API_ARB: {
-		    source_str = "Calls to OpenGL API";
+            source_str = "Calls to OpenGL API";
         } break;
         case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB: {
-		    source_str = "Calls to window-system API";
+            source_str = "Calls to window-system API";
         } break;
         case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB: {
-		    source_str = "A compiler for shading language"; 
+            source_str = "A compiler for shading language"; 
         } break;
         case GL_DEBUG_SOURCE_THIRD_PARTY_ARB: {
-		    source_str = "Application associated with OpenGL"; 
+            source_str = "Application associated with OpenGL"; 
         } break;
         case GL_DEBUG_SOURCE_APPLICATION_ARB: {
-		    source_str = "Generated by user"; 
+            source_str = "Generated by user"; 
         } break;
         case GL_DEBUG_SOURCE_OTHER_ARB: {
-		    source_str = "Other"; 
+            source_str = "Other"; 
         } break;
         default: {
-		    source_str = "Unknown"; 
+            source_str = "Unknown"; 
         } break;
     }
     
     char *type_str;
     switch (type) {
         case GL_DEBUG_TYPE_ERROR_ARB: {
-		    type_str = "ERROR"; 
+            type_str = "ERROR"; 
         } break;
         case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB: {
-		    type_str = "DEPRECATED_BEHAVIOR"; 
+            type_str = "DEPRECATED_BEHAVIOR"; 
         } break;
         case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB: {
-		    type_str = "UNDEFINED_BEHAVIOR"; 
+            type_str = "UNDEFINED_BEHAVIOR"; 
         } break;
         case GL_DEBUG_TYPE_PORTABILITY_ARB: {
-		    type_str = "PORTABILITY";
+            type_str = "PORTABILITY";
         } break;
         case GL_DEBUG_TYPE_PERFORMANCE_ARB: {
-		    type_str = "PERFORMANCE"; 
+            type_str = "PERFORMANCE"; 
         } break;
         case GL_DEBUG_TYPE_OTHER_ARB: {
-		    type_str = "OTHER"; 
+            type_str = "OTHER"; 
         } break;
         default: {
-		    type_str = "UNKNOWN"; 
+            type_str = "UNKNOWN"; 
         } break;
     }
     
     char *severity_str;
     switch(severity) {
         case GL_DEBUG_SEVERITY_NOTIFICATION: {
-		    severity_str = "NOTIFICATION"; 
+            severity_str = "NOTIFICATION"; 
         } break;
         case GL_DEBUG_SEVERITY_LOW_ARB: {
-		    severity_str = "LOW"; 
+            severity_str = "LOW"; 
         } break;
         case GL_DEBUG_SEVERITY_MEDIUM_ARB: {
-		    severity_str = "MEDIUM"; 
+            severity_str = "MEDIUM"; 
         } break;
         case GL_DEBUG_SEVERITY_HIGH_ARB: {
-		    severity_str = "HIGH"; 
+            severity_str = "HIGH"; 
         } break;
         default: {
-		    severity_str = "UNKNOWN"; 
+            severity_str = "UNKNOWN"; 
         } break;
     }
     fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n", source_str, type_str, severity_str, id, message);
@@ -420,11 +497,10 @@ static void init_framebuffer(Renderer *renderer, u32 idx,
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_id, 0);
     mem += size.x * size.y * 4;
     if (has_depth) {
-        glGenRenderbuffers(1, renderer->framebuffer_depths + idx);
         GLuint depth_id = renderer->framebuffer_depths[idx];
-        glBindRenderbuffer(GL_RENDERBUFFER, depth_id);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size.x, size.y);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_id);
+        glBindTexture(GL_TEXTURE_2D, depth_id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_id, 0);
         
         mem += size.x * size.y * 3;
     }
@@ -513,10 +589,12 @@ Renderer *renderer_init(RendererSettings settings) {
     renderer->commands.max_index_count = MAX_INDEX_COUNT;
     renderer->commands.indices = alloc_arr(&renderer->arena, MAX_INDEX_COUNT, RENDERER_INDEX_TYPE);
     
-    renderer->quad_shader = compile_quad_shader();
+    renderer->quad_shader = compile_quad_shader(false);
+    renderer->depth_peel_shader = compile_quad_shader(true);
     renderer->blit_framebuffer_shader = compile_blit_framebuffer_shader();
     renderer->horizontal_blur_shader = compile_horizontal_blur_shader();
     renderer->vertical_blur_shader = compile_vertical_blur_shader();
+    renderer->depth_peel_composite_shader = compile_depth_peel_composite();
     
     // Generate vertex arrays
     glGenVertexArrays(1, &renderer->render_framebuffer_vao);
@@ -569,14 +647,14 @@ Renderer *renderer_init(RendererSettings settings) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
                      iter.width, iter.height, MAX_TEXTURE_COUNT,
                      0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
-        renderer->video_memory_used += iter.width * iter.height * 4;
+        renderer->video_memory_used += iter.width * iter.height * 4 * renderer->max_texture_count;
     }
     
     glGenFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
     glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
-    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_SEPARATED);
-    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL1);
-    glGenRenderbuffers(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL2);
+    glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_SEPARATED);
+    glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL1);
+    glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL2);
     
     init_renderer_for_settings(renderer, settings);
     return renderer;
@@ -623,6 +701,7 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     bind_shader(&renderer->blit_framebuffer_shader, 0);
     glBindVertexArray(renderer->render_framebuffer_vao);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[from]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -652,6 +731,9 @@ void renderer_end_frame(Renderer *renderer) {
     
     u8 *cursor = renderer->commands.command_memory;
     u8 *commands_bound = renderer->commands.command_memory + renderer->commands.command_memory_used;
+    u8 *peel_header_restore = 0;
+    u32 peel_count = 0;
+    b32 is_peeling = false;
     
     u32 DEBUG_draw_call_count = 0;
     while (cursor < commands_bound) {
@@ -663,9 +745,17 @@ void renderer_end_frame(Renderer *renderer) {
                 cursor += sizeof(*quads);
                 
                 assert(current_setup);
-                bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
-                glBindVertexArray(renderer->vertex_array);
+                if (is_peeling) {
+                    bind_shader(&renderer->depth_peel_shader, &current_setup->view, &current_setup->projection, 0, 1);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_depths[RENDERER_FRAMEBUFFER_PEEL1]);
+                } else {
+                    bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
+                }
+                glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
+                glBindVertexArray(renderer->vertex_array);
+                
                 glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE, (void *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset), quads->vertex_array_offset);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
@@ -679,6 +769,7 @@ void renderer_end_frame(Renderer *renderer) {
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
                 bind_shader(&renderer->horizontal_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
+                glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_SEPARATED]);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
@@ -688,6 +779,7 @@ void renderer_end_frame(Renderer *renderer) {
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, true);
                 bind_shader(&renderer->vertical_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
+                glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_BLUR1]);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
@@ -712,6 +804,47 @@ void renderer_end_frame(Renderer *renderer) {
                 cursor += sizeof(*setup);
                 
                 current_setup = setup;
+            } break;
+            case RENDERER_COMMAND_BEGIN_DEPTH_PEELING: {
+#if 0
+                peel_header_restore = cursor;
+                bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, true);
+#endif 
+            } break;
+            case RENDERER_COMMAND_END_DEPTH_PEELING: {
+#if 0
+                if (peel_count == 0) {
+                    cursor = peel_header_restore;
+                    ++peel_count;
+                    
+                    bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, true);
+                    is_peeling = true;
+                    glDisable(GL_DEPTH_TEST);
+                } else {
+                    assert(peel_count == 1);
+                    
+#if 1
+                    blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, current_framebuffer);
+#else 
+                    glDisable(GL_DEPTH_TEST);
+                    glDisable(GL_BLEND);
+                    bind_framebuffer(renderer, current_framebuffer, true);
+                    bind_shader(&renderer->depth_peel_composite_shader, 0, 1);
+                    glBindVertexArray(renderer->render_framebuffer_vao);
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL1]);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL2]);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    glBindVertexArray(0);
+                    glUseProgram(0);
+                    glEnable(GL_BLEND);
+                    glEnable(GL_DEPTH_TEST);
+#endif 
+                    is_peeling = false;
+                    glEnable(GL_DEPTH_TEST);
+                }
+#endif 
             } break;
             INVALID_DEFAULT_CASE;
         }

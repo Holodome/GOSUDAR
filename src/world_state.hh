@@ -53,7 +53,7 @@ struct WorldState {
 };
 
 void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena);
-void update_and_render_world_state(WorldState *world_state, InputManager *input, RendererCommands *commands, Assets *assets);
+void update_and_render_world_state(WorldState *world_state, GameLinks links);
 
 #define WORLD_STATE_HH 1
 #endif

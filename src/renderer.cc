@@ -879,7 +879,6 @@ Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 widt
     return tex;
 }
 
-
-RendererSettings *get_current_settings(Renderer *renderer) {
+const RendererSettings *get_current_settings(Renderer *renderer) {
     return &renderer->settings;
 }

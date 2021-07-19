@@ -65,10 +65,10 @@ UIListener *get_listener(UIElement *element) {
     return &element->listener;
 }
 
-void update_and_render_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets) {
-    RendererSetup setup = setup_2d(Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0));
-    set_setup(commands, &setup);
-    RenderGroup ui_render_group = create_render_group(commands, assets);
+void update_and_render_interface(UIElement *first_element, GameLinks links) {
+    RendererSetup setup = setup_2d(Mat4x4::ortographic_2d(0, links.platform->display_size.x, links.platform->display_size.y, 0));
+    set_setup(links.commands, &setup);
+    RenderGroup ui_render_group = create_render_group(links.commands, links.assets);
     UIElement *element_depth_stack[UI_MAX_DEPTH] = {};
     u32 depth_stack_index = 0;
     element_depth_stack[0] = first_element;
@@ -93,12 +93,12 @@ void update_and_render_interface(UIElement *first_element, InputManager *input, 
                 push_rect(&ui_render_group, element->rect, element->block.color);
             } break;
             case UI_ELEMENT_BUTTON: {
-                bool collides = element->rect.collide(input->platform->mpos);
-                if (collides && is_key_pressed(input, KEY_MOUSE_LEFT)) {
+                bool collides = element->rect.collide(links.input->platform->mpos);
+                if (collides && is_key_pressed(links.input, KEY_MOUSE_LEFT)) {
                     element->button.is_held = true;
                 } else {
                     element->button.is_pressed = false;
-                    if (element->button.is_held && is_key_held(input, KEY_MOUSE_LEFT)) {
+                    if (element->button.is_held && is_key_held(links.input, KEY_MOUSE_LEFT)) {
                         element->button.is_held = true;
                     } else if (element->button.is_held) {
                         element->listener.is_pressed = true;
@@ -107,19 +107,19 @@ void update_and_render_interface(UIElement *first_element, InputManager *input, 
                     } 
                 }
                 
-                AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                AssetID font_id = assets_get_first_of_type(links.assets, ASSET_TYPE_FONT);
+                vec2 text_size = DEBUG_get_text_size(links.assets, font_id, 
                                                      element->button.text);
                 vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
                 vec4 color = element->button.is_held ? element->button.color_active : element->button.color_inactive;
                 DEBUG_push_text(&ui_render_group, position, color, element->button.text, font_id, 1.0f);
             } break;
             case UI_ELEMENT_CHECKBOX: {
-                bool collides = element->rect.collide(input->platform->mpos);
-                if (collides && is_key_pressed(input, KEY_MOUSE_LEFT)) {
+                bool collides = element->rect.collide(links.input->platform->mpos);
+                if (collides && is_key_pressed(links.input, KEY_MOUSE_LEFT)) {
                     element->checkbox.is_held = true;
                 } else {
-                    if (element->checkbox.is_held && is_key_held(input, KEY_MOUSE_LEFT)) {
+                    if (element->checkbox.is_held && is_key_held(links.input, KEY_MOUSE_LEFT)) {
                         element->checkbox.is_held = true;
                     } else if (element->checkbox.is_held) {
                         *element->checkbox.value = !*element->checkbox.value;
@@ -127,16 +127,16 @@ void update_and_render_interface(UIElement *first_element, InputManager *input, 
                     } 
                 }
                 
-                AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                AssetID font_id = assets_get_first_of_type(links.assets, ASSET_TYPE_FONT);
+                vec2 text_size = DEBUG_get_text_size(links.assets, font_id, 
                                                      element->button.text);
                 vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
                 vec4 color = *element->checkbox.value ? element->checkbox.color_active : element->checkbox.color_inactive;
                 DEBUG_push_text(&ui_render_group, position, color, element->checkbox.text, font_id, 1.0f);
             } break;
             case UI_ELEMENT_LABEL: {
-                AssetID font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-                vec2 text_size = DEBUG_get_text_size(assets, font_id, 
+                AssetID font_id = assets_get_first_of_type(links.assets, ASSET_TYPE_FONT);
+                vec2 text_size = DEBUG_get_text_size(links.assets, font_id, 
                                                      element->label.text);
                 vec2 position = element->rect.p + (element->rect.s - text_size) * 0.5f;
                 DEBUG_push_text(&ui_render_group, position, element->label.color, element->label.text, font_id, 1.0f);

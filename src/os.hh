@@ -19,6 +19,19 @@ struct FileHandle {
     u8 storage[8];
 };
 
+enum {
+    OS_MEMORY_BLOCK_FLAG_UNDERFLOW = 0x1,
+    OS_MEMORY_BLOCK_FLAG_OVERFLOW  = 0x2,
+};
+
+struct OSMemoryBlock {
+    u32 flags;
+    u64 size;
+    u64 used;
+    u8 *base;
+    OSMemoryBlock *prev;
+};
+
 struct OS;
 
 // @CLEANUP do we really have to do this ugly display_size passing?

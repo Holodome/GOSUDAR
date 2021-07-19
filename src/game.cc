@@ -119,6 +119,7 @@ void game_init(Game *game) {
     game->os = os_init(&game->renderer_settings.display_size);
     game->renderer = renderer_init(game->renderer_settings);
     game->assets = assets_init(game->renderer, &game->frame_arena);
+    init_audio_system(&game->audio);
     
     world_state_init(&game->world_state, &game->arena, &game->frame_arena);
     game->state = STATE_MAIN_MENU;
@@ -126,19 +127,19 @@ void game_init(Game *game) {
 }
 
 
-static void update_game_state(Game *game, RendererCommands *commands) {
+static void update_game_state(Game *game, GameLinks links) {
     // @TODO think more about separated rendering - here we render interface during it, 
     // should that be the norm?
-    begin_separated_rendering(commands);
-    update_and_render_world_state(&game->world_state, &game->input, commands, game->assets);
+    begin_separated_rendering(links.commands);
+    update_and_render_world_state(&game->world_state, links);
     
     if (game->game_state == GAME_STATE_PAUSED) {
         if (is_key_pressed(&game->input, KEY_ESCAPE)) {
             game->game_state = GAME_STATE_PLAYING;
         }
         
-        do_blur(commands);
-        update_and_render_interface(game->pause_interface, &game->input, commands, game->assets);
+        do_blur(links.commands);
+        update_and_render_interface(game->pause_interface, links);
         if (game->pause_continue->is_pressed) {
             game->game_state = GAME_STATE_PLAYING;
         } 
@@ -157,8 +158,8 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        do_blur(commands);
-        update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
+        do_blur(links.commands);
+        update_and_render_interface(game->settings_interface, links);
         if (game->settings_back->is_pressed) {
             game->game_state = GAME_STATE_PAUSED;
         }
@@ -167,14 +168,14 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        update_and_render_interface(game->game_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->game_interface, links);
     }
-    end_separated_rendering(commands);
+    end_separated_rendering(links.commands);
 }
 
-static void update_main_menu_state(Game *game, RendererCommands *commands) {
+static void update_main_menu_state(Game *game, GameLinks links) {
     if (game->main_menu_state == MAIN_MENU_MAIN_SCREEN) {
-        update_and_render_interface(game->main_menu_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->main_menu_interface, links);
         if (game->main_menu_start_game_button->is_pressed) {
             game->state = STATE_PLAY;
         } 
@@ -188,7 +189,7 @@ static void update_main_menu_state(Game *game, RendererCommands *commands) {
         if (is_key_pressed(&game->input, KEY_ESCAPE)) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         }
-        update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
+        update_and_render_interface(game->settings_interface, links);
         if (game->settings_back->is_pressed) {
             game->main_menu_state = MAIN_MENU_MAIN_SCREEN;
         } 
@@ -211,6 +212,7 @@ void game_update_and_render(Game *game) {
     
     Platform *platform = os_begin_frame(game->os);
     game->input = create_input_manager(platform);
+    
     if (platform->is_quit_requested || (is_key_held(&game->input, KEY_ALT) && is_key_pressed(&game->input, KEY_F4))) {
         game->is_running = false;
     }     
@@ -229,18 +231,27 @@ void game_update_and_render(Game *game) {
     }
     
     RendererCommands *commands = renderer_begin_frame(game->renderer);
+    
+    GameLinks links;
+    links.commands = commands;
+    links.assets = game->assets;
+    links.platform = platform;
+    links.input = &game->input;
+    links.audio = &game->audio;
+    
     switch (game->state) {
         case STATE_MAIN_MENU: {
-            update_main_menu_state(game, commands);
+            update_main_menu_state(game, links);
         } break;
         case STATE_PLAY: {
-            update_game_state(game, commands);
+            update_game_state(game, links);
         } break;
     }
     DEBUG_update(game->debug_state, &game->input, commands, game->assets);
     renderer_end_frame(game->renderer);
     
     platform->vsync = game->renderer_settings.vsync;
+    update_audio(&game->audio, game->assets, platform);
     os_end_frame(game->os);
     DEBUG_frame_end(game->debug_state);
 }

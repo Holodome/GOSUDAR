@@ -53,6 +53,7 @@ extern "C" {
 #include "renderer.cc"
 #include "render_group.cc"
 #include "assets.cc"
+#include "audio.cc"
 #include "dev_ui.cc"
 #include "world.cc"
 #include "sim_region.cc"

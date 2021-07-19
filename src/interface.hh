@@ -1,6 +1,7 @@
 #if !defined(INTERFACE_HH)
 
 #include "lib.hh"
+#include "entity.hh"
 
 #define UI_MAX_DEPTH 10
 
@@ -94,16 +95,16 @@ UIElement *new_ui_element(MemoryArena *arena, UIElement **ll_elements, UIElement
 UIElement *create_ui_block(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color);
 UIElement *create_ui_label(MemoryArena *arena, UIElement **ll_elements, Rect rect, vec4 color, const char *text);
 UIElement *create_ui_button(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-     vec4 color_inactive, vec4 color_active, const char *text);
+                            vec4 color_inactive, vec4 color_active, const char *text);
 UIElement *create_ui_button_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-     vec4 color_inactive, vec4 color_active, const char *text, vec4 background);
+                                       vec4 color_inactive, vec4 color_active, const char *text, vec4 background);
 UIElement *create_ui_checkbox(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    vec4 color_inactive, vec4 color_active, const char *text, bool *value);
+                              vec4 color_inactive, vec4 color_active, const char *text, bool *value);
 UIElement *create_ui_checkbox_background(MemoryArena *arena, UIElement **ll_elements, Rect rect,
-    vec4 color_inactive, vec4 color_active, const char *text, bool *value, vec4 background);
+                                         vec4 color_inactive, vec4 color_active, const char *text, bool *value, vec4 background);
 UIListener *get_listener(UIElement *element);
 void interface_recalculate_rects(UIElement *first_element, InputManager *input);
-void update_and_render_interface(UIElement *first_element, InputManager *input, RendererCommands *commands, Assets *assets);
+void update_and_render_interface(UIElement *first_element, GameLinks links);
 
 static bool draw_ui_frames = false;
 

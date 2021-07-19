@@ -105,7 +105,8 @@ struct SimRegion {
     u32 entity_blocks_allocated;
     SimRegionChunkEntityBlock *first_free_entity_block;
     
-    u32 missing_entity_space;
+    u32 entity_hash_hits;
+    u32 entity_hash_misses;
 };
 
 #define MAX_ANCHORS 32

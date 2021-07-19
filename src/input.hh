@@ -70,7 +70,7 @@ struct Platform {
 };
 
 inline void update_key_state(Platform *input, u32 key, bool new_down) {
-    input->keys_transition_count[key] += (bool)(input->is_keys_down[key] != new_down);
+    input->keys_transition_count[key] += TO_BOOL(input->is_keys_down[key] != new_down);
     input->is_keys_down[key] = new_down;
 }
 
@@ -104,7 +104,7 @@ inline void lock_mouse(InputManager *manager) {
 inline bool is_key_pressed(InputManager *manager, u32 key) {
     bool result = false;
     // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
-        result = manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
+    result = manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
     // }
     return result;
 }
@@ -112,7 +112,7 @@ inline bool is_key_pressed(InputManager *manager, u32 key) {
 inline bool is_key_released(InputManager *manager, u32 key) {
     bool result = false;
     // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
-        result = !manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
+    result = !manager->platform->is_keys_down[key] && manager->platform->keys_transition_count[key];
     // }
     return result;
 }
@@ -120,7 +120,7 @@ inline bool is_key_released(InputManager *manager, u32 key) {
 bool is_key_held(InputManager *manager, u32 key) {
     bool result = false;
     // if ((is_mouse_keycode(key) && !manager->is_mouse_locked) || (!is_mouse_keycode(key) && !manager->is_keyboard_locked)) {
-        result = manager->platform->is_keys_down[key];
+    result = manager->platform->is_keys_down[key];
     // }
     return result;
 }

@@ -192,6 +192,9 @@ SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         SimRegionEntityHash *entry = sim->entity_hash + hash_idx;
         if (IS_NULL(entry->id) || IS_SAME(entry->id, id)) {
+            ++sim->entity_hash_hits;
+            sim->entity_hash_misses += offset;
+            
             result = entry;
             break;
         }
@@ -348,11 +351,9 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
 #define MAX_ENTITIES_PER_CHUNK 512
     sim->max_entity_count = next_highest_pow_2(chunk_count * MAX_ENTITIES_PER_CHUNK);
     sim->entity_count = 0;
-    BEGIN_BLOCK("Alloc");
     sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk, false);
     sim->entities = alloc_arr(arena, sim->max_entity_count, Entity, false);
     sim->entity_hash = alloc_arr(arena, sim->max_entity_count, SimRegionEntityHash);
-    END_BLOCK();
     sim->chunks_count = chunk_count;
     for (u32 chunk_idx = 0; chunk_idx < chunk_count; ++chunk_idx) {
         SimRegionChunk *sim_chunk = sim->chunks + chunk_idx;
@@ -403,6 +404,8 @@ void end_sim(SimRegion *sim, struct WorldState *world_state) {
             }
         }
     }
+    DEBUG_VALUE(sim->entity_hash_hits, "Entity hash hits");
+    DEBUG_VALUE(sim->entity_hash_misses, "Entit hash misses");
 }
 
 static void next(SimChunkIterator *iter) {

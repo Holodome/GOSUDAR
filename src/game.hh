@@ -9,16 +9,10 @@
 #include "render_group.hh"
 #include "interface.hh"
 
+#include "audio.hh"
 #include "world.hh"
 #include "sim_region.hh"
 #include "world_state.hh"
-
-struct PlayingSound {
-    AssetID sound_id;
-    f64 play_cursor;
-    bool is_finished;
-    PlayingSound *next;
-};
 
 enum StateKind {
     STATE_MAIN_MENU,  
@@ -35,7 +29,6 @@ enum GameState {
     GAME_STATE_PAUSED,
     GAME_STATE_SETTINGS,
 };
-
 
 // Game is a object that decribes program as one element 
 // It contains several elements that are all used in game state
@@ -54,18 +47,13 @@ struct Game {
     Assets *assets;
     DebugState *debug_state;
     InputManager input;
+    AudioSystem audio;
     
     //
     // Renderer settings
     //
     RendererSettings renderer_settings;
-    //
-    // Sound
-    //
-    u64 playing_sounds_allocated;
-    f32 global_volume;
-    PlayingSound *first_playing_sound;
-    PlayingSound *first_free_playing_sound;
+    
     // Game state
     StateKind state;  
     //

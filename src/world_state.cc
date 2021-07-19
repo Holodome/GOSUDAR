@@ -112,13 +112,13 @@ static void init_particles_for_interaction(WorldState *world_state, SimRegion *s
     }
 }
 
-static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *entity, InputManager *input) {
+static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *entity, GameLinks links) {
     assert(IS_NOT_NULL(entity->order));
     Order *order = get_order_by_id(&world_state->order_system, entity->order);
     assert(order);
     
     if (entity->interaction.kind) {
-        entity->interaction.current_time += input->platform->frame_dt;
+        entity->interaction.current_time += links.platform->frame_dt;
         if (entity->interaction.current_time > entity->interaction.time) {
             Entity *interactable = get_entity_by_id(sim, entity->interaction.entity);
             assert(interactable);
@@ -131,6 +131,9 @@ static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *
                 assert(interactable_spec.type == WORLD_OBJECT_TYPE_RESOURCE);
                 if (interactable_spec.resource_kind == RESOURCE_KIND_WOOD) {
                     world_state->wood_count += interactable_spec.resource_gain;
+                    
+                    AssetID sound_id = assets_get_first_of_type(links.assets, ASSET_TYPE_SOUND);
+                    play_audio(links.audio, sound_id);
                 } else {
                     NOT_IMPLEMENTED;
                 } 
@@ -178,12 +181,14 @@ static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *
             entity->interaction.entity = order_entity_id;
             entity->interaction.time = interaction_time;
             entity->interaction.current_time = 0.0f;
-            init_particles_for_interaction(world_state, sim, input, &entity->interaction);
+            init_particles_for_interaction(world_state, sim, links.input, &entity->interaction);
         }
     }
 }
 
-void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
+void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
+    InputManager *input = links.input;
+    
     TIMED_FUNCTION();
     if (is_key_held(input, KEY_Z)) {
         f32 x_view_coef = 1.0f * input->platform->frame_dt;
@@ -318,7 +323,7 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
                         vec2 new_pawn_p = entity->p + delta_p;
                         change_entity_position(sim, entity, new_pawn_p);
                     } else {
-                        update_interaction(world_state, sim, entity, input);
+                        update_interaction(world_state, sim, entity, links);
                         // to_chop->flags |= ENTITY_FLAG_IS_DELETED;
                         // disband_order(&world_state->order_system, entity->order);
                         // entity->order = {};
@@ -337,16 +342,16 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
     // Assign job to pawn if 
 }
 
-void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *commands, Assets *assets, InputManager *input) {
+void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     RendererSetup setup = setup_3d(world_state->view, world_state->projection);
-    set_setup(commands, &setup);
-    begin_depth_peel(commands);
-    RenderGroup render_group = create_render_group(commands, assets);
+    set_setup(links.commands, &setup);
+    begin_depth_peel(links.commands);
+    RenderGroup render_group = create_render_group(links.commands, links.assets);
     // 
     // Ground
     // 
     u32 chunk_count = get_chunk_count_for_radius(sim->chunk_radius);
-    AssetID ground_tex = assets_get_first_of_type(assets, ASSET_TYPE_GRASS);
+    AssetID ground_tex = assets_get_first_of_type(links.assets, ASSET_TYPE_GRASS);
     BEGIN_BLOCK("Ground render");
     for (u32 i = 0; i < chunk_count; ++i) {
         SimRegionChunk *chunk = sim->chunks + i;
@@ -406,7 +411,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         v[1] = xz(entity->p + Vec2(-half_size.x, half_size.y),  WORLD_EPSILON);
         v[2] = xz(entity->p + Vec2(half_size.x, -half_size.y),  WORLD_EPSILON);
         v[3] = xz(entity->p + Vec2(half_size.x, half_size.y),   WORLD_EPSILON);
-        AssetID select_tex_id = assets_get_first_of_type(assets, ASSET_TYPE_ADDITIONAL);
+        AssetID select_tex_id = assets_get_first_of_type(links.assets, ASSET_TYPE_ADDITIONAL);
         push_quad(&render_group, v, select_tex_id);
     }
     END_BLOCK();
@@ -430,17 +435,17 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         AssetID texture_id;
         switch (entity->kind) {
             case ENTITY_KIND_PLAYER: {
-                texture_id = assets_get_first_of_type(assets, ASSET_TYPE_PLAYER);
+                texture_id = assets_get_first_of_type(links.assets, ASSET_TYPE_PLAYER);
             } break;
             case ENTITY_KIND_WORLD_OBJECT: {
                 AssetTagList match_tags = {};
                 AssetTagList weight_tags = {};
                 match_tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = entity->world_object_kind;
                 weight_tags.tags[ASSET_TAG_WORLD_OBJECT_KIND] = 1.0f;
-                texture_id = assets_get_closest_match(assets, ASSET_TYPE_WORLD_OBJECT, &weight_tags, &match_tags);
+                texture_id = assets_get_closest_match(links.assets, ASSET_TYPE_WORLD_OBJECT, &weight_tags, &match_tags);
             } break;
             case ENTITY_KIND_PAWN: {
-                texture_id = assets_get_first_of_type(assets, ASSET_TYPE_PAWN);
+                texture_id = assets_get_first_of_type(links.assets, ASSET_TYPE_PAWN);
             } break;
             INVALID_DEFAULT_CASE;
         }
@@ -453,11 +458,11 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
     //
     // Particles
     //
-    update_and_render_particles(&world_state->particle_system, &render_group, input->platform->frame_dt);
-    end_depth_peel(commands);
+    update_and_render_particles(&world_state->particle_system, &render_group, links.platform->frame_dt);
+    end_depth_peel(links.commands);
 }
 
-void update_and_render_world_state(WorldState *world_state, InputManager *input, RendererCommands *commands, Assets *assets) {
+void update_and_render_world_state(WorldState *world_state, GameLinks links) {
     
     u32 sim_region_count = world_state->anchor_count;
     // Zero anchor count so it can be set again from different sim regions
@@ -471,8 +476,8 @@ void update_and_render_world_state(WorldState *world_state, InputManager *input,
         begin_sim(sim, world_state->frame_arena, world_state->world, anchor->chunk_x, anchor->chunk_y, anchor->radius);
         total_sim_entities += sim->entity_count;
         total_sim_chunks += sim->chunks_count;
-        update_game(world_state, sim, input);
-        render_game(world_state, sim, commands, assets, input);
+        update_game(world_state, sim, links);
+        render_game(world_state, sim, links);
         end_sim(sim, world_state);
     }
     {DEBUG_VALUE_BLOCK("World")

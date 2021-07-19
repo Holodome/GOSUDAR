@@ -17,6 +17,10 @@ struct OrderID {
     u32 value;
 };
 
+struct AudioID {
+    u32 value;
+};
+
 struct ParticleEmitterID {
     u32 value;
 };
@@ -62,6 +66,15 @@ struct Entity {
     // pawn
     OrderID order;
     Interaction interaction;
+};
+
+// @TODO put this somewhere more reasonable...
+struct GameLinks {
+    struct RendererCommands *commands;
+    struct Assets *assets;
+    struct Platform *platform;
+    struct InputManager *input;
+    struct AudioSystem *audio;
 };
 
 #define ENTITY_HH 1

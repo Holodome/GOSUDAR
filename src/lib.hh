@@ -157,9 +157,6 @@ void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
     arena->data_capacity = buffer_size;
 }
 
-void memset_16(void *dst, u8 value, size_t size) {
-}
-
 #define alloc_struct(_arena, _type, ...) (_type *)alloc(_arena, sizeof(_type), ##__VA_ARGS__)
 #define alloc_arr(_arena, _count, _type, ...) (_type *)alloc(_arena, _count * sizeof(_type), ##__VA_ARGS__)
 #define alloc_string(_arena, _string, ...) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
@@ -211,12 +208,6 @@ inline void *bootstrap_alloc_size(size_t size, size_t arena_offset, size_t minim
     void *struct_ptr = alloc(&bootstrap, size);
     *(MemoryArena *)((u8 *)struct_ptr + arena_offset) = bootstrap;
     return struct_ptr;
-}
-
-MemoryArena subarena(MemoryArena *arena, size_t capacity) {
-    MemoryArena result;
-    arena_init(&result, alloc(arena, capacity), capacity);
-    return result;
 }
 
 void arena_clear(MemoryArena *arena) {

@@ -65,8 +65,7 @@ void renderer_end_frame(Renderer *renderer);
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 // Clean all previous settings and init new
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);
-
-RendererSettings *get_current_settings(Renderer *renderer);
+const RendererSettings *get_current_settings(Renderer *renderer);
 
 #define RENDERER_H 1
 #endif

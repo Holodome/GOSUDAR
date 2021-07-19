@@ -51,7 +51,7 @@ extern "C" {
 #include "debug.cc"
 #include "mips.cc"
 #include "renderer.cc"
-#include "render_group.cc"
+#include "renderer_api.cc"
 #include "assets.cc"
 #include "audio.cc"
 #include "dev_ui.cc"

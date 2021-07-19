@@ -4,9 +4,8 @@
 
 #include "debug.hh"
 #include "os.hh"
-#include "renderer.hh"
 #include "assets.hh"
-#include "render_group.hh"
+#include "renderer_api.hh"
 #include "interface.hh"
 
 #include "audio.hh"

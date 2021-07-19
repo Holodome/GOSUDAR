@@ -26,6 +26,12 @@ typedef uint64_t u64;
 
 typedef float  f32;
 typedef double f64;
+// Bool type. When doing low-level simd stuff, things that C++ bool type does 
+// can actually hurt us (for example SSE comparsion functions use masks and not bools)
+// And it actually is little to do difference in using dedicated bool type and integer 
+// in terms of perfomance and interfacing (besides some corner cases in bit arithmetic)
+typedef u32 b32;
+#define TO_BOOL(_exp) ((b32)((_exp) ? true : false))
 
 #define ARRAY_SIZE(_a) ((size_t)(sizeof(_a) / sizeof(*(_a))))
 #define SQ(_a) ((_a) * (_a))

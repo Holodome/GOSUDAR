@@ -76,8 +76,10 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets, Ren
     layout.input = input;
     layout.assets = assets;
     layout.font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-    RenderGroup interface_render_group = render_group_begin(commands, assets,
-                                                            setup_2d(RENDERER_FRAMEBUFFER_GAME_INTERFACE, Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0)));
+    RendererSetup setup = setup_2d(Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0));
+    set_setup(commands, &setup);
+    
+    RenderGroup interface_render_group = create_render_group(commands, assets);
     layout.render_group = interface_render_group;
     return layout;
 }

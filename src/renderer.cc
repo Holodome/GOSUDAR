@@ -8,6 +8,60 @@ _type _name;
 #include "gl_procs.inc"
 #undef GLPROC
 
+struct RendererFramebuffer {
+    vec2 size;
+    u32 video_memory;
+    bool has_depth;
+};
+
+enum {
+    RENDERER_FRAMEBUFFER_MAIN = UINT32_MAX,
+    RENDERER_FRAMEBUFFER_SEPARATED = 0,
+    RENDERER_FRAMEBUFFER_BLUR1,
+    RENDERER_FRAMEBUFFER_BLUR2,
+    RENDERER_FRAMEBUFFER_PEEL1,
+    RENDERER_FRAMEBUFFER_PEEL2,
+    RENDERER_FRAMEBUFFER_SENTINEL,
+};
+
+struct Renderer {
+    MemoryArena arena;
+    
+    RendererSettings settings;
+    
+    GLuint standard_shader;
+    GLuint view_location;
+    GLuint projection_location;
+    GLuint tex_location;
+    
+    GLuint render_framebuffer_shader;
+    GLuint render_framebuffer_tex_location;
+    GLuint render_framebuffer_vao;
+    
+    GLuint horizontal_gaussian_blur_shader;
+    GLuint horizontal_gaussian_blur_tex_location;
+    GLuint horizontal_gaussian_blur_target_width;
+    GLuint vertical_gaussian_blur_shader;
+    GLuint vertical_gaussian_blur_tex_location;
+    GLuint vertical_gaussian_blur_target_height;
+    
+    RendererCommands commands;
+    
+    GLuint vertex_array;
+    GLuint vertex_buffer;
+    GLuint index_buffer;
+    size_t max_texture_count;
+    size_t texture_count;
+    GLuint texture_array;
+    
+    GLuint framebuffer_ids[RENDERER_FRAMEBUFFER_SENTINEL];
+    GLuint framebuffer_textures[RENDERER_FRAMEBUFFER_SENTINEL];
+    GLuint framebuffer_depths[RENDERER_FRAMEBUFFER_SENTINEL];
+    RendererFramebuffer framebuffers[RENDERER_FRAMEBUFFER_SENTINEL];
+    
+    u64 video_memory_used;
+};
+
 static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
                                            const GLchar* message, const void *_) {
     (void)_;
@@ -82,29 +136,8 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 		    severity_str = "UNKNOWN"; 
         } break;
     }
-    
-    // fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n",
-	// 		source_str, type_str, severity_str, id, message);
+    fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n", source_str, type_str, severity_str, id, message);
 }
-
-RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection) {
-    RendererSetup result;
-    result.view = view;
-    result.projection = projection;
-    result.mvp = projection * view;
-    result.framebuffer = framebuffer;
-    return result;
-}
-
-RendererSetup setup_2d(u32 framebuffer, Mat4x4 projection) {
-    RendererSetup result;
-    result.projection = projection;
-    result.view = Mat4x4::identity();
-    result.mvp = projection;
-    result.framebuffer = framebuffer;
-    return result;
-}
-
 
 static GLuint create_shader(const char *source) {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -153,45 +186,41 @@ static GLuint create_shader(const char *source) {
     return id;
 }
 
-static RendererFramebuffer create_framebuffer(Renderer *renderer, vec2 size, bool has_depth, bool filtered) {
+static void create_framebuffer(Renderer *renderer, u32 idx,
+                               vec2 size, bool has_depth, bool filtered) {
     RendererFramebuffer result = {};
     result.has_depth = has_depth;
     result.size = size;
     
-    glGenFramebuffers(1, &result.id);
-    glBindFramebuffer(GL_FRAMEBUFFER, result.id);
-    glGenTextures(1, &result.texture_id);
-    glBindTexture(GL_TEXTURE_2D, result.texture_id);
+    GLuint id = renderer->framebuffer_ids[idx];
+    GLuint tex_id = renderer->framebuffer_textures[idx];
+    u32 mem = 0;
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, id);
+    glBindTexture(GL_TEXTURE_2D, tex_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
     GLenum filter = filtered ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, result.texture_id, 0);
-    renderer->video_memory_used += size.x * size.y * 4;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_id, 0);
+    mem += size.x * size.y * 4;
     if (has_depth) {
-        glGenRenderbuffers(1, &result.depth_id);
-        glBindRenderbuffer(GL_RENDERBUFFER, result.depth_id);
+        glGenRenderbuffers(1, renderer->framebuffer_depths + idx);
+        GLuint depth_id = renderer->framebuffer_depths[idx];
+        glBindRenderbuffer(GL_RENDERBUFFER, depth_id);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size.x, size.y);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, result.depth_id);
-        renderer->video_memory_used += size.x * size.y * 3;
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_id);
+        
+        mem += size.x * size.y * 3;
     }
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    return result;
-}
-
-static void free_framebuffer(Renderer *renderer, RendererFramebuffer *framebuffer) {
-    if (framebuffer->id) {
-        if (framebuffer->has_depth) {
-            renderer->video_memory_used -= framebuffer->size.x * framebuffer->size.y * 3;
-            glDeleteRenderbuffers(1, &framebuffer->depth_id);
-        }
-        glDeleteTextures(1, &framebuffer->texture_id);
-        renderer->video_memory_used -= framebuffer->size.x * framebuffer->size.y * 4;
-        glDeleteFramebuffers(1, &framebuffer->id);
-    }
+    
+    renderer->video_memory_used += mem;
+    result.video_memory = mem;
+    renderer->framebuffers[idx] = result;
 }
 
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
@@ -232,23 +261,31 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, &white_data, 1, 1);
 #endif   
     
-    // @TODO optimize how we do this - there is probably no need to delete framebuffer handles
-    // and its attachment handles
-    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD);
-    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_INTERFACE);
-    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR1);
-    free_framebuffer(renderer, renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR2);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD] = create_framebuffer(renderer, settings.display_size, true, settings.filtered);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_INTERFACE] = create_framebuffer(renderer, settings.display_size, false, settings.filtered);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
-    renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2] = create_framebuffer(renderer, settings.display_size * 0.25, false, settings.filtered);
+    for (u32 i = 0; i < RENDERER_FRAMEBUFFER_SENTINEL; ++i) {
+        renderer->video_memory_used -= renderer->framebuffers[i].video_memory;
+    }
+    glDeleteTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
+    glDeleteRenderbuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_depths);
+    glDeleteFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
+    glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
+    glGenFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
+    
+    vec2 size = settings.display_size;
+    vec2 blur_size = size * 0.25f;
+    b32 filter = settings.filtered;
+    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter);
+    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter);
+    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter);
+    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter);
+    create_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, blur_size, false, filter);
     
     renderer->settings = settings;
 }
 
-void renderer_init(Renderer *renderer, RendererSettings settings) {
+Renderer *renderer_init(RendererSettings settings) {
 #define RENDERER_ARENA_SIZE MEGABYTES(256)
-    arena_init(&renderer->arena, os_alloc(RENDERER_ARENA_SIZE), RENDERER_ARENA_SIZE);
+    Renderer *renderer = bootstrap_alloc_struct(Renderer, arena, RENDERER_ARENA_SIZE);
+    
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
     glDepthMask(GL_TRUE);
@@ -258,11 +295,11 @@ void renderer_init(Renderer *renderer, RendererSettings settings) {
     glFrontFace(GL_CCW);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     
-#define MAX_QUADS_COUNT 1024
+#define MAX_QUADS_COUNT MEGABYTES(16)
 #define MAX_VERTEX_COUNT (1 << 16)
 #define MAX_INDEX_COUNT (MAX_VERTEX_COUNT / 2 * 3)
-    renderer->commands.max_quads_count = MAX_QUADS_COUNT;
-    renderer->commands.quads = alloc_arr(&renderer->arena, MAX_QUADS_COUNT, RenderQuads);
+    renderer->commands.command_memory_size = MAX_QUADS_COUNT;
+    renderer->commands.command_memory = (u8 *) alloc(&renderer->arena, MAX_QUADS_COUNT);
     renderer->commands.max_vertex_count = MAX_VERTEX_COUNT;
     renderer->commands.vertices = alloc_arr(&renderer->arena, MAX_VERTEX_COUNT, Vertex);
     renderer->commands.max_index_count = MAX_INDEX_COUNT;
@@ -484,21 +521,57 @@ void main() {
         renderer->video_memory_used += iter.width * iter.height * 4;
     }
     init_renderer_for_settings(renderer, settings);
+    return renderer;
 }
 
 RendererCommands *renderer_begin_frame(Renderer *renderer) {
     RendererCommands *commands = &renderer->commands;
-    commands->quads_count = 0;
+    commands->command_memory_used = 0;
     commands->vertex_count = 0;
     commands->index_count = 0;
-    commands->last_quads = 0;
-    commands->perform_blur = false;
+    commands->last_header = 0;
+    commands->last_setup = 0;
     return commands;
 }
 
-static void bind_framebuffer(RendererFramebuffer *framebuffer) {
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->id);
-    glViewport(0, 0, framebuffer->size.x, framebuffer->size.y);
+static void bind_framebuffer(Renderer *renderer, u32 id, bool clear = false) {
+    b32 has_depth = false;
+    if (id == RENDERER_FRAMEBUFFER_MAIN) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, renderer->settings.display_size.x, renderer->settings.display_size.y);
+        has_depth = true;
+    } else {
+        RendererFramebuffer *framebuffer = renderer->framebuffers + id;
+        glBindFramebuffer(GL_FRAMEBUFFER, renderer->framebuffer_ids[id]);
+        glViewport(0, 0, framebuffer->size.x, framebuffer->size.y);
+        has_depth = framebuffer->has_depth;
+    }
+    
+    if (clear) {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        u32 flags = GL_COLOR_BUFFER_BIT;
+        if (has_depth) {
+            flags |= GL_DEPTH_BUFFER_BIT;
+        }
+        glClear(flags);
+    }
+    
+}
+
+static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = false) {
+    bind_framebuffer(renderer, to, clear);
+    
+    glDisable(GL_DEPTH_TEST);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glUseProgram(renderer->render_framebuffer_shader);
+    glBindVertexArray(renderer->render_framebuffer_vao);
+    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[from]);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    glUseProgram(0);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void renderer_end_frame(Renderer *renderer) {
@@ -509,113 +582,97 @@ void renderer_end_frame(Renderer *renderer) {
     glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, renderer->commands.index_count * sizeof(RENDERER_INDEX_TYPE), renderer->commands.indices);
     glBindVertexArray(0);
     
-    // Prepare framebuffers
-    for (size_t i = 0; i < ARRAY_SIZE(renderer->framebuffers); ++i) {
-        GLuint id = renderer->framebuffers[i].id;
-        glBindFramebuffer(GL_FRAMEBUFFER, id);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        u32 flags = GL_COLOR_BUFFER_BIT;
-        if (renderer->framebuffers[i].has_depth) {
-            flags |= GL_DEPTH_BUFFER_BIT;
-        }
-        glClear(flags);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    // Do renderer commands
-    u64 DEBUG_draw_call_count = 0;
-    u64 DEBUG_quads_dispatched = 0;
-    for (size_t i = 0; i < renderer->commands.quads_count; ++i) {
-        RenderQuads *quads = renderer->commands.quads + i;
-        RendererFramebuffer *framebuffer = renderer->framebuffers + quads->setup.framebuffer;
-        bind_framebuffer(framebuffer);
-        glBindVertexArray(renderer->vertex_array);
-        glUseProgram(renderer->standard_shader);
-        glUniformMatrix4fv(renderer->view_location, 1, false, quads->setup.view.value_ptr());
-        glUniformMatrix4fv(renderer->projection_location, 1, false, quads->setup.projection.value_ptr());
-        glUniform1i(renderer->tex_location, 0); 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
-        glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)(6 * quads->quad_count), GL_INDEX_TYPE,
-                                 (GLvoid *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset),
-                                 (GLint)quads->vertex_array_offset);
-        glUseProgram(0);
-        glBindVertexArray(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        
-        ++DEBUG_draw_call_count;
-        DEBUG_quads_dispatched += quads->quad_count;       
-    }
-    
-    glDisable(GL_DEPTH_TEST);
-    // Switch to premultiplied alpha
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glActiveTexture(GL_TEXTURE0);
-    // Make gaussian blur pass
-    if (renderer->commands.perform_blur) {
-        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR1);
-        glUseProgram(renderer->horizontal_gaussian_blur_shader);
-        glBindVertexArray(renderer->render_framebuffer_vao);
-        glUniform1f(renderer->horizontal_gaussian_blur_target_width, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x);
-        glBindTexture(GL_TEXTURE_2D, renderer->framebuffers[RENDERER_FRAMEBUFFER_GAME_WORLD].texture_id);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindVertexArray(0);
-        glUseProgram(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        
-        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_BLUR2);
-        glViewport(0, 0, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
-        glUseProgram(renderer->vertical_gaussian_blur_shader);
-        glBindVertexArray(renderer->render_framebuffer_vao);
-        glUniform1f(renderer->vertical_gaussian_blur_target_height, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
-        glBindTexture(GL_TEXTURE_2D, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR1].texture_id);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindVertexArray(0);
-        glUseProgram(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // @TODO we can remove this step
-        bind_framebuffer(renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(renderer->render_framebuffer_shader);
-        glBindVertexArray(renderer->render_framebuffer_vao);
-        glBindTexture(GL_TEXTURE_2D, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].texture_id);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindVertexArray(0);
-        glUseProgram(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-    
-    // Render all framebuffers to default one
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, (GLsizei)renderer->settings.display_size.x, (GLsizei)renderer->settings.display_size.y);
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glUseProgram(renderer->render_framebuffer_shader);
-    glBindVertexArray(renderer->render_framebuffer_vao);
     glActiveTexture(GL_TEXTURE0);
     
-    RendererFramebuffer *framebuffer = renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_WORLD;
-    glBindTexture(GL_TEXTURE_2D, framebuffer->texture_id);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    framebuffer = renderer->framebuffers + RENDERER_FRAMEBUFFER_GAME_INTERFACE;
-    glBindTexture(GL_TEXTURE_2D, framebuffer->texture_id);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    // This is local renderer state
+    RendererSetup *current_setup = 0;
+    u32 current_framebuffer = RENDERER_FRAMEBUFFER_MAIN;
+    bind_framebuffer(renderer, current_framebuffer, true);
     
-    glBindVertexArray(0);
-    glUseProgram(0);
+    u8 *cursor = renderer->commands.command_memory;
+    u8 *commands_bound = renderer->commands.command_memory + renderer->commands.command_memory_used;
+    
+    u32 DEBUG_draw_call_count = 0;
+    while (cursor < commands_bound) {
+        RendererCommandHeader *header = (RendererCommandHeader *)cursor;
+        cursor += sizeof(*header);
+        switch (header->type) {
+            case RENDERER_COMMAND_QUADS: {
+                RendererCommandQuads *quads = (RendererCommandQuads *)cursor;
+                cursor += sizeof(*quads);
+                
+                assert(current_setup);
+                glUseProgram(renderer->standard_shader);
+                glBindVertexArray(renderer->vertex_array);
+                glUniformMatrix4fv(renderer->view_location, 1, false, current_setup->view.value_ptr());
+                glUniformMatrix4fv(renderer->projection_location, 1, false, current_setup->projection.value_ptr());
+                glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
+                glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE, (void *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset), quads->vertex_array_offset);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+                glBindVertexArray(0);
+                glUseProgram(0);
+                
+                ++DEBUG_draw_call_count;
+            } break;
+            case RENDERER_COMMAND_BLUR: {
+                assert(current_framebuffer == RENDERER_FRAMEBUFFER_SEPARATED);
+                
+                bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
+                
+                glUseProgram(renderer->horizontal_gaussian_blur_shader);
+                glBindVertexArray(renderer->render_framebuffer_vao);
+                glUniform1f(renderer->horizontal_gaussian_blur_target_width, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x);
+                glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_SEPARATED]);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glBindVertexArray(0);
+                glUseProgram(0);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                
+                bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, true);
+                
+                glUseProgram(renderer->vertical_gaussian_blur_shader);
+                glBindVertexArray(renderer->render_framebuffer_vao);
+                glUniform1f(renderer->vertical_gaussian_blur_target_height, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y);
+                glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_BLUR1]);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glBindVertexArray(0);
+                glUseProgram(0);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                
+                blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, RENDERER_FRAMEBUFFER_SEPARATED, true);
+                
+                DEBUG_draw_call_count += 3;
+            } break;
+            case RENDERER_COMMAND_BEGIN_SEPARATED: {
+                current_framebuffer = RENDERER_FRAMEBUFFER_SEPARATED;
+                bind_framebuffer(renderer, current_framebuffer, true);
+            } break;
+            case RENDERER_COMMAND_END_SEPARATED: {
+                current_framebuffer = RENDERER_FRAMEBUFFER_MAIN;
+                blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, RENDERER_FRAMEBUFFER_MAIN);
+                ++DEBUG_draw_call_count;
+            } break;
+            case RENDERER_COMMAND_SET_SETUP: {
+                RendererSetup *setup = (RendererSetup *)cursor;
+                cursor += sizeof(*setup);
+                
+                current_setup = setup;
+            } break;
+            INVALID_DEFAULT_CASE;
+        }
+    }
+    
+    assert(current_framebuffer == RENDERER_FRAMEBUFFER_MAIN);
     
     {DEBUG_VALUE_BLOCK("Renderer")
             DEBUG_VALUE(renderer->video_memory_used >> 20, "Video memory used");
-        DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
-        DEBUG_VALUE(DEBUG_quads_dispatched, "Quads dispatched");
         DEBUG_VALUE(renderer->texture_count, "Texture count");
         DEBUG_VALUE((f32)renderer->commands.index_count / renderer->commands.max_index_count * 100, "Index buffer");
         DEBUG_VALUE((f32)renderer->commands.vertex_count / renderer->commands.max_vertex_count * 100, "Vertex buffer");
+        DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
     }
 }
 
@@ -635,4 +692,9 @@ Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 widt
     }
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     return tex;
+}
+
+
+RendererSettings *get_current_settings(Renderer *renderer) {
+    return &renderer->settings;
 }

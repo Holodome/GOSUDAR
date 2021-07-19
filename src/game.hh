@@ -50,7 +50,7 @@ struct Game {
     MemoryArena arena;
     
     OS *os;
-    Renderer renderer;
+    struct Renderer *renderer;
     Assets *assets;
     DebugState *debug_state;
     InputManager input;

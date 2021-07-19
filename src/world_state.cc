@@ -338,8 +338,9 @@ void update_game(WorldState *world_state, SimRegion *sim, InputManager *input) {
 }
 
 void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *commands, Assets *assets, InputManager *input) {
-    RenderGroup world_render_group = render_group_begin(commands, assets,
-                                                        setup_3d(RENDERER_FRAMEBUFFER_GAME_WORLD, world_state->view, world_state->projection));
+    RendererSetup setup = setup_3d(world_state->view, world_state->projection);
+    set_setup(commands, &setup);
+    RenderGroup render_group = create_render_group(commands, assets);
     // 
     // Ground
     // 
@@ -361,9 +362,9 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         p1[1].y = WORLD_EPSILON;
         p1[2].y = WORLD_EPSILON;
         p1[3].y = WORLD_EPSILON;
-        push_quad(&world_render_group, p, ground_tex);
+        push_quad(&render_group, p, ground_tex);
         if (world_state->draw_frames) {
-            push_quad_outline(&world_render_group, p1[0], p1[1], p1[2], p1[3], BLACK, 0.05f);
+            DEBUG_push_quad_outline(&render_group, p1);
         }
     }
     vec2 mouse_cell_pos = Vec2(Floor(world_state->mouse_projection.x), Floor(world_state->mouse_projection.y));
@@ -375,17 +376,21 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
             for (i32 dx = -MOUSE_CELL_RAD / 2; dx <= MOUSE_CELL_RAD / 2; ++dx) {
                 bool is_occupied = is_cell_occupied(sim, mouse_cell_pos.x + dx, mouse_cell_pos.y + dy);
                 if (!is_occupied) {
-                    vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                    vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE);
-                    vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    push_quad_outline(&world_render_group, v0, v1, v2, v3, BLACK, 0.05f);
+                    vec3 v[4] = {
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                    };
+                    DEBUG_push_quad_outline(&render_group, v);
                 } else {
-                    vec3 v0 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                    vec3 v1 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    vec3 v2 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE);
-                    vec3 v3 = Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5.0f, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE);
-                    push_quad_outline(&world_render_group, v0, v1, v2, v3, RED, 0.05f);
+                    vec3 v[4] = {
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                    };
+                    DEBUG_push_quad_outline(&render_group, v, RED);
                 }
             }
         }
@@ -401,7 +406,7 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         v[2] = xz(entity->p + Vec2(half_size.x, -half_size.y),  WORLD_EPSILON);
         v[3] = xz(entity->p + Vec2(half_size.x, half_size.y),   WORLD_EPSILON);
         AssetID select_tex_id = assets_get_first_of_type(assets, ASSET_TYPE_ADDITIONAL);
-        push_quad(&world_render_group, v, select_tex_id);
+        push_quad(&render_group, v, select_tex_id);
     }
     END_BLOCK();
     
@@ -440,17 +445,15 @@ void render_game(WorldState *world_state, SimRegion *sim, RendererCommands *comm
         }
         vec3 v[4];
         get_billboard_positions(xz(entity->p), cam_x, cam_y, 1.5f, 1.5f, v);
-        push_quad(&world_render_group, v, texture_id);
+        push_quad(&render_group, v, texture_id);
     }
     END_BLOCK();
     
     //
     // Particles
     //
-    update_and_render_particles(&world_state->particle_system, &world_render_group, input->platform->frame_dt);
+    update_and_render_particles(&world_state->particle_system, &render_group, input->platform->frame_dt);
     
-    
-    render_group_end(&world_render_group);
 }
 
 void update_and_render_world_state(WorldState *world_state, InputManager *input, RendererCommands *commands, Assets *assets) {

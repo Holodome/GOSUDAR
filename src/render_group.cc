@@ -2,47 +2,91 @@
 
 #include "renderer.hh"
 
-// Returns quads that render group should use with given setup.
-// This quads are guaranteed to fit at least single quad in it
-// We may add additional checks for buffer overflow if some renderer call draws multiple quads while using single get_quads call
-static RenderQuads *get_quads(RendererCommands *commands, RendererSetup setup) {
-    RenderQuads *quads = 0;
-    if (commands->vertex_count + 4 > commands->max_vertex_count || commands->index_count + 6 > commands->max_index_count) {
-        // logprintln("Renderer", "Commands buffer overflow. I is %llu/%llu, V is %llu/%llu", 
-        //     commands->index_count, commands->max_index_count, commands->vertex_count, commands->max_vertex_count);
-    } else {
-        if (commands->last_quads && memcmp(&commands->last_quads->setup, &setup, sizeof(setup)) == 0) {
-            // Check that index type can fit more indices without overflowing
-            size_t base_index = commands->vertex_count - commands->last_quads->vertex_array_offset;
-            if (base_index + 6 <= RENDERER_MAX_INDEX) {
-                quads = commands->last_quads;
-                ++quads->quad_count;
-            }
-        } 
-        
-        if (!quads) {
-            if (commands->quads_count + 1 > commands->max_quads_count) {
-                // logprintln("Renderer", "Commands buffer overflow. Quads is %llu/%llu", 
-                //     commands->quads_count, commands->max_quads_count);
-            } else {
-                quads = commands->quads + commands->quads_count++;
-                quads->index_array_offset = commands->index_count;
-                quads->vertex_array_offset = commands->vertex_count;
-                quads->quad_count = 1;
-                quads->setup = setup;
-                commands->last_quads = quads;
-            }
-        }
-    }
-    return quads;
+RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection) {
+    RendererSetup result;
+    result.view = view;
+    result.projection = projection;
+    result.mvp = projection * view;
+    return result;
 }
 
-void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
+RendererSetup setup_2d(Mat4x4 projection) {
+    RendererSetup result;
+    result.projection = projection;
+    result.view = Mat4x4::identity();
+    result.mvp = projection;
+    return result;
+}
+
+// Data size is size of full request - with header and additional structures
+static RendererCommandHeader *get_command_buffer_memory(RendererCommands *commands, size_t data_size) {
+    assert(data_size >= sizeof(RendererCommandHeader));
+    RendererCommandHeader *result = 0;
+    if (commands->command_memory_used + data_size <= commands->command_memory_size) {
+        result = (RendererCommandHeader *)(commands->command_memory + commands->command_memory_used);
+        commands->command_memory_used += data_size;
+    }
+    
+    return result;
+}
+
+#define push_command_no_storage(_commands, _type) (push_command_(_commands, 0, _type), 0)
+#define push_command(_commands, _struct, _type) (_struct *)push_command_(_commands, sizeof(_struct), _type)
+static u8 *push_command_(RendererCommands *commands, size_t data_size, u32 type) {
+    u8 *result = 0;
+    
+    data_size += sizeof(RendererCommandHeader);
+    RendererCommandHeader *header = get_command_buffer_memory(commands, data_size);
+    if (header) {
+        header->type = type;
+        commands->last_header = header;
+        
+        result = (u8 *)(header + 1);
+    }
+    
+    return result;
+}
+
+static RendererCommandQuads *get_current_quads(RendererCommands *commands) {
+    RendererCommandQuads *result = 0;
+    if (commands->last_header && commands->last_header->type == RENDERER_COMMAND_QUADS) {
+        result = (RendererCommandQuads *)(commands->last_header + 1);
+        ++result->quad_count;
+    } else {
+        result = push_command(commands, RendererCommandQuads, RENDERER_COMMAND_QUADS);
+        if (result) {
+            result->index_array_offset = commands->index_count;
+            result->vertex_array_offset = commands->vertex_count;
+            result->quad_count = 1;
+        }
+    }
+    return result;
+}
+
+void begin_separated_rendering(RendererCommands *commands) {
+    push_command_no_storage(commands, RENDERER_COMMAND_BEGIN_SEPARATED);
+}
+
+void end_separated_rendering(RendererCommands *commands) {
+    push_command_no_storage(commands, RENDERER_COMMAND_END_SEPARATED);
+}
+
+void do_blur(RendererCommands *commands) {
+    push_command_no_storage(commands, RENDERER_COMMAND_BLUR);
+}
+
+void set_setup(RendererCommands *commands, RendererSetup *src) {
+    RendererSetup *dst = push_command(commands, RendererSetup, RENDERER_COMMAND_SET_SETUP);
+    *dst = *src;
+    commands->last_setup = dst;
+}
+
+void push_quad(RendererCommands *commands, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
                vec4 c00, vec4 c01, vec4 c10, vec4 c11,
                vec2 uv00, vec2 uv01, vec2 uv10, vec2 uv11,
                Texture texture) {
     TIMED_FUNCTION();
-    RenderQuads *quads = get_quads(render_group->commands, render_group->setup);
+    RendererCommandQuads *quads = get_current_quads(commands);
     if (quads) {
         vec2 uv_scale = Vec2(texture.width, texture.height) * RENDERER_RECIPROCAL_TEXTURE_SIZE;
         uv00 = uv00 * uv_scale;
@@ -52,8 +96,8 @@ void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11
         
         u16 texture_index = (u16)texture.index;
         // Vertex buffer
-        assert(render_group->commands->vertex_count + 4 <= render_group->commands->max_vertex_count);
-        Vertex *vertex_buffer = render_group->commands->vertices + render_group->commands->vertex_count;
+        assert(commands->vertex_count + 4 <= commands->max_vertex_count);
+        Vertex *vertex_buffer = commands->vertices + commands->vertex_count;
         vertex_buffer[0].p = v00;
         vertex_buffer[0].uv  = uv00;
         vertex_buffer[0].c = c00;
@@ -72,9 +116,9 @@ void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11
         vertex_buffer[3].tex = texture_index;
         
         // Index buffer
-        assert(render_group->commands->index_count + 6 <= render_group->commands->max_index_count);
-        RENDERER_INDEX_TYPE *index_buffer = render_group->commands->indices + render_group->commands->index_count;
-        RENDERER_INDEX_TYPE  base_index   = (RENDERER_INDEX_TYPE)(render_group->commands->vertex_count - quads->vertex_array_offset);
+        assert(commands->index_count + 6 <= commands->max_index_count);
+        RENDERER_INDEX_TYPE *index_buffer = commands->indices + commands->index_count;
+        RENDERER_INDEX_TYPE  base_index   = (RENDERER_INDEX_TYPE)(commands->vertex_count - quads->vertex_array_offset);
         index_buffer[0] = base_index + 0;
         index_buffer[1] = base_index + 2;
         index_buffer[2] = base_index + 3;
@@ -83,37 +127,36 @@ void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11
         index_buffer[5] = base_index + 3;
         
         // Update buffer sizes after we are finished.
-        render_group->commands->vertex_count += 4;
-        render_group->commands->index_count  += 6;
+        commands->vertex_count += 4;
+        commands->index_count  += 6;
     }
 }
 
 static Texture get_texture(RenderGroup *render_group, AssetID id) {
     Texture result;
-    if (id.value == INVALID_ASSET_ID.value) {
+    if (IS_SAME(id, INVALID_ASSET_ID)) {
         result = render_group->commands->white_texture;
     } else {
-        result = *assets_get_texture(render_group->assets, id);
+        Texture *requested = assets_get_texture(render_group->assets, id);
+        assert(requested);
+        result = *requested;
     }
     return result;
 }
+#define DEFAULT_UV_LIST Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1)
 
 void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11,
                vec4 c, AssetID texture_id) {
-    Texture tex = get_texture(render_group, texture_id);
-    push_quad(render_group, v00, v01, v10, v11, c, c, c, c, Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
-}
-
-void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
-    Texture tex = get_texture(render_group, texture_id);
-    push_quad(render_group, v[0], v[1], v[2], v[3], WHITE, WHITE, WHITE, WHITE,
-              Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
+    Texture texture = get_texture(render_group, texture_id);
+    push_quad(render_group->commands, v00, v01, v10, v11, c, c, c, c, DEFAULT_UV_LIST, texture);
 }
 
 void push_quad(RenderGroup *render_group, vec3 v[4], vec4 c, AssetID texture_id) {
-    Texture tex = get_texture(render_group, texture_id);
-    push_quad(render_group, v[0], v[1], v[2], v[3], c, c, c, c,
-              Vec2(0, 0), Vec2(0, 1), Vec2(1, 0), Vec2(1, 1), tex);
+    push_quad(render_group, v[0], v[1], v[2], v[3], c, texture_id);
+}
+
+void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
+    push_quad(render_group, v, WHITE, texture_id);
 }
 
 void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, AssetID texture_id) {
@@ -122,7 +165,34 @@ void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, A
     vec2 uvs[4];
     uv_rect.store_points(uvs);
     Texture tex = get_texture(render_group, texture_id);
-    push_quad(render_group, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
+    push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
+}
+
+void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
+    vec3 cam_z = render_group->commands->last_setup->mvp.get_z();
+    vec3 line = (b - a);
+    line -= cam_z * dot(cam_z, line);
+    vec3 line_perp = cross(line, cam_z);
+    line_perp = normalize(line_perp);
+    line_perp *= thickness;
+    push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
+}
+
+void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color, f32 thickness) {
+    DEBUG_push_line(render_group, v00, v01, color, thickness);
+    DEBUG_push_line(render_group, v01, v11, color, thickness);
+    DEBUG_push_line(render_group, v11, v10, color, thickness);
+    DEBUG_push_line(render_group, v10, v00, color, thickness);
+}
+
+void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v[4], vec4 color, f32 thickness) {
+    DEBUG_push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
+}
+
+void DEBUG_push_rect_outline(RenderGroup *render_group, Rect rect, vec4 color, f32 thickness) {
+    vec3 v[4]; 
+    rect.store_points(v);
+    DEBUG_push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
 }
 
 void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale) {
@@ -167,39 +237,3 @@ void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *
 	}
 }
 
-void push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
-    // @TODO not behaving properly when ab is close to parallel with cam_z
-    vec3 cam_z = render_group->setup.mvp.get_z();
-    vec3 line = (b - a);
-    line -= cam_z * dot(cam_z, line);
-    vec3 line_perp = cross(line, cam_z);
-    line_perp = normalize(line_perp);
-    line_perp *= thickness;
-    push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
-}
-
-void push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color, f32 thickness) {
-    push_line(render_group, v00, v01, color, thickness);
-    push_line(render_group, v01, v11, color, thickness);
-    push_line(render_group, v11, v10, color, thickness);
-    push_line(render_group, v10, v00, color, thickness);
-}
-
-void push_rect_outline(RenderGroup *render_group, Rect rect, vec4 color, f32 thickness) {
-    vec3 v[4]; 
-    rect.store_points(v);
-    push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
-}
-
-RenderGroup render_group_begin(RendererCommands *commands, Assets *assets, RendererSetup setup) {
-    RenderGroup result = {};
-    result.commands = commands;
-    result.assets = assets;
-    result.setup = setup;
-    return result;
-}
-
-void render_group_end(RenderGroup *group) {
-    (void)group;
-    // group->renderer->has_render_group = false;
-}

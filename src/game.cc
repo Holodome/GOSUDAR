@@ -117,8 +117,8 @@ void game_init(Game *game) {
     game->renderer_settings.vsync = true;
     game->renderer_settings.sample_count = 4;
     game->os = os_init(&game->renderer_settings.display_size);
-    renderer_init(&game->renderer, game->renderer_settings);
-    game->assets = assets_init(&game->renderer, &game->frame_arena);
+    game->renderer = renderer_init(game->renderer_settings);
+    game->assets = assets_init(game->renderer, &game->frame_arena);
     
     world_state_init(&game->world_state, &game->arena, &game->frame_arena);
     game->state = STATE_MAIN_MENU;
@@ -127,13 +127,16 @@ void game_init(Game *game) {
 
 
 static void update_game_state(Game *game, RendererCommands *commands) {
+    begin_separated_rendering(commands);
     update_and_render_world_state(&game->world_state, &game->input, commands, game->assets);
+    
     if (game->game_state == GAME_STATE_PAUSED) {
         if (is_key_pressed(&game->input, KEY_ESCAPE)) {
             game->game_state = GAME_STATE_PLAYING;
         }
         
-        commands->perform_blur = true;
+        //commands->perform_blur = true;
+        do_blur(commands);
         update_and_render_interface(game->pause_interface, &game->input, commands, game->assets);
         if (game->pause_continue->is_pressed) {
             game->game_state = GAME_STATE_PLAYING;
@@ -153,7 +156,8 @@ static void update_game_state(Game *game, RendererCommands *commands) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        commands->perform_blur = true;
+        // commands->perform_blur = true;
+        do_blur(commands);
         update_and_render_interface(game->settings_interface, &game->input, commands, game->assets);
         if (game->settings_back->is_pressed) {
             game->game_state = GAME_STATE_PAUSED;
@@ -165,6 +169,7 @@ static void update_game_state(Game *game, RendererCommands *commands) {
         
         update_and_render_interface(game->game_interface, &game->input, commands, game->assets);
     }
+    end_separated_rendering(commands);
 }
 
 static void update_main_menu_state(Game *game, RendererCommands *commands) {
@@ -200,7 +205,7 @@ void game_update_and_render(Game *game) {
             DEBUG_VALUE(game->frame_arena.peak_size >> 10, "Frame arena size");
         DEBUG_VALUE(game->debug_state->arena.peak_size >> 10, "Debug arena size");
         DEBUG_VALUE(game->arena.peak_size >> 10, "Game arena size");
-        DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
+        // DEBUG_VALUE(game->renderer.arena.peak_size >> 10, "Renderer arena size");
         DEBUG_VALUE(game->assets->arena.peak_size >> 10, "Assets arena size");
     }
     
@@ -217,15 +222,13 @@ void game_update_and_render(Game *game) {
     }
     
     game->renderer_settings.display_size = platform->display_size;
-    if (memcmp(&game->renderer.settings, &game->renderer_settings, sizeof(RendererSettings)) != 0) {
-        if (game->renderer.settings.display_size != game->renderer_settings.display_size) {
-            build_interface_for_window_size(game);
-        }
+    if (memcmp(get_current_settings(game->renderer), &game->renderer_settings, sizeof(RendererSettings)) != 0) {
+        build_interface_for_window_size(game);
         assets_purge_textures(game->assets);
-        init_renderer_for_settings(&game->renderer, game->renderer_settings);
+        init_renderer_for_settings(game->renderer, game->renderer_settings);
     }
     
-    RendererCommands *commands = renderer_begin_frame(&game->renderer);
+    RendererCommands *commands = renderer_begin_frame(game->renderer);
     switch (game->state) {
         case STATE_MAIN_MENU: {
             update_main_menu_state(game, commands);
@@ -235,7 +238,7 @@ void game_update_and_render(Game *game) {
         } break;
     }
     DEBUG_update(game->debug_state, &game->input, commands, game->assets);
-    renderer_end_frame(&game->renderer);
+    renderer_end_frame(game->renderer);
     
     platform->vsync = game->renderer_settings.vsync;
     os_end_frame(game->os);

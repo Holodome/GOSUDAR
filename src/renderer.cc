@@ -72,66 +72,9 @@ struct OpenGLQuadShader {
 };
 
 OpenGLQuadShader compile_quad_shader(bool depth_peel) {
-    const char *standard_shader_code = R"FOO(#ifdef VERTEX_SHADER       
-layout(location = 0) in vec4 position;     
-layout(location = 1) in vec2 uv;       
-layout(location = 2) in vec3 n;        
-layout(location = 3) in vec4 color;        
-layout(location = 4) in int texture_index;     
-       
-out vec4 rect_color;       
-out vec2 frag_uv;      
-       
-flat out int frag_texture_index;       
-
-uniform mat4 view_matrix = mat4(1);     
-uniform mat4 projection_matrix = mat4(1);
-
-void main() {             
-    vec4 world_space = position;       
-    vec4 cam_space = view_matrix * world_space;
-    vec4 clip_space = projection_matrix * cam_space;        
-    gl_Position = clip_space;      
-       
-    rect_color = color;        
-    frag_uv = uv;      
-    frag_texture_index = texture_index;        
-    
-    float d = length(cam_space.xyz);
-}      
-#else 
-
-in vec4 rect_color;        
-in vec2 frag_uv;       
-flat in int frag_texture_index;        
-
-uniform sampler2DArray tex;        
-#if DEPTH_PEEL
-uniform sampler2D depth;
-#endif 
-out vec4 out_color;        
-
-void main()        
-{      
-#if DEPTH_PEEL
-float clip_depth = texelFetch(depth, ivec2(gl_FragCoord.xy), 0).x;
-float frag_z = gl_FragCoord.z;
-if (frag_z <= clip_depth) {
-discard;
-}
-#endif 
-    
-vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
-    vec4 texture_sample = texture(tex, array_uv, 0);      
-
-if (texture_sample.a > 0) {
-out_color = texture_sample * rect_color;       
-} else {
-discard;
-}
-}    
-  
-#endif)FOO";
+    const char *standard_shader_code = 
+#include "quad_shader.glsl"
+    ;
     
     char defines[256];
     snprintf(defines, sizeof(defines), "#define DEPTH_PEEL %u\n", (u32)TO_BOOL(depth_peel));
@@ -164,27 +107,9 @@ struct OpenGLBlitFramebufferShader {
 };
 
 static OpenGLBlitFramebufferShader compile_blit_framebuffer_shader() {
-    const char *render_framebuffer_shader_code = R"FOO(#ifdef VERTEX_SHADER
-        layout(location = 0) in vec2 position;
-        
-        out vec2 frag_uv;
-        
-        void main() {
-            gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-            frag_uv = (position + vec2(1)) * 0.5;
-        }
-        #else     
-        
-        in vec2 frag_uv;
-        out vec4 out_color;
-        
-        uniform sampler2D tex;
-        
-        void main() {
-            out_color = texture(tex, frag_uv);
-        }
-        
-        #endif)FOO";
+    const char *render_framebuffer_shader_code = 
+#include "blit_framebuffer.glsl"
+    ;
     OpenGLBlitFramebufferShader result = {};
     result.id = create_shader(render_framebuffer_shader_code);
     result.tex_location = get_uniform(result.id, "tex");
@@ -203,44 +128,9 @@ struct OpenGLHorizontalBlurShader {
 };
 
 static OpenGLHorizontalBlurShader compile_horizontal_blur_shader() {
-    const char *horizontal_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-
-out vec2 blur_uvs[11];
-uniform float target_width;
-
-void main() {
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    vec2 center_uv = (position + vec2(1)) * 0.5;
-    float px_size = 1.0 / target_width;
-    for (int i = -5; i <= 5; ++i) {
-        blur_uvs[i + 5] = center_uv + vec2(px_size * i, 0);
-    }
-}
-
-#else 
-
-out vec4 out_color;
-in vec2 blur_uvs[11];
-
-uniform sampler2D tex;
-
-void main() {
-    out_color = vec4(0);
-    out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    out_color += texture(tex, blur_uvs[10]) * 0.0093;
-}
-
-#endif)FOO";
+    const char *horizontal_gaussian_blur_shader_code = 
+#include "horizontal_gaussian_blur.glsl"
+    ;
     OpenGLHorizontalBlurShader result = {};
     result.id = create_shader(horizontal_gaussian_blur_shader_code);
     result.tex_location = get_uniform(result.id, "tex");
@@ -261,44 +151,9 @@ struct OpenGLVerticalBlurShader {
 };
 
 static OpenGLVerticalBlurShader compile_vertical_blur_shader() {
-    const char *vertical_gaussian_blur_shader_code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-
-out vec2 blur_uvs[11];
-uniform float target_height;
-
-void main() {
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-    vec2 center_uv = (position + vec2(1)) * 0.5;
-    float px_size = 1.0 / target_height;
-    for (int i = -5; i <= 5; ++i) {
-        blur_uvs[i + 5] = center_uv + vec2(0, px_size * i);
-    }
-}
-
-#else 
-
-out vec4 out_color;
-in vec2 blur_uvs[11];
-
-uniform sampler2D tex;
-
-void main() {
-    out_color = vec4(0);
-    out_color += texture(tex, blur_uvs[0]) * 0.0093;
-    out_color += texture(tex, blur_uvs[1]) * 0.028002;
-    out_color += texture(tex, blur_uvs[2]) * 0.065984;
-    out_color += texture(tex, blur_uvs[3]) * 0.121703;
-    out_color += texture(tex, blur_uvs[4]) * 0.175713;
-    out_color += texture(tex, blur_uvs[5]) * 0.198596;
-    out_color += texture(tex, blur_uvs[6]) * 0.175713;
-    out_color += texture(tex, blur_uvs[7]) * 0.121703;
-    out_color += texture(tex, blur_uvs[8]) * 0.065984;
-    out_color += texture(tex, blur_uvs[9]) * 0.028002;
-    out_color += texture(tex, blur_uvs[10]) * 0.0093;
-}
-
-#endif)FOO";
+    const char *vertical_gaussian_blur_shader_code = 
+    #include "vertical_gaussian_blur.glsl"
+;
     OpenGLVerticalBlurShader result = {};
     result.id = create_shader(vertical_gaussian_blur_shader_code);
     result.tex_location = get_uniform(result.id, "tex");
@@ -319,30 +174,9 @@ struct OpenGLDepthPeelCompositeShader {
 };
 
 static OpenGLDepthPeelCompositeShader compile_depth_peel_composite() {
-    const char *code = R"FOO(#ifdef VERTEX_SHADER
-layout(location = 0) in vec2 position;
-        
-        out vec2 frag_uv;
-        
-        void main() {
-            gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-            frag_uv = (position + vec2(1)) * 0.5;
-        }
-#else 
-
-uniform sampler2D peel0_tex;
-uniform sampler2D peel1_tex;
-
-in vec2 frag_uv;
-out vec4 out_color;
-
-void main() {
-vec4 peel0 = texture(peel0_tex, frag_uv);
-vec4 peel1 = texture(peel1_tex, frag_uv);
-out_color.rgb = peel0.rgb + (1.0 - peel0.a) * peel1.rgb;
-
-}
-#endif)FOO";
+    const char *code = 
+#include "depth_peel_composite.glsl"
+    ;
     OpenGLDepthPeelCompositeShader result = {};
     result.id = create_shader(code);
     result.peel0_location = get_uniform(result.id, "peel0_tex");

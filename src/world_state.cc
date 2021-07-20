@@ -73,10 +73,6 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(-5, 5));
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(5, -5));
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(-5, -5));
-    world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(15, 15));
-    world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(-15, 15));
-    world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(15, -15));
-    world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(-15, -15));
     for (u32 i = 0; i < 1000; ++i) {
         for (;;) {
             f32 x = random_bilateral(&gen_entropy) * CHUNK_SIZE * 15;
@@ -427,7 +423,7 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
         sort_a[entity_idx].sort_key = dot(cam_z, xz(sim->entities[entity_idx].p) - world_state->cam_p);
         sort_a[entity_idx].sort_index = entity_idx;
     }
-    radix_sort(sort_a, sort_b, sim->entity_count);
+    //radix_sort(sort_a, sort_b, sim->entity_count);
     vec3 cam_x = world_state->mvp.get_x();
     vec3 cam_y = world_state->mvp.get_y();
     for (size_t sorted_idx = 0; sorted_idx < sim->entity_count; ++sorted_idx) {

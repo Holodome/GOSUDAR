@@ -204,6 +204,8 @@ enum {
     RENDERER_FRAMEBUFFER_BLUR2,
     RENDERER_FRAMEBUFFER_PEEL1,
     RENDERER_FRAMEBUFFER_PEEL2,
+    RENDERER_FRAMEBUFFER_PEEL3,
+    RENDERER_FRAMEBUFFER_PEEL4,
     RENDERER_FRAMEBUFFER_SENTINEL,
 };
 
@@ -398,6 +400,8 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     vec2 blur_size = size * 0.25f;
     b32 filter = settings.filtered;
     init_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL4, size, true, filter);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL3, size, true, filter);
     init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter);
     init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter);
     init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter);
@@ -562,7 +566,6 @@ void renderer_end_frame(Renderer *renderer) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glActiveTexture(GL_TEXTURE0);
     
     // This is local renderer state
     RendererSetup *current_setup = 0;
@@ -646,20 +649,19 @@ void renderer_end_frame(Renderer *renderer) {
                 current_setup = setup;
             } break;
             case RENDERER_COMMAND_BEGIN_DEPTH_PEELING: {
-#if 1
                 peel_header_restore = cursor;
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, true);
-#endif 
+                glDisable(GL_BLEND);
             } break;
             case RENDERER_COMMAND_END_DEPTH_PEELING: {
-#if 1
                 if (peel_count == 0) {
                     is_peeling = true;
                     cursor = peel_header_restore;
                     ++peel_count;
                     
                     bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, true);
-                    glDisable(GL_DEPTH_TEST);
+                    glEnable(GL_BLEND);
+                    //glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
                 } else {
                     assert(peel_count == 1);
                     
@@ -676,15 +678,19 @@ void renderer_end_frame(Renderer *renderer) {
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL2]);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, 0);
                     glBindVertexArray(0);
                     glUseProgram(0);
                     glEnable(GL_BLEND);
-                    glEnable(GL_DEPTH_TEST);
-#endif 
+                    
                     is_peeling = false;
                     glEnable(GL_DEPTH_TEST);
-                }
+                    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif 
+                }
             } break;
             INVALID_DEFAULT_CASE;
         }

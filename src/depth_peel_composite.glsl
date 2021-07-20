@@ -18,7 +18,14 @@ out vec4 out_color;
 void main() {
 vec4 peel0 = texture(peel0_tex, frag_uv);
 vec4 peel1 = texture(peel1_tex, frag_uv);
-out_color.rgb = peel0.rgb + (1.0 - peel0.a) * peel1.rgb;
+float inv_a = 0;
+if (peel1.a > 0) {
+inv_a = 1.0 / peel1.a;
+}
+peel1.rgb *= inv_a;
 
+peel0.rgb *= peel0.a;
+
+out_color.rgb = peel0.rgb + (1.0 - peel0.a) * peel1.rgb;
 }
 #endif)FOO"

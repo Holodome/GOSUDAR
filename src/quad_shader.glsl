@@ -48,19 +48,11 @@ void main()
     vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
     vec4 texture_sample = texture(tex, array_uv, 0);      
 
-#if DEPTH_PEEL && 0
-texture_sample *= 0.001;
-texture_sample.xyz += vec3(texelFetch(depth, ivec2(gl_FragCoord.xy), 0).r);
-texture_sample.a = 1;
-out_color = texture_sample;
-return;
-#endif 
-
-    if (texture_sample.a > 0) {
+    //if (texture_sample.a > 0) {
         out_color = texture_sample * rect_color;       
-    } else {
-        discard;
-    }
+    //} else {
+        //discard;
+    //}
 
 }    
   

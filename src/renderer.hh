@@ -60,8 +60,6 @@ Renderer *renderer_init(RendererSettings settings);
 RendererCommands *renderer_begin_frame(Renderer *renderer);
 void renderer_end_frame(Renderer *renderer);
 // Creates texture from mipmaps data.
-// @TODO see if we need to zero-initialize all mipmap levels to transparent so 
-// filtering works properly - maybe we can just avoid using textures of non-standart sizes?
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 // Clean all previous settings and init new
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);

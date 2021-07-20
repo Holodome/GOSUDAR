@@ -152,8 +152,8 @@ struct OpenGLVerticalBlurShader {
 
 static OpenGLVerticalBlurShader compile_vertical_blur_shader() {
     const char *vertical_gaussian_blur_shader_code = 
-    #include "vertical_gaussian_blur.glsl"
-;
+#include "vertical_gaussian_blur.glsl"
+    ;
     OpenGLVerticalBlurShader result = {};
     result.id = create_shader(vertical_gaussian_blur_shader_code);
     result.tex_location = get_uniform(result.id, "tex");
@@ -333,7 +333,13 @@ static void init_framebuffer(Renderer *renderer, u32 idx,
     if (has_depth) {
         GLuint depth_id = renderer->framebuffer_depths[idx];
         glBindTexture(GL_TEXTURE_2D, depth_id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_id, 0);
         
         mem += size.x * size.y * 3;
@@ -640,24 +646,24 @@ void renderer_end_frame(Renderer *renderer) {
                 current_setup = setup;
             } break;
             case RENDERER_COMMAND_BEGIN_DEPTH_PEELING: {
-#if 0
+#if 1
                 peel_header_restore = cursor;
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, true);
 #endif 
             } break;
             case RENDERER_COMMAND_END_DEPTH_PEELING: {
-#if 0
+#if 1
                 if (peel_count == 0) {
+                    is_peeling = true;
                     cursor = peel_header_restore;
                     ++peel_count;
                     
                     bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, true);
-                    is_peeling = true;
                     glDisable(GL_DEPTH_TEST);
                 } else {
                     assert(peel_count == 1);
                     
-#if 1
+#if 0
                     blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, current_framebuffer);
 #else 
                     glDisable(GL_DEPTH_TEST);

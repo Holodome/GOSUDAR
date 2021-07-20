@@ -22,8 +22,6 @@ void main() {
     rect_color = color;        
     frag_uv = uv;      
     frag_texture_index = texture_index;        
-    
-    float d = length(cam_space.xyz);
 }      
 #else 
 
@@ -31,10 +29,10 @@ in vec4 rect_color;
 in vec2 frag_uv;       
 flat in int frag_texture_index;        
 
-uniform sampler2DArray tex;        
 #if DEPTH_PEEL
 uniform sampler2D depth;
 #endif 
+uniform sampler2DArray tex;        
 out vec4 out_color;        
 
 void main()        
@@ -50,11 +48,20 @@ void main()
     vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
     vec4 texture_sample = texture(tex, array_uv, 0);      
 
+#if DEPTH_PEEL && 0
+texture_sample *= 0.001;
+texture_sample.xyz += vec3(texelFetch(depth, ivec2(gl_FragCoord.xy), 0).r);
+texture_sample.a = 1;
+out_color = texture_sample;
+return;
+#endif 
+
     if (texture_sample.a > 0) {
         out_color = texture_sample * rect_color;       
     } else {
         discard;
     }
+
 }    
   
 #endif)FOO"

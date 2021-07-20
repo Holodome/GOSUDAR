@@ -133,13 +133,16 @@ static void update_game_state(Game *game, GameLinks links) {
     begin_separated_rendering(links.commands);
     update_and_render_world_state(&game->world_state, links);
     
+    bool blur_game = false;
+    UIElement *interface = 0;
+    
     if (game->game_state == GAME_STATE_PAUSED) {
         if (is_key_pressed(&game->input, KEY_ESCAPE)) {
             game->game_state = GAME_STATE_PLAYING;
         }
         
-        do_blur(links.commands);
-        update_and_render_interface(game->pause_interface, links);
+        blur_game = true;
+        interface = game->pause_interface;
         if (game->pause_continue->is_pressed) {
             game->game_state = GAME_STATE_PLAYING;
         } 
@@ -158,8 +161,8 @@ static void update_game_state(Game *game, GameLinks links) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        do_blur(links.commands);
-        update_and_render_interface(game->settings_interface, links);
+        blur_game = true;
+        interface = game->settings_interface; 
         if (game->settings_back->is_pressed) {
             game->game_state = GAME_STATE_PAUSED;
         }
@@ -168,8 +171,16 @@ static void update_game_state(Game *game, GameLinks links) {
             game->game_state = GAME_STATE_PAUSED;
         }
         
-        update_and_render_interface(game->game_interface, links);
+        interface = game->game_interface;
     }
+    
+    if (blur_game) {
+        do_blur(links.commands);
+    }
+    end_separated_rendering(links.commands);
+    
+    begin_separated_rendering(links.commands);
+    update_and_render_interface(interface, links);
     end_separated_rendering(links.commands);
 }
 

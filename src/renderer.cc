@@ -536,7 +536,7 @@ static void bind_framebuffer(Renderer *renderer, u32 id, bool clear = false) {
     }
     
     if (clear) {
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         u32 flags = GL_COLOR_BUFFER_BIT;
         if (has_depth) {
             flags |= GL_DEPTH_BUFFER_BIT;
@@ -549,7 +549,9 @@ static void bind_framebuffer(Renderer *renderer, u32 id, bool clear = false) {
 static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = false) {
     bind_framebuffer(renderer, to, clear);
     
+    glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     bind_shader(&renderer->blit_framebuffer_shader, 0);
     glBindVertexArray(renderer->render_framebuffer_vao);
@@ -561,6 +563,7 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     glUseProgram(0);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
 }
 
 void renderer_end_frame(Renderer *renderer) {
@@ -618,6 +621,8 @@ void renderer_end_frame(Renderer *renderer) {
             case RENDERER_COMMAND_BLUR: {
                 assert(current_framebuffer == RENDERER_FRAMEBUFFER_SEPARATED);
                 
+                glDisable(GL_DEPTH_TEST);
+                glDisable(GL_BLEND);
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
                 bind_shader(&renderer->horizontal_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, 0);
                 glActiveTexture(GL_TEXTURE0);
@@ -637,7 +642,8 @@ void renderer_end_frame(Renderer *renderer) {
                 glBindVertexArray(0);
                 glBindTexture(GL_TEXTURE_2D, 0);
                 glUseProgram(0);
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glEnable(GL_BLEND);
+                glEnable(GL_DEPTH_TEST);
                 
                 blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, RENDERER_FRAMEBUFFER_SEPARATED, true);
             } break;
@@ -659,7 +665,7 @@ void renderer_end_frame(Renderer *renderer) {
                 peel_header_restore = cursor;
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, true);
                 glDisable(GL_BLEND);
-                peel_count = 0;
+                assert(peel_count == 0);
             } break;
             case RENDERER_COMMAND_END_DEPTH_PEELING: {
                 if (peel_count < 3) {
@@ -669,8 +675,11 @@ void renderer_end_frame(Renderer *renderer) {
                     bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1 + peel_count, true);
                 } else {
                     assert(peel_count == 3);
-                    glDisable(GL_BLEND);
-                    bind_framebuffer(renderer, current_framebuffer, true);
+                    peel_count = 0;
+                    
+                    glDisable(GL_DEPTH_TEST);
+                    glDepthMask(GL_FALSE);
+                    bind_framebuffer(renderer, current_framebuffer);
                     bind_shader(&renderer->depth_peel_composite_shader, 0, 1, 2, 3);
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL1]);
@@ -693,6 +702,8 @@ void renderer_end_frame(Renderer *renderer) {
                     glBindTexture(GL_TEXTURE_2D, 0);
                     glUseProgram(0);
                     glEnable(GL_BLEND);
+                    glEnable(GL_DEPTH_TEST);
+                    glDepthMask(GL_TRUE);
                 }
             } break;
             INVALID_DEFAULT_CASE;

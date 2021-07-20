@@ -171,6 +171,8 @@ struct OpenGLDepthPeelCompositeShader {
     GLuint id;
     GLuint peel0_location;
     GLuint peel1_location;
+    GLuint peel2_location;
+    GLuint peel3_location;
 };
 
 static OpenGLDepthPeelCompositeShader compile_depth_peel_composite() {
@@ -181,13 +183,17 @@ static OpenGLDepthPeelCompositeShader compile_depth_peel_composite() {
     result.id = create_shader(code);
     result.peel0_location = get_uniform(result.id, "peel0_tex");
     result.peel1_location = get_uniform(result.id, "peel1_tex");
+    result.peel2_location = get_uniform(result.id, "peel2_tex");
+    result.peel3_location = get_uniform(result.id, "peel3_tex");
     return result;
 }
 
-void bind_shader(OpenGLDepthPeelCompositeShader *shader, u32 peel0, u32 peel1) {
+void bind_shader(OpenGLDepthPeelCompositeShader *shader, u32 peel0, u32 peel1, u32 peel2, u32 peel3) {
     glUseProgram(shader->id);
     glUniform1i(shader->peel0_location, peel0);
     glUniform1i(shader->peel1_location, peel1);
+    glUniform1i(shader->peel2_location, peel2);
+    glUniform1i(shader->peel3_location, peel3);
 }
 
 // This is more like description
@@ -499,6 +505,8 @@ Renderer *renderer_init(RendererSettings settings) {
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_SEPARATED);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL1);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL2);
+    glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL3);
+    glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL4);
     
     init_renderer_for_settings(renderer, settings);
     return renderer;
@@ -576,9 +584,8 @@ void renderer_end_frame(Renderer *renderer) {
     u8 *commands_bound = renderer->commands.command_memory + renderer->commands.command_memory_used;
     u8 *peel_header_restore = 0;
     u32 peel_count = 0;
-    b32 is_peeling = false;
+    // b32 is_peeling = false;
     
-    u32 DEBUG_draw_call_count = 0;
     while (cursor < commands_bound) {
         RendererCommandHeader *header = (RendererCommandHeader *)cursor;
         cursor += sizeof(*header);
@@ -588,50 +595,51 @@ void renderer_end_frame(Renderer *renderer) {
                 cursor += sizeof(*quads);
                 
                 assert(current_setup);
-                if (is_peeling) {
+                if (peel_count) {
                     bind_shader(&renderer->depth_peel_shader, &current_setup->view, &current_setup->projection, 0, 1);
                     glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_depths[RENDERER_FRAMEBUFFER_PEEL1]);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_depths[RENDERER_FRAMEBUFFER_PEEL1 + peel_count - 1]);
                 } else {
                     bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
                 }
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);
                 glBindVertexArray(renderer->vertex_array);
-                
                 glDrawElementsBaseVertex(GL_TRIANGLES, 6 * quads->quad_count, GL_INDEX_TYPE, (void *)(sizeof(RENDERER_INDEX_TYPE) * quads->index_array_offset), quads->vertex_array_offset);
-                glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+                if (peel_count) {
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                }
                 glUseProgram(0);
-                
-                ++DEBUG_draw_call_count;
             } break;
             case RENDERER_COMMAND_BLUR: {
                 assert(current_framebuffer == RENDERER_FRAMEBUFFER_SEPARATED);
                 
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
                 bind_shader(&renderer->horizontal_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, 0);
-                glBindVertexArray(renderer->render_framebuffer_vao);
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_SEPARATED]);
+                glBindVertexArray(renderer->render_framebuffer_vao);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
+                glBindTexture(GL_TEXTURE_2D, 0);
                 glUseProgram(0);
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, true);
                 bind_shader(&renderer->vertical_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y, 0);
-                glBindVertexArray(renderer->render_framebuffer_vao);
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_BLUR1]);
+                glBindVertexArray(renderer->render_framebuffer_vao);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
+                glBindTexture(GL_TEXTURE_2D, 0);
                 glUseProgram(0);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 
                 blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, RENDERER_FRAMEBUFFER_SEPARATED, true);
-                
-                DEBUG_draw_call_count += 3;
             } break;
             case RENDERER_COMMAND_BEGIN_SEPARATED: {
                 current_framebuffer = RENDERER_FRAMEBUFFER_SEPARATED;
@@ -640,7 +648,6 @@ void renderer_end_frame(Renderer *renderer) {
             case RENDERER_COMMAND_END_SEPARATED: {
                 current_framebuffer = RENDERER_FRAMEBUFFER_MAIN;
                 blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, RENDERER_FRAMEBUFFER_MAIN);
-                ++DEBUG_draw_call_count;
             } break;
             case RENDERER_COMMAND_SET_SETUP: {
                 RendererSetup *setup = (RendererSetup *)cursor;
@@ -652,44 +659,40 @@ void renderer_end_frame(Renderer *renderer) {
                 peel_header_restore = cursor;
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, true);
                 glDisable(GL_BLEND);
+                peel_count = 0;
             } break;
             case RENDERER_COMMAND_END_DEPTH_PEELING: {
-                if (peel_count == 0) {
-                    is_peeling = true;
+                if (peel_count < 3) {
                     cursor = peel_header_restore;
                     ++peel_count;
                     
-                    bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, true);
-                    glEnable(GL_BLEND);
-                    //glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
+                    bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1 + peel_count, true);
                 } else {
-                    assert(peel_count == 1);
-                    
-#if 0
-                    blit_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, current_framebuffer);
-#else 
-                    glDisable(GL_DEPTH_TEST);
+                    assert(peel_count == 3);
                     glDisable(GL_BLEND);
                     bind_framebuffer(renderer, current_framebuffer, true);
-                    bind_shader(&renderer->depth_peel_composite_shader, 0, 1);
-                    glBindVertexArray(renderer->render_framebuffer_vao);
+                    bind_shader(&renderer->depth_peel_composite_shader, 0, 1, 2, 3);
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL1]);
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL2]);
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL3]);
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL4]);
+                    glBindVertexArray(renderer->render_framebuffer_vao);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    glBindVertexArray(0);
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, 0);
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, 0);
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, 0);
-                    glBindVertexArray(0);
                     glUseProgram(0);
                     glEnable(GL_BLEND);
-                    
-                    is_peeling = false;
-                    glEnable(GL_DEPTH_TEST);
-                    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#endif 
                 }
             } break;
             INVALID_DEFAULT_CASE;
@@ -703,7 +706,6 @@ void renderer_end_frame(Renderer *renderer) {
         DEBUG_VALUE(renderer->texture_count, "Texture count");
         DEBUG_VALUE((f32)renderer->commands.index_count / renderer->commands.max_index_count * 100, "Index buffer");
         DEBUG_VALUE((f32)renderer->commands.vertex_count / renderer->commands.max_vertex_count * 100, "Vertex buffer");
-        DEBUG_VALUE(DEBUG_draw_call_count, "Draw call count");
     }
 }
 

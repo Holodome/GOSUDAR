@@ -416,18 +416,10 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     // Entities
     //
     BEGIN_BLOCK("Render entities");
-    SortEntry *sort_a = alloc_arr(world_state->frame_arena, sim->entity_count, SortEntry);
-    SortEntry *sort_b = alloc_arr(world_state->frame_arena, sim->entity_count, SortEntry);
-    vec3 cam_z = world_state->mvp.get_z();
-    for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
-        sort_a[entity_idx].sort_key = dot(cam_z, xz(sim->entities[entity_idx].p) - world_state->cam_p);
-        sort_a[entity_idx].sort_index = entity_idx;
-    }
-    //radix_sort(sort_a, sort_b, sim->entity_count);
     vec3 cam_x = world_state->mvp.get_x();
     vec3 cam_y = world_state->mvp.get_y();
-    for (size_t sorted_idx = 0; sorted_idx < sim->entity_count; ++sorted_idx) {
-        Entity *entity = sim->entities + sort_a[sim->entity_count - sorted_idx - 1].sort_index;
+    for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
+        Entity *entity = sim->entities + entity_idx;
         AssetID texture_id;
         switch (entity->kind) {
             case ENTITY_KIND_PLAYER: {

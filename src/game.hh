@@ -6,7 +6,7 @@
 #include "os.hh"
 #include "assets.hh"
 #include "renderer_api.hh"
-#include "interface.hh"
+#include "ui.hh"
 
 #include "audio.hh"
 #include "world.hh"
@@ -18,21 +18,56 @@ enum StateKind {
     STATE_PLAY,  
 };
 
-enum MainMenuState {
+enum {
     MAIN_MENU_MAIN_SCREEN,  
     MAIN_MENU_SETTINGS,  
 };
 
-enum GameState {
+enum {
     GAME_STATE_PLAYING,
     GAME_STATE_PAUSED,
     GAME_STATE_SETTINGS,
 };
 
+struct MainMenuUI {
+    UIID play_button;
+    UIID settings_button;
+    UIID exit_button;
+};
+
+struct SettingsUI {
+    UIID vsync;
+    UIID tex_filter;
+    UIID mipmapping;
+    UIID back;
+    
+    UIID volume;
+};
+
+struct GameUI {
+    UIID toolbar;
+};
+
+struct GamePauseUI {
+    UIID play;
+    UIID settings;
+    UIID button;
+    UIID main_menu;
+};
+
+struct MainMenuState {
+    u32 main_menu_state_kind;
+};
+
+struct PlayState {
+    u32 game_state;
+    WorldState world_state;
+};
+
 // Game is a object that decribes program as one element 
-// It contains several elements that are all used in game state
-// Game state is the logic of the game
-// It decides how to use all data recived from input, what to render when to close etc.
+// It is responsible for initializing and updating all separate game elements (see GameLinks)
+// 
+// Policy on allocations: All modules should have their own allocators
 struct Game {
     bool is_running;
     // Global temporary arena - easy way to allocate some stuff that doesn't need to exist for long
@@ -42,51 +77,18 @@ struct Game {
     MemoryArena arena;
     
     OS *os;
-    struct Renderer *renderer;
+    Renderer *renderer;
     Assets *assets;
     DebugState *debug_state;
     InputManager input;
     AudioSystem audio;
-    
-    //
-    // Renderer settings
-    //
     RendererSettings renderer_settings;
+    RendererCommands commands;
+    UI *ui;
     
-    // Game state
     StateKind state;  
-    //
-    // Main menu state
-    //
-    MemoryArena interface_arena;
-    MainMenuState main_menu_state;
-    UIElement *main_menu_interface;
-    UIListener *main_menu_start_game_button;
-    UIListener *main_menu_settings_button;
-    UIListener *main_menu_exit_button;
-    
-    UIElement *settings_interface;
-    UIListener *settings_vsync;
-    UIListener *settings_texture_filtering;
-    UIListener *settings_texture_mipmapping;
-    UIListener *settings_back;
-    //
-    // Game state
-    //
-    GameState game_state;
-    WorldState world_state;
-    
-    UIElement *pause_interface;
-    UIListener *pause_continue;
-    UIListener *pause_main_menu;
-    UIListener *pause_settings;
-    UIListener *pause_exit;
-    
-    UIElement *game_interface;
-    UIListener *game_interface_button_mine_resource;
-    UIListener *game_interface_button_ground_interact;
-    UIListener *game_interface_button_building1;
-    UIListener *game_interface_button_building2;
+    MainMenuState main_menu_state;;
+    PlayState play_state;
 };
 
 void game_init(Game *game);

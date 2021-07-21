@@ -8,11 +8,14 @@ _type _name;
 #include "gl_procs.inc"
 #undef GLPROC
 
+const char *global_shader_code = R"FOO(#version 330
+)FOO";
+
 static GLuint create_shader(const char *source, const char *defines = "") {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *const vertex_source[] = { "#version 330\n", "#define VERTEX_SHADER\n", defines, source };
-    const char *const fragment_source[] = { "#version 330\n", defines, source };
+    const char *const vertex_source[] = { global_shader_code, "#define VERTEX_SHADER\n", defines, source };
+    const char *const fragment_source[] = { global_shader_code, defines, source };
     glShaderSource(vertex_shader, ARRAY_SIZE(vertex_source), vertex_source, 0);
     glShaderSource(fragment_shader, ARRAY_SIZE(fragment_source), fragment_source, 0);
     glCompileShader(vertex_shader);
@@ -50,6 +53,9 @@ static GLuint create_shader(const char *source, const char *defines = "") {
         fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
         shader_failed = true;
     }    
+    
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
     
     assert(!shader_failed);
     return id;
@@ -199,7 +205,6 @@ void bind_shader(OpenGLDepthPeelCompositeShader *shader, u32 peel0, u32 peel1, u
 // This is more like description
 struct RendererFramebuffer {
     vec2 size;
-    u32 video_memory;
     bool has_depth;
 };
 
@@ -218,7 +223,6 @@ enum {
 struct Renderer {
     MemoryArena arena;
     RendererSettings settings;
-    RendererCommands commands;
     
     OpenGLQuadShader quad_shader;
     OpenGLQuadShader depth_peel_shader;
@@ -240,7 +244,7 @@ struct Renderer {
     GLuint framebuffer_depths[RENDERER_FRAMEBUFFER_SENTINEL];
     RendererFramebuffer framebuffers[RENDERER_FRAMEBUFFER_SENTINEL];
     
-    u64 video_memory_used;
+    Texture white_texture;
 };
 
 static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id, GLenum severity, GLsizei length,
@@ -319,48 +323,61 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
 }
 
 static void init_framebuffer(Renderer *renderer, u32 idx,
-                             vec2 size, bool has_depth, bool filtered) {
+                             vec2 size, bool has_depth, bool filtered, u32 sample_count) {
     RendererFramebuffer result = {};
     result.has_depth = has_depth;
     result.size = size;
+    GLenum tex_slot = GL_TEXTURE_2D;
     
+    GLenum filter = filtered ? GL_LINEAR : GL_NEAREST;
     GLuint id = renderer->framebuffer_ids[idx];
     GLuint tex_id = renderer->framebuffer_textures[idx];
-    u32 mem = 0;
     
     glBindFramebuffer(GL_FRAMEBUFFER, id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glBindTexture(tex_slot, tex_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-    GLenum filter = filtered ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_id, 0);
-    mem += size.x * size.y * 4;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_slot, tex_id, 0);
     if (has_depth) {
         GLuint depth_id = renderer->framebuffer_depths[idx];
-        glBindTexture(GL_TEXTURE_2D, depth_id);
+        glBindTexture(tex_slot, depth_id);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_id, 0);
-        
-        mem += size.x * size.y * 3;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, tex_slot, depth_id, 0);
     }
+    
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
-    renderer->video_memory_used += mem;
-    result.video_memory = mem;
     renderer->framebuffers[idx] = result;
 }
 
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
+    glBindVertexArray(renderer->vertex_array);
+    glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, settings.max_vertex_count * sizeof(Vertex), 0, GL_STREAM_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, settings.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, p));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, uv));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, n));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, c));
+    glEnableVertexAttribArray(3);
+    glVertexAttribIPointer(4, 1, GL_UNSIGNED_SHORT, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, tex));
+    glEnableVertexAttribArray(4);
+    
+    glBindVertexArray(0);
+    
     renderer->texture_count = 0;
     GLenum min_filter, mag_filter;
     if (settings.filtered) {
@@ -390,7 +407,7 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     TempMemory white_temp = begin_temp_memory(&renderer->arena);
     void *white_data = alloc(&renderer->arena, white_data_size);
     memset(white_data, 0xFF, white_data_size);
-    renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+    renderer->white_texture = renderer_create_texture_mipmaps(renderer, white_data, RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     end_temp_memory(white_temp);
 #else   
     // ...
@@ -398,27 +415,37 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     renderer->commands.white_texture = renderer_create_texture_mipmaps(renderer, &white_data, 1, 1);
 #endif   
     
-    for (u32 i = 0; i < RENDERER_FRAMEBUFFER_SENTINEL; ++i) {
-        renderer->video_memory_used -= renderer->framebuffers[i].video_memory;
-    }
-    
     vec2 size = settings.display_size;
     vec2 blur_size = size * 0.25f;
     b32 filter = settings.filtered;
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL4, size, true, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL3, size, true, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter);
-    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, blur_size, false, filter);
+    u32 sample_count = settings.sample_count;
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_SEPARATED, size, true, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL4, size, true, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL3, size, true, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL2, size, true, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_PEEL1, size, true, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, blur_size, false, filter, sample_count);
+    init_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, blur_size, false, filter, sample_count);
     
     renderer->settings = settings;
+    
+    glDeleteProgram(renderer->quad_shader.id);
+    glDeleteProgram(renderer->depth_peel_shader.id);
+    glDeleteProgram(renderer->blit_framebuffer_shader.id);
+    glDeleteProgram(renderer->horizontal_blur_shader.id);
+    glDeleteProgram(renderer->vertical_blur_shader.id);
+    glDeleteProgram(renderer->depth_peel_composite_shader.id);
+    renderer->quad_shader = compile_quad_shader(false);
+    renderer->depth_peel_shader = compile_quad_shader(true);
+    renderer->blit_framebuffer_shader = compile_blit_framebuffer_shader();
+    renderer->horizontal_blur_shader = compile_horizontal_blur_shader();
+    renderer->vertical_blur_shader = compile_vertical_blur_shader();
+    renderer->depth_peel_composite_shader = compile_depth_peel_composite();
+    
 }
 
 Renderer *renderer_init(RendererSettings settings) {
-#define RENDERER_ARENA_SIZE MEGABYTES(256)
-    Renderer *renderer = bootstrap_alloc_struct(Renderer, arena, RENDERER_ARENA_SIZE);
+    Renderer *renderer = bootstrap_alloc_struct(Renderer, arena);
     
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);
@@ -428,23 +455,6 @@ Renderer *renderer_init(RendererSettings settings) {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-    
-#define MAX_QUADS_COUNT MEGABYTES(16)
-#define MAX_VERTEX_COUNT (1 << 16)
-#define MAX_INDEX_COUNT (MAX_VERTEX_COUNT / 2 * 3)
-    renderer->commands.command_memory_size = MAX_QUADS_COUNT;
-    renderer->commands.command_memory = (u8 *) alloc(&renderer->arena, MAX_QUADS_COUNT);
-    renderer->commands.max_vertex_count = MAX_VERTEX_COUNT;
-    renderer->commands.vertices = alloc_arr(&renderer->arena, MAX_VERTEX_COUNT, Vertex);
-    renderer->commands.max_index_count = MAX_INDEX_COUNT;
-    renderer->commands.indices = alloc_arr(&renderer->arena, MAX_INDEX_COUNT, RENDERER_INDEX_TYPE);
-    
-    renderer->quad_shader = compile_quad_shader(false);
-    renderer->depth_peel_shader = compile_quad_shader(true);
-    renderer->blit_framebuffer_shader = compile_blit_framebuffer_shader();
-    renderer->horizontal_blur_shader = compile_horizontal_blur_shader();
-    renderer->vertical_blur_shader = compile_vertical_blur_shader();
-    renderer->depth_peel_composite_shader = compile_depth_peel_composite();
     
     // Generate vertex arrays
     glGenVertexArrays(1, &renderer->render_framebuffer_vao);
@@ -464,30 +474,8 @@ Renderer *renderer_init(RendererSettings settings) {
     glBindVertexArray(0);
     
     glGenVertexArrays(1, &renderer->vertex_array);
-    glBindVertexArray(renderer->vertex_array);
-    
     glGenBuffers(1, &renderer->vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, renderer->vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, renderer->commands.max_vertex_count * sizeof(Vertex), 0, GL_STREAM_DRAW);
-    renderer->video_memory_used += renderer->commands.max_vertex_count * sizeof(Vertex);
-    
     glGenBuffers(1, &renderer->index_buffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE), 0, GL_STREAM_DRAW);
-    renderer->video_memory_used += renderer->commands.max_index_count * sizeof(RENDERER_INDEX_TYPE);
-    
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, p));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, uv));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, n));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, c));
-    glEnableVertexAttribArray(3);
-    glVertexAttribIPointer(4, 1, GL_UNSIGNED_SHORT, sizeof(Vertex), (void *)STRUCT_OFFSET(Vertex, tex));
-    glEnableVertexAttribArray(4);
-    
-    glBindVertexArray(0);
     
 #define MAX_TEXTURE_COUNT 256
     renderer->max_texture_count = MAX_TEXTURE_COUNT;
@@ -497,29 +485,22 @@ Renderer *renderer_init(RendererSettings settings) {
         glTexImage3D(GL_TEXTURE_2D_ARRAY, iter.level, GL_RGBA8, 
                      iter.width, iter.height, MAX_TEXTURE_COUNT,
                      0, GL_RGBA, GL_UNSIGNED_BYTE, 0);        
-        renderer->video_memory_used += iter.width * iter.height * 4 * renderer->max_texture_count;
     }
     
     glGenFramebuffers(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_ids);
     glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_textures);
+#if 0
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_SEPARATED);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL1);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL2);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL3);
     glGenTextures(1, renderer->framebuffer_depths + RENDERER_FRAMEBUFFER_PEEL4);
+#else 
+    glGenTextures(RENDERER_FRAMEBUFFER_SENTINEL, renderer->framebuffer_depths);
+#endif 
     
     init_renderer_for_settings(renderer, settings);
     return renderer;
-}
-
-RendererCommands *renderer_begin_frame(Renderer *renderer) {
-    RendererCommands *commands = &renderer->commands;
-    commands->command_memory_used = 0;
-    commands->vertex_count = 0;
-    commands->index_count = 0;
-    commands->last_header = 0;
-    commands->last_setup = 0;
-    return commands;
 }
 
 static void bind_framebuffer(Renderer *renderer, u32 id, bool clear = false) {
@@ -546,6 +527,17 @@ static void bind_framebuffer(Renderer *renderer, u32 id, bool clear = false) {
     
 }
 
+static void bind_framebuffer_texture(Renderer *renderer, u32 id, u32 idx, bool is_depth = false) {
+    glActiveTexture(GL_TEXTURE0 + idx);
+    GLuint *tex_arr = is_depth ? renderer->framebuffer_depths : renderer->framebuffer_textures;
+    glBindTexture(GL_TEXTURE_2D, tex_arr[id]);
+}
+
+static void unbind_framebuffer_texture(Renderer *renderer, u32 idx) {
+    glActiveTexture(GL_TEXTURE0 + idx);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = false) {
     bind_framebuffer(renderer, to, clear);
     
@@ -555,10 +547,9 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     bind_shader(&renderer->blit_framebuffer_shader, 0);
     glBindVertexArray(renderer->render_framebuffer_vao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[from]);
+    bind_framebuffer_texture(renderer, from, 0);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    unbind_framebuffer_texture(renderer, 0);
     glBindVertexArray(0);
     glUseProgram(0);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -566,12 +557,12 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     glDepthMask(GL_TRUE);
 }
 
-void renderer_end_frame(Renderer *renderer) {
+void renderer_end_frame(Renderer *renderer, RendererCommands *commands) {
     TIMED_FUNCTION();
     // Upload data from vertex array to OpenGL buffers
     glBindVertexArray(renderer->vertex_array);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, renderer->commands.vertex_count * sizeof(Vertex), renderer->commands.vertices);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, renderer->commands.index_count * sizeof(RENDERER_INDEX_TYPE), renderer->commands.indices);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, commands->vertex_count * sizeof(Vertex), commands->vertices);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, commands->index_count * sizeof(RENDERER_INDEX_TYPE), commands->indices);
     glBindVertexArray(0);
     
     glEnable(GL_DEPTH_TEST);
@@ -583,11 +574,10 @@ void renderer_end_frame(Renderer *renderer) {
     u32 current_framebuffer = RENDERER_FRAMEBUFFER_MAIN;
     bind_framebuffer(renderer, current_framebuffer, true);
     
-    u8 *cursor = renderer->commands.command_memory;
-    u8 *commands_bound = renderer->commands.command_memory + renderer->commands.command_memory_used;
+    u8 *cursor = commands->command_memory;
+    u8 *commands_bound = commands->command_memory + commands->command_memory_used;
     u8 *peel_header_restore = 0;
     u32 peel_count = 0;
-    // b32 is_peeling = false;
     
     while (cursor < commands_bound) {
         RendererCommandHeader *header = (RendererCommandHeader *)cursor;
@@ -600,8 +590,8 @@ void renderer_end_frame(Renderer *renderer) {
                 assert(current_setup);
                 if (peel_count) {
                     bind_shader(&renderer->depth_peel_shader, &current_setup->view, &current_setup->projection, 0, 1);
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_depths[RENDERER_FRAMEBUFFER_PEEL1 + peel_count - 1]);
+                    u32 framebuffer_idx = RENDERER_FRAMEBUFFER_PEEL1 + peel_count - 1;
+                    bind_framebuffer_texture(renderer, framebuffer_idx, 1, true);
                 } else {
                     bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
                 }
@@ -613,8 +603,7 @@ void renderer_end_frame(Renderer *renderer) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 if (peel_count) {
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, 0);
+                    unbind_framebuffer_texture(renderer, 1);
                 }
                 glUseProgram(0);
             } break;
@@ -625,22 +614,20 @@ void renderer_end_frame(Renderer *renderer) {
                 glDisable(GL_BLEND);
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR1, true);
                 bind_shader(&renderer->horizontal_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.x, 0);
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_SEPARATED]);
+                bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_SEPARATED, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                unbind_framebuffer_texture(renderer, 0);
                 glUseProgram(0);
                 
                 bind_framebuffer(renderer, RENDERER_FRAMEBUFFER_BLUR2, true);
                 bind_shader(&renderer->vertical_blur_shader, renderer->framebuffers[RENDERER_FRAMEBUFFER_BLUR2].size.y, 0);
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_BLUR1]);
+                bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_BLUR1, 0);
                 glBindVertexArray(renderer->render_framebuffer_vao);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glBindVertexArray(0);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                unbind_framebuffer_texture(renderer, 0);
                 glUseProgram(0);
                 glEnable(GL_BLEND);
                 glEnable(GL_DEPTH_TEST);
@@ -681,25 +668,17 @@ void renderer_end_frame(Renderer *renderer) {
                     glDepthMask(GL_FALSE);
                     bind_framebuffer(renderer, current_framebuffer);
                     bind_shader(&renderer->depth_peel_composite_shader, 0, 1, 2, 3);
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL1]);
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL2]);
-                    glActiveTexture(GL_TEXTURE2);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL3]);
-                    glActiveTexture(GL_TEXTURE3);
-                    glBindTexture(GL_TEXTURE_2D, renderer->framebuffer_textures[RENDERER_FRAMEBUFFER_PEEL4]);
+                    bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_PEEL1, 0);
+                    bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_PEEL2, 1);
+                    bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_PEEL3, 2);
+                    bind_framebuffer_texture(renderer, RENDERER_FRAMEBUFFER_PEEL4, 3);
                     glBindVertexArray(renderer->render_framebuffer_vao);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                     glBindVertexArray(0);
-                    glActiveTexture(GL_TEXTURE3);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                    glActiveTexture(GL_TEXTURE2);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, 0);
+                    unbind_framebuffer_texture(renderer, 0);
+                    unbind_framebuffer_texture(renderer, 1);
+                    unbind_framebuffer_texture(renderer, 2);
+                    unbind_framebuffer_texture(renderer, 3);
                     glUseProgram(0);
                     glEnable(GL_BLEND);
                     glEnable(GL_DEPTH_TEST);
@@ -711,13 +690,6 @@ void renderer_end_frame(Renderer *renderer) {
     }
     
     assert(current_framebuffer == RENDERER_FRAMEBUFFER_MAIN);
-    
-    {DEBUG_VALUE_BLOCK("Renderer")
-            DEBUG_VALUE(renderer->video_memory_used >> 20, "Video memory used");
-        DEBUG_VALUE(renderer->texture_count, "Texture count");
-        DEBUG_VALUE((f32)renderer->commands.index_count / renderer->commands.max_index_count * 100, "Index buffer");
-        DEBUG_VALUE((f32)renderer->commands.vertex_count / renderer->commands.max_vertex_count * 100, "Vertex buffer");
-    }
 }
 
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height) {
@@ -740,4 +712,8 @@ Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 widt
 
 const RendererSettings *get_current_settings(Renderer *renderer) {
     return &renderer->settings;
+}
+
+Texture get_white_texture(Renderer *renderer) {
+    return renderer->white_texture;
 }

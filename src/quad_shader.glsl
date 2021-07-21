@@ -47,9 +47,9 @@ void main()
     
     vec3 array_uv = vec3(frag_uv.x, frag_uv.y, frag_texture_index);        
     vec4 texture_sample = texture(tex, array_uv, 0);      
-
-    if (texture_sample.a > 0) {
-        out_color = texture_sample * rect_color;       
+vec4 mod_color = texture_sample * rect_color;
+    if (mod_color.a > 0) {
+        out_color = mod_color;       
     } else {
         discard;
     }

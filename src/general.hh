@@ -97,12 +97,11 @@ LLIST_ADD(*(_list_ptr), (_node)); \
 (_node)->next->prev = (_node)->prev;\
 } while (0);
 
-// All iterators are defined with 3 functions:
-// next() - used internally (but can actually be made part of api???)
+// All iterators are defined with 2 functions:
 // is_valid()
-// advance()
+// next()
 // This API allows use of this macro which saves space writing countless for loops
-#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); advance(&(_iter_name)) )
+#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); next(&(_iter_name)) )
 
 #if BUILD_WITHOUT_CRT 
 

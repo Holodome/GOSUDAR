@@ -286,7 +286,7 @@ OS *os_init(vec2 *display_size) {
 #define WINDOW_HEIGHT 720
 #define WINDOW_NAME "GOSUDAR"
     os->hwnd = CreateWindowExA(WS_EX_APPWINDOW, wndclss.lpszClassName, WINDOW_NAME, 
-                               WS_CAPTION | WS_SYSMENU | WS_VISIBLE, 
+                               WS_OVERLAPPEDWINDOW, 
                                CW_USEDEFAULT, CW_USEDEFAULT,
                                WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, os->instance, 0);
     ShowWindow(os->hwnd, SW_SHOW);
@@ -774,4 +774,17 @@ size_t outf(const char *format, ...) {
     WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, 0, 0);
     va_end(args);
     return len;
+}
+
+#define WIN32_PAGE_SIZE 4096
+OSMemoryBlock *os_alloc_block(size_t size) {
+    uintptr_t page_size = WIN32_PAGE_SIZE;
+    uintptr_t total_size = size + sizeof(OSMemoryBlock);
+    
+    OSMemoryBlock *block = (OSMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    assert(block);
+    block->size = size;
+    block->base = (u8 *)(block + 1);
+    
+    return block;
 }

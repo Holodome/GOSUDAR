@@ -36,6 +36,7 @@ inline i32 Round_i32(f32 value) {
 
 inline f32 Round(f32 value) {
     return (f32)Round_i32(value);
+    // roundps has no rounding to nearest
 }
 
 inline i32 Ceil_i32(f32 value) {
@@ -47,7 +48,7 @@ inline f32 Ceil(f32 value) {
 }
 
 inline f32 Sqrt(f32 value) {
-    return _mm_cvtss_f32(_mm_sqrt_ps(_mm_set_ss(value)));
+    return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
 }
 
 inline f32 Rsqrt(f32 value) {
@@ -99,6 +100,8 @@ inline f32 Cos(f32 a) {
 
 // @CLEANUP
 void *os_alloc(size_t size);
+void os_free(void *ptr);
+struct OSMemoryBlock *os_alloc_block(size_t size);
 
 struct Entropy {
     u32 state;
@@ -141,6 +144,7 @@ inline uintptr_t align_forward(uintptr_t ptr, size_t align) {
     return p;
 }
 
+#if 0
 struct MemoryArena {
     u8 *data;
     size_t last_data_size;
@@ -150,93 +154,46 @@ struct MemoryArena {
     size_t peak_size;
     u32 temp_count;
 };
+#else 
 
-void arena_init(MemoryArena *arena, void *buffer, size_t buffer_size) {
-    memset(arena, 0, sizeof(*arena));
-    arena->data = (u8 *)buffer;
-    arena->data_capacity = buffer_size;
-}
+struct MemoryArena {
+    OSMemoryBlock *current_block;
+    u32 minimum_block_size;
+    u32 temp_count;
+};
+
+#endif 
 
 #define alloc_struct(_arena, _type, ...) (_type *)alloc(_arena, sizeof(_type), ##__VA_ARGS__)
 #define alloc_arr(_arena, _count, _type, ...) (_type *)alloc(_arena, _count * sizeof(_type), ##__VA_ARGS__)
 #define alloc_string(_arena, _string, ...) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
-void *alloc(MemoryArena *arena, size_t size, bool clear_to_zero = true) {
-    void *result = 0;
-    
-    if (size) {
-        uintptr_t curr_ptr = (uintptr_t)arena->data + arena->data_size;
-        uintptr_t offset = align_forward(curr_ptr, 16) - (uintptr_t)arena->data;
-        
-        if (offset + size < arena->data_capacity) {
-            u8 *ptr = arena->data + offset;
-            arena->last_data_size = offset;
-            arena->data_size = offset + size;
-            
-            result = ptr;
-        } else {
-            assert(!"Memory is out of bounds");
-        }
-        
-        if (result && clear_to_zero) {
-            // @TODO we need to adress problem of huge amounth of cycles 
-            // used on memset in this routine.
-            // Basically, memory only needs to be zeroed when we use same block for several
-            // algorithm iterations (ex. sim region)
-            // Maybe it will  even be faster to allocate new pages here - 
-            // or just have single block for simulaion that is zeroed only once per frame
-            memset(result, 0, size);
-        }
-    }
-    
-    if (arena->data_size > arena->peak_size) {
-        arena->peak_size = arena->data_size;
-    }
-    
-    return result;
-}
 
-void *alloc_copy(MemoryArena *arena, const void *src, size_t size) {
-    void *result = alloc(arena, size);
-    memcpy(result, src, size);
-    return result;
+
+void *alloc(MemoryArena *arena, size_t size);
+void arena_init(MemoryArena *arena, size_t minimum_block_size = 0) {
+    arena->minimum_block_size = minimum_block_size;
+    
 }
+void arena_clear(MemoryArena *arena);
 
 #define bootstrap_alloc_struct(_type, _field, ...) (_type *)bootstrap_alloc_size(SIZE_OF(_type), STRUCT_OFFSET(_type, _field), __VA_ARGS__)
 inline void *bootstrap_alloc_size(size_t size, size_t arena_offset, size_t minimal_block_size = MEGABYTES(4)) {
-    MemoryArena bootstrap;
-    arena_init(&bootstrap, os_alloc(minimal_block_size), minimal_block_size);
+    MemoryArena bootstrap = {};
+    arena_init(&bootstrap, minimal_block_size);
     void *struct_ptr = alloc(&bootstrap, size);
     *(MemoryArena *)((u8 *)struct_ptr + arena_offset) = bootstrap;
     return struct_ptr;
 }
 
-void arena_clear(MemoryArena *arena) {
-    arena->data_size = 0;
-    arena->last_data_size = 0;
-}
 
 struct TempMemory {
     MemoryArena *arena;
-    u64 data_size;
-    u64 last_data_size;
+    OSMemoryBlock *block;
+    u64 block_used;
 };
 
-inline TempMemory begin_temp_memory(MemoryArena *arena) {
-    ++arena->temp_count;
-    TempMemory result;
-    result.arena = arena;
-    result.data_size = arena->data_size;
-    result.last_data_size = arena->last_data_size;
-    return result;
-}
-
-inline void end_temp_memory(TempMemory mem) {
-    assert(mem.arena->temp_count);
-    --mem.arena->temp_count;
-    mem.arena->data_size = mem.data_size;
-    mem.arena->last_data_size = mem.last_data_size;
-}
-
+inline TempMemory begin_temp_memory(MemoryArena *arena);
+inline void end_temp_memory(TempMemory mem);
 
 static u32 crc32_lookup_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
@@ -1188,10 +1145,10 @@ inline u32 rgba_pack_linear256(u32 r, u32 g, u32 b, u32 a) {
 }
 
 inline u32 rgba_pack_4x8_linear1(vec4 c) {
-    u32 ru = (u32)Round_i32(Clamp(c.r, 0, 0.999f) * 255.0f);
-    u32 gu = (u32)Round_i32(Clamp(c.g, 0, 0.999f) * 255.0f);
-    u32 bu = (u32)Round_i32(Clamp(c.b, 0, 0.999f) * 255.0f);
-    u32 au = (u32)Round_i32(Clamp(c.a, 0, 0.999f) * 255.0f);
+    u32 ru = (u32)Round(Clamp(c.r, 0, 0.999f) * 255.0f);
+    u32 gu = (u32)Round(Clamp(c.g, 0, 0.999f) * 255.0f);
+    u32 bu = (u32)Round(Clamp(c.b, 0, 0.999f) * 255.0f);
+    u32 au = (u32)Round(Clamp(c.a, 0, 0.999f) * 255.0f);
     return rgba_pack_linear256(ru, gu, bu, au);
 }
 
@@ -1212,16 +1169,12 @@ struct SortEntry {
 
 // Turn floating-point key to strictly ascending u32 value
 inline u32 sort_key_to_u32(f32 sort_key) {
-#if 1
     u32 result = *(u32 *)&sort_key;
     if (result & 0x80000000) {
         result = ~result;
     } else {
         result |= 0x80000000;
     }
-#else 
-    u32 result = (u32)sort_key;
-#endif 
     return result;
 }
 
@@ -1393,17 +1346,29 @@ i64 interlocked_compare_exchange(volatile i64 *dest, i64 exchange, i64 comparand
 
 #include "simd_math.hh"
 
-
 void get_billboard_positions(vec3 mid_bottom, vec3 right, vec3 up, f32 width, f32 height, vec3 out[4]) {
-    vec3 top_left = mid_bottom - right * width * 0.5f + up * height;
-    vec3 bottom_left = top_left - up * height;
-    vec3 top_right = top_left + right * width;
-    vec3 bottom_right = top_right - up * height;
+    vec3 v_width = right * width;
+    vec3 v_height = up * height;
+    vec3 top_left = mid_bottom - v_width * 0.5f + v_height;
+    vec3 bottom_left = top_left - v_height;
+    vec3 top_right = top_left + v_width;
+    vec3 bottom_right = top_right - v_height;
     out[0] = top_left;
     out[1] = bottom_left;
     out[2] = top_right;
     out[3] = bottom_right;
 }
+
+// @TODO put this somewhere more reasonable...
+struct GameLinks {
+    struct RendererCommands *commands;
+    struct Assets *assets;
+    struct Platform *platform;
+    struct InputManager *input;
+    struct AudioSystem *audio;
+    struct MemoryArena *frame_arena;
+    struct UI *ui;
+};
 
 #define LIB_HH 1
 #endif

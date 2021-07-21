@@ -50,7 +50,7 @@ bool is_valid(MipIterator *iter) {
     return iter->width && iter->height;
 }
 
-void advance(MipIterator *iter) {
+void next(MipIterator *iter) {
     iter->pixel_offset += iter->width * iter->height;
     if (iter->width == 1 && iter->height == 1) {
         iter->width = iter->height = 0;
@@ -75,7 +75,7 @@ size_t get_total_size_for_mips(u32 width, u32 height) {
 
 void generate_sequential_mips(u32 width, u32 height, void *data) {
     MipIterator iter = iterate_mips(width, height);
-    advance(&iter);
+    next(&iter);
     u32 *src_px = (u32 *)data;
     u32 src_width = width;
     u32 src_height = height;
@@ -84,7 +84,7 @@ void generate_sequential_mips(u32 width, u32 height, void *data) {
         src_px = (u32 *)data + iter.pixel_offset;
         src_width = iter.width;
         src_height = iter.height;
-        advance(&iter);
+        next(&iter);
     }
     assert(get_total_size_for_mips(width, height) == iter.pixel_offset * 4);
 }

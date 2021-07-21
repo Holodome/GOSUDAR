@@ -19,12 +19,22 @@ struct Camera {
 #define PAWN_DISTANCE_TO_PLAYER 3.0f
 #define PAWN_DISTANCE_TO_PLAYER_SQ SQ(PAWN_DISTANCE_TO_PLAYER)
 #define PAWN_SPEED 3.0f
+#define WORLD_EPSILON 0.001f
+#define WORLD_VISUAL_EPSILON 0.01f
+#define CAMERA_FOV rad(60)
+#define CAMERA_NEAR_PLANE 0.001f
+#define CAMERA_FAR_PLANE  10000.0f
+#define MIN_CAM_PITCH (HALF_PI * 0.1f)
+#define MAX_CAM_PITCH (HALF_PI * 0.5f)
+#define X_VIEW_COEF 1.0f
+#define Y_VIEW_COEF 0.6f
+#define MOVE_COEF 16.0f
+#define ZOOM_COEF 1.0f
 
 // Structure that defines all data related to game world - anythting that can or should
 // be saved is placed here
 struct WorldState {
     MemoryArena *arena;
-    MemoryArena *frame_arena;
     
     World *world;
     
@@ -52,7 +62,7 @@ struct WorldState {
     u32 wood_count;
 };
 
-void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena);
+void world_state_init(WorldState *world_state, MemoryArena *arena);
 void update_and_render_world_state(WorldState *world_state, GameLinks links);
 
 #define WORLD_STATE_HH 1

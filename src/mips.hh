@@ -18,7 +18,7 @@ struct MipIterator {
 
 MipIterator iterate_mips(u32 width, u32 height);
 bool is_valid(MipIterator *iter);
-void advance(MipIterator *iter);
+void next(MipIterator *iter);
 // @CLEANUP Used in asset system, but place here anyway
 void generate_sequential_mips(u32 width, u32 height, void *data);
 size_t get_total_size_for_mips(u32 width, u32 height);

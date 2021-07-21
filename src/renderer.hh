@@ -4,6 +4,9 @@
 
 #include "glcorearb.h"
 
+// @TODO investigate bug when lower part of billboard sprites does not pass 
+// any of depth peel depth tests
+
 // Renderer is built the way, so up vector is {0, 1, 0}
 // This may be not optimal, bacuause 2.5 requires some 3d space calculations,
 // and converting from world plane position to renderer position requires setting 3d.z = 2d.y
@@ -48,6 +51,9 @@ struct RendererSettings {
     bool mipmapping;
     bool vsync;
     u32 sample_count;
+    
+    u32 max_vertex_count;
+    u32 max_index_count;
 };
 
 #define RENDERER_TEXTURE_DIM   512
@@ -57,13 +63,14 @@ struct RendererSettings {
 struct Renderer; 
 
 Renderer *renderer_init(RendererSettings settings);
-RendererCommands *renderer_begin_frame(Renderer *renderer);
-void renderer_end_frame(Renderer *renderer);
+void renderer_end_frame(Renderer *renderer, RendererCommands *commands);
 // Creates texture from mipmaps data.
 Texture renderer_create_texture_mipmaps(Renderer *renderer, void *data, u32 width, u32 height);
 // Clean all previous settings and init new
 void init_renderer_for_settings(Renderer *renderer, RendererSettings settings);
 const RendererSettings *get_current_settings(Renderer *renderer);
+// @TODO do already something about this stupidity...
+Texture get_white_texture(Renderer *renderer);
 
 #define RENDERER_H 1
 #endif

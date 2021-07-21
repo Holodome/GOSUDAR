@@ -185,7 +185,7 @@ SimChunkIterator iterate_sim_chunks(SimRegion *sim, i32 min_chunk_x, i32 min_chu
 // or rectangular iteration
 // @TODO this structure can be used in construction of sim regions, where 
 bool is_valid(SimChunkIterator *iter);
-void advance(SimChunkIterator *iter);
+void next(SimChunkIterator *iter);
 
 // 
 // Iterate entities in chunk
@@ -197,7 +197,7 @@ struct SimChunkEntityIterator {
 
 SimChunkEntityIterator iterate_chunk_entities(SimRegionChunk *chunk);
 bool is_valid(SimChunkEntityIterator *iter);
-void advance(SimChunkEntityIterator *iter);
+void next(SimChunkEntityIterator *iter);
 
 // Tool to iterate entities inside sim region
 // It is quite easy to create all this (useless) iterators now, so why not do it?
@@ -230,7 +230,7 @@ struct EntityIterator {
 // @TODO iterate using chunks
 EntityIterator iterate_entities(SimRegion *sim, EntityIteratorSettings settings);
 bool is_valid(EntityIterator *iter);
-void advance(EntityIterator *iter);
+void next(EntityIterator *iter);
 
 #define SIM_REGION_HH 1
 #endif

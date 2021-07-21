@@ -252,7 +252,10 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
     }
 }
 
-void DEBUG_update(DebugState *debug_state, InputManager *input, RendererCommands *commands, Assets *assets) {
+void DEBUG_update(DebugState *debug_state, GameLinks links) {
+    InputManager *input = links.input;
+    Assets *assets = links.assets;
+    RendererCommands *commands = links.commands;
     TIMED_FUNCTION();
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets, commands);
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / input->platform->frame_dt, (u32)(input->platform->frame_dt * 1000));

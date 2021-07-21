@@ -68,14 +68,5 @@ struct Entity {
     Interaction interaction;
 };
 
-// @TODO put this somewhere more reasonable...
-struct GameLinks {
-    struct RendererCommands *commands;
-    struct Assets *assets;
-    struct Platform *platform;
-    struct InputManager *input;
-    struct AudioSystem *audio;
-};
-
 #define ENTITY_HH 1
 #endif

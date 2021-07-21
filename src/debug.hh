@@ -43,7 +43,7 @@ enum {
     DEBUG_EVENT_VALUE_SWITCH,
     DEBUG_EVENT_VALUE_DRAG,
 #define DEBUG_VALUE_TYPE(_name) DEBUG_EVENT_VALUE_##_name,
-DEBUG_VALUE_TYPE_LIST()
+    DEBUG_VALUE_TYPE_LIST()
 #undef DEBUG_VALUE_TYPE
 };
 
@@ -56,7 +56,7 @@ struct DebugEvent {
         bool *value_switch;
         f32 *value_drag;
 #define DEBUG_VALUE_TYPE(_name) _name value_##_name;
-DEBUG_VALUE_TYPE_LIST()
+        DEBUG_VALUE_TYPE_LIST()
 #undef DEBUG_VALUE_TYPE
     };
 };
@@ -77,19 +77,19 @@ extern DebugTable *debug_table;
 
 // @TODO(hl): Can actualy replace interlocked_add with interlocked_increment
 #define RECORD_DEBUG_EVENT_INTERNAL(event_type, debug_name_init, name_init)                   \
-    u64 array_index_event_index = debug_table->event_array_index_event_index++;               \
-    u32 event_index = array_index_event_index & 0xFFFFFFFF;                                   \
-    assert(event_index < ARRAY_SIZE(debug_table->events[0]));                                 \
-    DebugEvent *event = debug_table->events[array_index_event_index >> 32] + event_index;     \
-    event->clock = __rdtsc();                                                                 \
-    event->type = (u8)event_type;                                                             \
-    event->debug_name = debug_name_init;                                                      \
-    event->name = name_init;                                                                  
-    
+u64 array_index_event_index = debug_table->event_array_index_event_index++;               \
+u32 event_index = array_index_event_index & 0xFFFFFFFF;                                   \
+assert(event_index < ARRAY_SIZE(debug_table->events[0]));                                 \
+DebugEvent *event = debug_table->events[array_index_event_index >> 32] + event_index;     \
+event->clock = __rdtsc();                                                                 \
+event->type = (u8)event_type;                                                             \
+event->debug_name = debug_name_init;                                                      \
+event->name = name_init;                                                                  
+
 #define RECORD_DEBUG_EVENT(_event_type, _debug_name_init, _name_init)           \
-    do {                                                                        \
-        RECORD_DEBUG_EVENT_INTERNAL(_event_type, _debug_name_init, _name_init); \
-    } while (0);
+do {                                                                        \
+RECORD_DEBUG_EVENT_INTERNAL(_event_type, _debug_name_init, _name_init); \
+} while (0);
 
 #define TIMED_BLOCK__(debug_name, name, number) DebugTimedBlock __timed_block_##number(debug_name, name)
 #define TIMED_BLOCK_(debug_name, name, number) TIMED_BLOCK__(debug_name, name, number)
@@ -105,8 +105,8 @@ extern DebugTable *debug_table;
 
 #define DEBUG_VALUE_PROC_DEF(_type)                                                \
 inline void DEBUG_VALUE_(const char *debug_name, const char *name, _type value) {  \
-    RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_##_type, debug_name, name);      \
-    event->value_##_type = value;                                                  \
+RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_##_type, debug_name, name);      \
+event->value_##_type = value;                                                  \
 }
 #define DEBUG_VALUE_TYPE DEBUG_VALUE_PROC_DEF
 DEBUG_VALUE_TYPE_LIST()
@@ -139,7 +139,7 @@ struct DebugTimedBlock {
     DebugTimedBlock(const char *debug_name, const char *name) {
         BEGIN_BLOCK_(debug_name, name);
     }
-
+    
     ~DebugTimedBlock() {
         END_BLOCK();
     }
@@ -179,7 +179,7 @@ enum {
     DEBUG_VALUE_SWITCH,  
     DEBUG_VALUE_DRAG,  
 #define DEBUG_VALUE_TYPE(_name) DEBUG_VALUE_##_name,
-DEBUG_VALUE_TYPE_LIST()
+    DEBUG_VALUE_TYPE_LIST()
 #undef DEBUG_VALUE_TYPE
 };
 
@@ -190,7 +190,7 @@ struct DebugValue {
         bool *value_switch;
         f32 *value_drag;
 #define DEBUG_VALUE_TYPE(_name) _name value_##_name;
-DEBUG_VALUE_TYPE_LIST()
+        DEBUG_VALUE_TYPE_LIST()
 #undef DEBUG_VALUE_TYPE
     };
     DebugValue *next;
@@ -207,7 +207,7 @@ struct DebugValueBlock {
 
 struct DebugState {
     MemoryArena arena;
-
+    
     DebugTable debug_table;
     
     u32 frame_index;
@@ -231,7 +231,7 @@ struct DebugState {
 
 DebugState *DEBUG_init();
 void DEBUG_begin_frame(DebugState *debug_state);
-void DEBUG_update(DebugState *debug_state, struct InputManager *input, RendererCommands *commands, Assets *assets);
+void DEBUG_update(DebugState *debug_state, GameLinks links);
 void DEBUG_frame_end(DebugState *debug_state);
 
 #else 

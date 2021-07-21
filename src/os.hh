@@ -20,16 +20,13 @@ struct FileHandle {
 };
 
 enum {
-    OS_MEMORY_BLOCK_FLAG_UNDERFLOW = 0x1,
-    OS_MEMORY_BLOCK_FLAG_OVERFLOW  = 0x2,
 };
 
 struct OSMemoryBlock {
-    u32 flags;
     u64 size;
     u64 used;
     u8 *base;
-    OSMemoryBlock *prev;
+    OSMemoryBlock *next;
 };
 
 struct OS;
@@ -57,6 +54,8 @@ void DEBUG_out_string(const char *format, ...);
 
 void mkdir(const char *name);
 void sleep(u32 ms);
+
+OSMemoryBlock *os_alloc_block(size_t size);
 
 #define OS_H 1
 #endif

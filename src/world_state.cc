@@ -45,9 +45,8 @@ inline WorldObjectSpec building_spec() {
     return spec;
 }
 
-void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *frame_arena) {    
+void world_state_init(WorldState *world_state, MemoryArena *arena) {    
     world_state->arena = arena;
-    world_state->frame_arena = frame_arena;
     // @TODO initialize world properly
     world_state->world = alloc_struct(arena, World);
     world_state->world->arena = arena;
@@ -64,9 +63,10 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
     world_state->particle_system.emitter.spec.spawn_rate = 10;
     
     // Generate world
+    TempMemory gen_temp = begin_temp_memory(arena);
     Entropy gen_entropy { 123456789 };
-    SimRegion *creation_sim = alloc_struct(frame_arena, SimRegion);
-    begin_sim(creation_sim, frame_arena, world_state->world, 100, 100, 25);
+    SimRegion *creation_sim = alloc_struct(arena, SimRegion);
+    begin_sim(creation_sim, arena, world_state->world, 100, 100, 25);
     vec2 player_pos = Vec2(0);
     world_state->camera_followed_entity = add_player(creation_sim, player_pos);    
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(5, 5));
@@ -84,6 +84,7 @@ void world_state_init(WorldState *world_state, MemoryArena *arena, MemoryArena *
         }
     }
     end_sim(creation_sim, world_state);
+    end_temp_memory(gen_temp);
 }
 
 static vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, vec2 uv) {
@@ -187,15 +188,13 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     
     TIMED_FUNCTION();
     if (is_key_held(input, KEY_Z)) {
-        f32 x_view_coef = 1.0f * input->platform->frame_dt;
-        f32 y_view_coef = 0.6f * input->platform->frame_dt;
+        f32 x_view_coef = X_VIEW_COEF * input->platform->frame_dt;
+        f32 y_view_coef = Y_VIEW_COEF * input->platform->frame_dt;
         f32 x_angle_change = input->platform->mdelta.x * x_view_coef;
         f32 y_angle_change = input->platform->mdelta.y * y_view_coef;
         world_state->cam.yaw += x_angle_change;
         world_state->cam.pitch += y_angle_change;
-#define MIN_CAM_PITCH (HALF_PI * 0.1f)
-#define MAX_CAM_PITCH (HALF_PI * 0.9f)
-        f32 delta_zoom = input->platform->mwheel;
+        f32 delta_zoom = ZOOM_COEF * input->platform->mwheel;
         world_state->cam.distance_from_player -= delta_zoom;
     }
     world_state->cam.yaw = unwind_rad(world_state->cam.yaw);
@@ -206,7 +205,7 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     assert(camera_controlled_entity);
     // Calculate player movement
     vec2 player_delta = Vec2(0);
-    f32 move_coef = 16.0f * input->platform->frame_dt;
+    f32 move_coef = MOVE_COEF * input->platform->frame_dt;
     f32 z_speed = 0;
     if (is_key_held(input, KEY_W)) {
         z_speed = move_coef;
@@ -243,25 +242,24 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     cam_p.y = vert_distance;
     world_state->cam_p = cam_p;
     
-#define CAMERA_FOV rad(60)
-#define CAMERA_NEAR_PLANE 0.001f
-#define CAMERA_FAR_PLANE  10000.0f
     f32 aspect_ratio = input->platform->display_size.x / input->platform->display_size.y;
     world_state->projection = Mat4x4::perspective(CAMERA_FOV, aspect_ratio, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
     world_state->view = Mat4x4::identity() * Mat4x4::rotation(world_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(world_state->cam.yaw, Vec3(0, 1, 0))
         * Mat4x4::translate(-cam_p);
     world_state->mvp = world_state->projection * world_state->view;
     
-    vec2 mouse_uv = Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
-                         1.0f - (2.0f * input->platform->mpos.y) / input->platform->display_size.y);
-    vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, mouse_uv);
-    f32 t = 0;
-    ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
-    vec3 mouse_point_xyz = cam_p + ray_dir * t;
-    vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
-    DEBUG_VALUE(mouse_point, "Mouse point");
-    DEBUG_VALUE(world_state->cam_p, "Cam p");
-    world_state->mouse_projection = mouse_point;
+    if (is_key_held(links.input, KEY_X)) {
+        vec2 mouse_uv = Vec2((2.0f * input->platform->mpos.x) / input->platform->display_size.x - 1.0f,
+                             1.0f - (2.0f * input->platform->mpos.y) / input->platform->display_size.y);
+        vec3 ray_dir = uv_to_world(world_state->projection, world_state->view, mouse_uv);
+        f32 t = 0;
+        ray_intersect_plane(Vec3(0, 1, 0), 0, cam_p, ray_dir, &t);
+        vec3 mouse_point_xyz = cam_p + ray_dir * t;
+        vec2 mouse_point = Vec2(mouse_point_xyz.x, mouse_point_xyz.z);
+        DEBUG_VALUE(mouse_point, "Mouse point");
+        DEBUG_VALUE(world_state->cam_p, "Cam p");
+        world_state->mouse_projection = mouse_point;
+    }
     // Find entity to be selected with mouse
     world_state->mouse_selected_entity = {};
     f32 min_distance = F32_INFINITY;
@@ -351,22 +349,19 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     BEGIN_BLOCK("Ground render");
     for (u32 i = 0; i < chunk_count; ++i) {
         SimRegionChunk *chunk = sim->chunks + i;
-#define WORLD_EPSILON 0.01f
         vec3 p[4] = {
             Vec3(chunk->chunk_x, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y) * CHUNK_SIZE,
             Vec3(chunk->chunk_x + 1, 0, chunk->chunk_y + 1) * CHUNK_SIZE,
         };
-        vec3 p1[4];
-        memcpy(p1, p, sizeof(p));
-        p1[0].y = WORLD_EPSILON;
-        p1[1].y = WORLD_EPSILON;
-        p1[2].y = WORLD_EPSILON;
-        p1[3].y = WORLD_EPSILON;
         push_quad(&render_group, p, ground_tex);
         if (world_state->draw_frames) {
-            DEBUG_push_quad_outline(&render_group, p1);
+            p[0].y = WORLD_VISUAL_EPSILON;
+            p[1].y = WORLD_VISUAL_EPSILON;
+            p[2].y = WORLD_VISUAL_EPSILON;
+            p[3].y = WORLD_VISUAL_EPSILON;
+            DEBUG_push_quad_outline(&render_group, p);
         }
     }
     vec2 mouse_cell_pos = Vec2(Floor(world_state->mouse_projection.x), Floor(world_state->mouse_projection.y));
@@ -379,18 +374,18 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
                 bool is_occupied = is_cell_occupied(sim, mouse_cell_pos.x + dx, mouse_cell_pos.y + dy);
                 if (!is_occupied) {
                     vec3 v[4] = {
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_VISUAL_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_VISUAL_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_VISUAL_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_VISUAL_EPSILON, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
                     };
                     DEBUG_push_quad_outline(&render_group, v);
                 } else {
                     vec3 v[4] = {
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
-                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_VISUAL_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE, WORLD_VISUAL_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_VISUAL_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE),
+                        Vec3(mouse_cell_pos.x + dx * CELL_SIZE + CELL_SIZE, WORLD_VISUAL_EPSILON * 5, mouse_cell_pos.y + dy * CELL_SIZE + CELL_SIZE),
                     };
                     DEBUG_push_quad_outline(&render_group, v, RED);
                 }
@@ -403,10 +398,10 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
         assert(entity);
         vec2 half_size = Vec2(1, 1) * 0.5f;
         vec3 v[4];
-        v[0] = xz(entity->p + Vec2(-half_size.x, -half_size.y), WORLD_EPSILON);
-        v[1] = xz(entity->p + Vec2(-half_size.x, half_size.y),  WORLD_EPSILON);
-        v[2] = xz(entity->p + Vec2(half_size.x, -half_size.y),  WORLD_EPSILON);
-        v[3] = xz(entity->p + Vec2(half_size.x, half_size.y),   WORLD_EPSILON);
+        v[0] = xz(entity->p + Vec2(-half_size.x, -half_size.y), WORLD_VISUAL_EPSILON * 5);
+        v[1] = xz(entity->p + Vec2(-half_size.x, half_size.y),  WORLD_VISUAL_EPSILON * 5);
+        v[2] = xz(entity->p + Vec2(half_size.x, -half_size.y),  WORLD_VISUAL_EPSILON * 5);
+        v[3] = xz(entity->p + Vec2(half_size.x, half_size.y),   WORLD_VISUAL_EPSILON * 5);
         AssetID select_tex_id = assets_get_first_of_type(links.assets, ASSET_TYPE_ADDITIONAL);
         push_quad(&render_group, v, select_tex_id);
     }
@@ -438,8 +433,9 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
             INVALID_DEFAULT_CASE;
         }
         vec3 v[4];
-        get_billboard_positions(xz(entity->p), cam_x, cam_y, 1.5f, 1.5f, v);
+        get_billboard_positions(xz(entity->p, WORLD_VISUAL_EPSILON), cam_x, cam_y, 1.5f, 1.5f, v);
         push_quad(&render_group, v, texture_id);
+        //DEBUG_push_quad_outline(&render_group, v);
     }
     END_BLOCK();
     
@@ -455,13 +451,13 @@ void update_and_render_world_state(WorldState *world_state, GameLinks links) {
     u32 sim_region_count = world_state->anchor_count;
     // Zero anchor count so it can be set again from different sim regions
     world_state->anchor_count = 0;
-    SimRegion *sim_regions = alloc_arr(world_state->frame_arena, sim_region_count, SimRegion);
+    SimRegion *sim_regions = alloc_arr(links.frame_arena, sim_region_count, SimRegion);
     u32 total_sim_entities = 0;
     u32 total_sim_chunks = 0;
     for (u32 anchor_idx = 0; anchor_idx < sim_region_count; ++anchor_idx) {
         Anchor *anchor = world_state->anchors + anchor_idx;
         SimRegion *sim = sim_regions + anchor_idx;
-        begin_sim(sim, world_state->frame_arena, world_state->world, anchor->chunk_x, anchor->chunk_y, anchor->radius);
+        begin_sim(sim, links.frame_arena, world_state->world, anchor->chunk_x, anchor->chunk_y, anchor->radius);
         total_sim_entities += sim->entity_count;
         total_sim_chunks += sim->chunks_count;
         update_game(world_state, sim, links);

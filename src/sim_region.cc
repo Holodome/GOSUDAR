@@ -351,8 +351,8 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
 #define MAX_ENTITIES_PER_CHUNK 512
     sim->max_entity_count = next_highest_pow_2(chunk_count * MAX_ENTITIES_PER_CHUNK);
     sim->entity_count = 0;
-    sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk, false);
-    sim->entities = alloc_arr(arena, sim->max_entity_count, Entity, false);
+    sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk);
+    sim->entities = alloc_arr(arena, sim->max_entity_count, Entity);
     sim->entity_hash = alloc_arr(arena, sim->max_entity_count, SimRegionEntityHash);
     sim->chunks_count = chunk_count;
     for (u32 chunk_idx = 0; chunk_idx < chunk_count; ++chunk_idx) {
@@ -408,7 +408,7 @@ void end_sim(SimRegion *sim, struct WorldState *world_state) {
     DEBUG_VALUE(sim->entity_hash_misses, "Entit hash misses");
 }
 
-static void next(SimChunkIterator *iter) {
+void next(SimChunkIterator *iter) {
     for (;;) {
         if (iter->idx < ((iter->max_chunk_y - iter->min_chunk_y + 1) * (iter->max_chunk_x - iter->min_chunk_x + 1))) {
             i32 local_x = iter->idx % (iter->max_chunk_x - iter->min_chunk_x + 1);
@@ -460,10 +460,6 @@ bool is_valid(SimChunkIterator *iter) {
     return iter->ptr;
 }
 
-void advance(SimChunkIterator *iter) {
-    next(iter);
-}
-
 static void next(SimChunkEntityIterator *iter) {
     for(;;) {
         if (iter->entity_idx < iter->block->entity_count) {
@@ -491,10 +487,6 @@ bool is_valid(SimChunkEntityIterator *iter) {
     return iter->ptr != 0;
 }
 
-void advance(SimChunkEntityIterator *iter) {
-    next(iter);
-}
-
 EntityIteratorSettings iter_radius(vec2 origin, f32 radius) {
     EntityIteratorSettings iter = {};
     iter.flags = ENTITY_ITERATOR_DISTANCE_BASED;
@@ -506,15 +498,19 @@ EntityIteratorSettings iter_radius(vec2 origin, f32 radius) {
 void next(EntityIterator *iter) {
     for (;;) {
         if (is_valid(&iter->chunk_entity_iterator)) {
-            advance(&iter->chunk_entity_iterator);
+            next(&iter->chunk_entity_iterator);
             iter->ptr = iter->chunk_entity_iterator.ptr;
             if (iter->ptr) {
                 break;
             }
         } else if (is_valid(&iter->chunk_iterator)) {
-            advance(&iter->chunk_iterator);
+            next(&iter->chunk_iterator);
             if (is_valid(&iter->chunk_iterator)) {
                 iter->chunk_entity_iterator = iterate_chunk_entities(iter->chunk_iterator.ptr);
+                iter->ptr = iter->chunk_entity_iterator.ptr;
+                if (iter->ptr) {
+                    break;
+                }
             } 
         } else {
             iter->ptr = 0;
@@ -541,8 +537,4 @@ EntityIterator iterate_entities(SimRegion *sim, EntityIteratorSettings settings)
 
 bool is_valid(EntityIterator *iter) {
     return iter->ptr != 0;
-}
-
-void advance(EntityIterator *iter) {
-    next(iter);
 }

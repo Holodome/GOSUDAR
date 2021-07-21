@@ -59,8 +59,8 @@
  *    khronos_uint64_t            unsigned 64 bit
  *    khronos_intptr_t            signed   same number of bits as a pointer
  *    khronos_uintptr_t           unsigned same number of bits as a pointer
- *    khronos_ssize_t             signed   size
- *    khronos_usize_t             unsigned size
+ *    khronos_suptr             signed   size
+ *    khronos_uuptr             unsigned size
  *    khronos_float_t             signed   32 bit floating point
  *    khronos_time_ns_t           unsigned 64 bit time in nanoseconds
  *    khronos_utime_nanoseconds_t unsigned time interval or absolute time in
@@ -100,8 +100,8 @@
  * This precedes the return type of the function in the function prototype.
  */
 #if defined(KHRONOS_STATIC)
-    /* If the preprocessor constant KHRONOS_STATIC is defined, make the
-     * header compatible with static linking. */
+/* If the preprocessor constant KHRONOS_STATIC is defined, make the
+ * header compatible with static linking. */
 #   define KHRONOS_APICALL
 #elif defined(_WIN32)
 #   define KHRONOS_APICALL __declspec(dllimport)
@@ -120,7 +120,7 @@
  * name in the function prototype.
  */
 #if defined(_WIN32) && !defined(_WIN32_WCE) && !defined(KHRONOS_STATIC)
-    /* Win32 but not WinCE */
+/* Win32 but not WinCE */
 #   define KHRONOS_APIENTRY __stdcall
 #else
 #   define KHRONOS_APIENTRY
@@ -238,13 +238,13 @@ typedef unsigned short int     khronos_uint16_t;
 #ifdef _WIN64
 typedef signed   long long int khronos_intptr_t;
 typedef unsigned long long int khronos_uintptr_t;
-typedef signed   long long int khronos_ssize_t;
-typedef unsigned long long int khronos_usize_t;
+typedef signed   long long int khronos_suptr;
+typedef unsigned long long int khronos_uuptr;
 #else
 typedef signed   long  int     khronos_intptr_t;
 typedef unsigned long  int     khronos_uintptr_t;
-typedef signed   long  int     khronos_ssize_t;
-typedef unsigned long  int     khronos_usize_t;
+typedef signed   long  int     khronos_suptr;
+typedef unsigned long  int     khronos_uuptr;
 #endif
 
 #if KHRONOS_SUPPORT_FLOAT

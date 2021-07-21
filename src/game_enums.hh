@@ -18,9 +18,9 @@ struct EnumString {
 // This is better of using some hash table, but since this code is executed very rarely we
 // probably shouldn't care
 #define DEBUG_enum_string_lookup(_strings, _test, _dst) DEBUG_enum_string_lookup_(_strings, ARRAY_SIZE(_strings), _test, _dst)
-inline bool DEBUG_enum_string_lookup_(const EnumString *strings, size_t strings_count, const char *test, u32 *dst) {
+inline bool DEBUG_enum_string_lookup_(const EnumString *strings, uptr strings_count, const char *test, u32 *dst) {
     bool found = false;
-    for (size_t i = 0; i < strings_count; ++i) {
+    for (uptr i = 0; i < strings_count; ++i) {
         const EnumString *test_id = strings + i;
         if (strcmp(test_id->string, test) == 0) {
             found = true;

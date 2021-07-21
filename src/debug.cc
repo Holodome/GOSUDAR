@@ -120,7 +120,7 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
 #endif 
                     u32 hash_mask = (DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME - 1);
                     u32 hash_slot = hash_value & hash_mask;
-                    for (size_t offset = 0; offset < DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME; ++offset) {
+                    for (uptr offset = 0; offset < DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME; ++offset) {
                         u32 hash_index = ((hash_value + offset) & hash_mask);
                         DebugRecordHash *test = collation_frame->records_hash + hash_index;
                         if (test->debug_name_hash == 0) {
@@ -267,7 +267,7 @@ void DEBUG_update(DebugState *debug_state, GameLinks links) {
         TempMemory records_sort_temp = begin_temp_memory(&debug_state->arena);
         SortEntry *sort_a = alloc_arr(&debug_state->arena, record_count, SortEntry);
         SortEntry *sort_b = alloc_arr(&debug_state->arena, record_count, SortEntry);
-        for (size_t i = 0; i < record_count; ++i) {
+        for (uptr i = 0; i < record_count; ++i) {
             sort_a[i].sort_key = frame->records[i].total_clocks;
             sort_a[i].sort_index = i;
         }
@@ -275,7 +275,7 @@ void DEBUG_update(DebugState *debug_state, GameLinks links) {
         dev_ui_labelf(&dev_ui, "Frame %llu", frame->frame_index);    
         dev_ui_checkbox(&dev_ui, "Pause", &debug_state->is_paused);
         dev_ui_begin_sizable(&dev_ui);
-        for (size_t i = 0; i < Min_i32(frame->records_count, 20); ++i) {
+        for (uptr i = 0; i < Min_i32(frame->records_count, 20); ++i) {
             DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
             dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                           record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
@@ -311,8 +311,7 @@ void DEBUG_frame_end(DebugState *debug_state) {
 }
 
 DebugState *DEBUG_init() {
-#define DEBUG_ARENA_SIZE MEGABYTES(1024)
-    DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena, DEBUG_ARENA_SIZE);
+    DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena);
     debug_table = &debug_state->debug_table;
     return debug_state;
 }

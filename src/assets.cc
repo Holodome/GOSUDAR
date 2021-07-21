@@ -14,12 +14,12 @@ AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *w
     u32 best_idx = 0;
     
     AssetTypeInfo *info = assets->type_infos + type;
-    for (size_t info_idx = info->first_info_idx, i = 0;
+    for (uptr info_idx = info->first_info_idx, i = 0;
          i < info->asset_count;
          ++info_idx, ++i) {
         Asset *info = assets->asset_infos + info_idx;
         f32 total_weigted_diff = 0;
-        for (size_t tag_idx = info->file_info.first_tag_idx, j = 0;
+        for (uptr tag_idx = info->file_info.first_tag_idx, j = 0;
              j < info->file_info.tag_count;
              ++tag_idx, ++j) {
             AssetTag *tag = assets->tags + tag_idx;
@@ -128,7 +128,7 @@ vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
     AssetInfo *info = assets_get_info(assets, id);
     AssetFont *font = assets_get_font(assets, id);
     assert(info->kind == ASSET_KIND_FONT);
-    size_t count = strlen(text);
+    uptr count = strlen(text);
     vec2 result = {};
     for (u32 i = 0; i < count; ++i) {
         u8 codepoint = text[i];
@@ -142,7 +142,7 @@ vec2 DEBUG_get_text_size(Assets *assets, AssetID id, const char *text) {
 }
 
 void assets_purge_textures(Assets *assets) {
-    for (size_t i = 0; i < assets->asset_info_count; ++i) {
+    for (uptr i = 0; i < assets->asset_info_count; ++i) {
         Asset *asset = assets->asset_infos + i;
         if (asset->file_info.kind == ASSET_KIND_TEXTURE && asset->state == ASSET_STATE_LOADED) {
             asset->state = ASSET_STATE_UNLOADED;
@@ -155,14 +155,14 @@ void assets_purge_textures(Assets *assets) {
 }
 
 Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena) {
-    Assets *assets = bootstrap_alloc_struct(Assets, arena, MEGABYTES(512));
+    Assets *assets = bootstrap_alloc_struct(Assets, arena);
     assets->renderer = renderer;
     assets->frame_arena = frame_arena;
     
     FileHandle file = open_file("assets.assets");
     assets->asset_file = file;
     assert(file_handle_valid(file));
-    size_t file_size = get_file_size(file);
+    uptr file_size = get_file_size(file);
     AssetFileHeader header;
     read_file(file, 0, sizeof(AssetFileHeader), &header);
     assert(header.magic_value == ASSET_FILE_MAGIC_VALUE);
@@ -179,7 +179,7 @@ Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena) {
     TempMemory info_temp = begin_temp_memory(&assets->arena);
     AssetInfo *src_infos = alloc_arr(&assets->arena, header.asset_infos_count, AssetInfo);
     read_file(file, header.asset_infos_offset, header.asset_infos_size, src_infos);
-    for (size_t i = 0; i < header.asset_infos_count; ++i) {
+    for (uptr i = 0; i < header.asset_infos_count; ++i) {
         AssetInfo *src = src_infos + i;
         AssetInfo *dst = &assets->asset_infos[i].file_info;
         *dst = *src;

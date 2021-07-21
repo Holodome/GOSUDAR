@@ -62,7 +62,7 @@ inline f32 Abs(f32 value) {
 }
 
 inline i32 Abs(i32 value) {
-    u32 mask = value >> (SIZE_OF(i32) * 8 - 1);
+    u32 mask = value >> 31;
     return ((value ^ mask) - mask);
 }
 
@@ -98,10 +98,16 @@ inline f32 Cos(f32 a) {
     return cosf(a);
 }
 
-// @CLEANUP
-void *os_alloc(size_t size);
-void os_free(void *ptr);
-struct OSMemoryBlock *os_alloc_block(size_t size);
+inline u32 align_forward_pow2(u32 v) {
+    --v;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    ++v;
+    return v;
+}
 
 struct Entropy {
     u32 state;
@@ -128,73 +134,6 @@ u64 random_int(Entropy *entropy, u64 modulo) {
     return xorshift32(&entropy->state) % modulo;
 }
 
-
-#define DEFAULT_ALIGNMENT (2 * sizeof(void *))
-
-inline uintptr_t align_forward(uintptr_t ptr, size_t align) {
-    assert(!(align & (align - 1)));
-    
-    uintptr_t p = ptr;
-    uintptr_t a = align;
-    uintptr_t modulo = p & (a - 1);
-    
-    if (modulo) {
-        p += a - modulo;
-    }
-    return p;
-}
-
-#if 0
-struct MemoryArena {
-    u8 *data;
-    size_t last_data_size;
-    size_t data_size;
-    size_t data_capacity;
-    
-    size_t peak_size;
-    u32 temp_count;
-};
-#else 
-
-struct MemoryArena {
-    OSMemoryBlock *current_block;
-    u32 minimum_block_size;
-    u32 temp_count;
-};
-
-#endif 
-
-#define alloc_struct(_arena, _type, ...) (_type *)alloc(_arena, sizeof(_type), ##__VA_ARGS__)
-#define alloc_arr(_arena, _count, _type, ...) (_type *)alloc(_arena, _count * sizeof(_type), ##__VA_ARGS__)
-#define alloc_string(_arena, _string, ...) (const char *)alloc_copy(_arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
-
-
-void *alloc(MemoryArena *arena, size_t size);
-void arena_init(MemoryArena *arena, size_t minimum_block_size = 0) {
-    arena->minimum_block_size = minimum_block_size;
-    
-}
-void arena_clear(MemoryArena *arena);
-
-#define bootstrap_alloc_struct(_type, _field, ...) (_type *)bootstrap_alloc_size(SIZE_OF(_type), STRUCT_OFFSET(_type, _field), __VA_ARGS__)
-inline void *bootstrap_alloc_size(size_t size, size_t arena_offset, size_t minimal_block_size = MEGABYTES(4)) {
-    MemoryArena bootstrap = {};
-    arena_init(&bootstrap, minimal_block_size);
-    void *struct_ptr = alloc(&bootstrap, size);
-    *(MemoryArena *)((u8 *)struct_ptr + arena_offset) = bootstrap;
-    return struct_ptr;
-}
-
-
-struct TempMemory {
-    MemoryArena *arena;
-    OSMemoryBlock *block;
-    u64 block_used;
-};
-
-inline TempMemory begin_temp_memory(MemoryArena *arena);
-inline void end_temp_memory(TempMemory mem);
-
 static u32 crc32_lookup_table[256] = {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
     0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7, 0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC, 0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
@@ -214,7 +153,7 @@ static u32 crc32_lookup_table[256] = {
     0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6, 0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF, 0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D,
 };
 
-inline u32 crc32(const void *data_init, size_t data_size, u32 seed = 0) {
+inline u32 crc32(const void *data_init, uptr data_size, u32 seed = 0) {
     u32 crc = ~seed;
     u8  *data = (u8 *)data_init;
     u32 *crc32_lut = crc32_lookup_table;
@@ -1178,7 +1117,7 @@ inline u32 sort_key_to_u32(f32 sort_key) {
     return result;
 }
 
-void radix_sort(SortEntry *sort_a, SortEntry *sort_b, size_t count) {
+void radix_sort(SortEntry *sort_a, SortEntry *sort_b, uptr count) {
     SortEntry *src = sort_a;
     SortEntry *dst = sort_b;
     for (u32 byte_idx = 0; byte_idx < 32; byte_idx += 8) {
@@ -1231,17 +1170,6 @@ struct AssetID {
 inline u8 safe_truncate_u32_u8(u32 value) {
     assert(value <= MAX_VALUE(u8));
     return (u8)value;
-}
-
-inline u32 next_highest_pow_2(u32 v) {
-    --v;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    ++v;
-    return v;
 }
 
 i8 interlocked_increment(volatile i8 *value) {

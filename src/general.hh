@@ -33,19 +33,20 @@ typedef double f64;
 typedef u32 b32;
 #define TO_BOOL(_exp) ((b32)((_exp) ? true : false))
 
-#define ARRAY_SIZE(_a) ((size_t)(sizeof(_a) / sizeof(*(_a))))
+typedef uintptr_t uptr;
+
+#define ARRAY_SIZE(_a) ((uptr)(sizeof(_a) / sizeof(*(_a))))
 #define SQ(_a) ((_a) * (_a))
 #define ADD_MODULO(_a, _b, _modulo) (((_a) + (_b)) % _modulo)
 #define INC_MODULO(_a, _modulo) ADD_MODULO(_a, 1, _modulo)
 
-#define BYTES(_n) ((size_t)_n)
+#define BYTES(_n) ((uptr)_n)
 #define KILOBYTES(_n) (BYTES(_n) << 10) 
 #define MEGABYTES(_n) (KILOBYTES(_n) << 10) 
 
 // This is just to follow the style
-#define SIZE_OF(_v) (sizeof(_v))
 #define STRUCT_FIELD(_struct, _field) (((_struct *)(0))->_field)
-#define STRUCT_OFFSET(_struct, _field) ((size_t)((u8 *)(&STRUCT_FIELD(_struct, _field))))
+#define STRUCT_OFFSET(_struct, _field) ((uptr)((u8 *)(&STRUCT_FIELD(_struct, _field))))
 #define MAX_VALUE(_variable) ((1llu << (8llu * sizeof(_variable))) - 1)
 #define INVALID_DEFAULT_CASE default: assert(!"Invalid switch default case");
 #define INVALID_CODE_PATH assert(!"Invalid code path")
@@ -118,9 +119,9 @@ LLIST_ADD(*(_list_ptr), (_node)); \
 #define vsnprintf stbsp_vsnprintf
 
 extern "C" {
-    void *__cdecl memset(void *ptr, int value, size_t num);
-    void *__cdecl memcpy(void *dst_p, const void *src_p, size_t num);
-    int __cdecl memcmp(const void *ptr1, const void *ptr2, size_t num);
+    void *__cdecl memset(void *ptr, int value, uptr num);
+    void *__cdecl memcpy(void *dst_p, const void *src_p, uptr num);
+    int __cdecl memcmp(const void *ptr1, const void *ptr2, uptr num);
 }
 
 extern f32 F32_INFINITY;
@@ -140,7 +141,7 @@ extern f32 F32_INFINITY;
 #define F32_INFINITY INFINITY
 #endif 
 
-size_t outf(const char *format, ...);
+uptr outf(const char *format, ...);
 
 #define GENERAL_H 1
 #endif

@@ -26,7 +26,7 @@ struct Lexer {
     MemoryArena arena;
     
     const u8 *file_data;
-    size_t file_data_size;
+    uptr file_data_size;
     
     const u8 *cursor;
     u32 current_symb;
@@ -39,7 +39,7 @@ struct Lexer {
 // Lexer should have memory arena initialized prior to this call
 // Buffer is zero-terminated 
 // @TODO remove need to zero terminate
-void lexer_init(Lexer *lexer, const void *buffer, size_t buffer_size);
+void lexer_init(Lexer *lexer, const void *buffer, uptr buffer_size);
 Token *lexer_peek(Lexer *lexer);
 void eat_tok(Lexer *lexer);
 

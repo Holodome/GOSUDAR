@@ -711,12 +711,10 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
         
         DWORD bytes_read;
         if (ReadFile(win32handle, dest, size32, &bytes_read, &overlapped) &&
-            (size32 == bytes_read))
-        {
+            (size32 == bytes_read)){
             // Success        
-        }
-        else 
-        {
+        } else { 
+            DWORD error = GetLastError();
             INVALID_CODE_PATH;
         }
     }
@@ -734,12 +732,10 @@ void write_file(FileHandle handle, size_t offset, size_t size, const void *sourc
         
         DWORD bytes_wrote;
         if (WriteFile(win32handle, source, size32, &bytes_wrote, &overlapped) &&
-            (size32 == bytes_wrote))
-        {
+            (size32 == bytes_wrote)) {
             // Success        
-        }
-        else 
-        {
+        } else {
+            DWORD error = GetLastError();
             INVALID_CODE_PATH;
         }
     }    

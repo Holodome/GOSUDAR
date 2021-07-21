@@ -22,13 +22,6 @@ struct FileHandle {
 enum {
 };
 
-struct OSMemoryBlock {
-    u64 size;
-    u64 used;
-    u8 *base;
-    OSMemoryBlock *next;
-};
-
 struct OS;
 
 // @CLEANUP do we really have to do this ugly display_size passing?
@@ -40,14 +33,14 @@ void os_end_frame(OS *os);
 
 RealWorldTime get_real_world_time();
 // Virtual memory management
-void *os_alloc(size_t size);
+void *os_alloc(uptr size);
 void os_free(void *ptr);
 // Filesytem
 FileHandle open_file(const char *name, bool read = true);
-size_t get_file_size(FileHandle handle);
+uptr get_file_size(FileHandle handle);
 bool file_handle_valid(FileHandle handle);
-void read_file(FileHandle handle, size_t offset, size_t size, void *dest);
-void write_file(FileHandle handle, size_t offset, size_t size, const void *source);
+void read_file(FileHandle handle, uptr offset, uptr size, void *dest);
+void write_file(FileHandle handle, uptr offset, uptr size, const void *source);
 void close_file(FileHandle handle);
 
 void DEBUG_out_string(const char *format, ...);
@@ -55,7 +48,7 @@ void DEBUG_out_string(const char *format, ...);
 void mkdir(const char *name);
 void sleep(u32 ms);
 
-OSMemoryBlock *os_alloc_block(size_t size);
+OSMemoryBlock *os_alloc_block(uptr size);
 
 #define OS_H 1
 #endif

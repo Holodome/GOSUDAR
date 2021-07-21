@@ -27,16 +27,16 @@ struct Vertex {
 
 // Per-frame abstracted renderer interface.
 struct RendererCommands {
-    size_t command_memory_size;
-    size_t command_memory_used;
+    uptr command_memory_size;
+    uptr command_memory_used;
     u8 *command_memory;
     
-    size_t max_vertex_count;
-    size_t vertex_count;
+    uptr max_vertex_count;
+    uptr vertex_count;
     Vertex *vertices;
     
-    size_t max_index_count;
-    size_t index_count;
+    uptr max_index_count;
+    uptr index_count;
     RENDERER_INDEX_TYPE *indices;
     
     struct RendererCommandHeader *last_header;

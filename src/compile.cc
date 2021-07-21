@@ -8,7 +8,7 @@ extern "C" {
     int _fltused = 0x9875;
     
 #pragma function(memset)
-    void *__cdecl memset(void *ptr, int value, size_t num) {
+    void *__cdecl memset(void *ptr, int value, uptr num) {
         unsigned char *dest = (unsigned char *)ptr;
         while (num--) {
             *dest++ = value;
@@ -17,7 +17,7 @@ extern "C" {
     }
     
 #pragma function(memcpy)
-    void *__cdecl memcpy(void *dst_p, const void *src_p, size_t num) {
+    void *__cdecl memcpy(void *dst_p, const void *src_p, uptr num) {
         unsigned char *src = (unsigned char *)src_p;
         unsigned char *dst = (unsigned char *)dst_p;
         while (num--) {
@@ -27,7 +27,7 @@ extern "C" {
     }
     
 #pragma function(memcmp)
-    int __cdecl memcmp(const void *ptr1, const void *ptr2, size_t num) {
+    int __cdecl memcmp(const void *ptr1, const void *ptr2, uptr num) {
         int result = 0;
         unsigned char *a = (unsigned char *)ptr1;
         unsigned char *b = (unsigned char *)ptr2;
@@ -48,6 +48,7 @@ extern "C" {
 #include "stb_sprintf.h"
 #endif 
 
+#include "mem.hh"
 #include "debug.cc"
 #include "mips.cc"
 #include "renderer.cc"

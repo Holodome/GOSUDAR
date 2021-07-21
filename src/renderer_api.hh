@@ -39,9 +39,9 @@ struct RendererCommandHeader {
 };
 
 struct RendererCommandQuads {
-    size_t quad_count;
-    size_t vertex_array_offset;
-    size_t index_array_offset;  
+    uptr quad_count;
+    uptr vertex_array_offset;
+    uptr index_array_offset;  
 };
 
 // Set rendering to be done on separate framebuffer - useful when need to postprocess

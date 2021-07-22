@@ -63,18 +63,24 @@ void end_depth_peel(RendererCommands *commands);
 //
 // Additional rendering helpers
 //
+#define MAX_CLIP_RECT_STACK_SIZE 16
+
 // Render group is layer above renderer draw calls
 // for example it can store missing resource count, 
 // but its primary usage is saving time writing assets accessing code
 struct RenderGroup {
     RendererCommands *commands;
     struct Assets *assets;
+    
+    u32 clip_rect_stack_idx;
+    Rect clip_rect_stack[MAX_CLIP_RECT_STACK_SIZE];
 };
 
 inline RenderGroup create_render_group(RendererCommands *commands, struct Assets *assets) {
-    RenderGroup result;
+    RenderGroup result = {};
     result.commands = commands;
     result.assets = assets;
+    result.clip_rect_stack[0] = Rect(Vec2(-INFINITY), Vec2(INFINITY));
     return result;
 }
 
@@ -85,7 +91,8 @@ void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id = INVALI
 
 void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), AssetID texture_id = INVALID_ASSET_ID);
 
-
+void push_clip_rect(RenderGroup *render_group, Rect rect);
+void pop_clip_rect(RenderGroup *render_group);
 #define DEFAULT_THICKNESS 0.05f
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);

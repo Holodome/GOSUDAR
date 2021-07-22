@@ -49,7 +49,7 @@ void DEBUG_out_string(const char *format, ...);
 void mkdir(const char *name);
 void sleep(u32 ms);
 
-OSMemoryBlock *os_alloc_block(uptr size);
+MemoryBlock *os_alloc_block(uptr size);
 
 #define OS_H 1
 #endif

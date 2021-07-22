@@ -7,19 +7,24 @@
 
 #define DEFUALT_ARENA_BLOCK_SIZE (1024 * 1024)
 #define DEFAULT_ALIGNMENT (2 * sizeof(uptr))
+// @TODO since all os allocation functions return memory all set to zero,
+// we can try to avoid having need to memset it and only do that in cases 
+// where we recycle memory - like in temp memory
+// Lets see if this approach works
+#define MEM_NO_MEMZERO 1
 
-struct OSMemoryBlock {
+struct MemoryBlock {
     u64 size;
     u64 used;
     u8 *base;
-    OSMemoryBlock *next;
+    MemoryBlock *next;
 };
 
-OSMemoryBlock *os_alloc_block(uptr size);
+MemoryBlock *os_alloc_block(uptr size);
 void os_free(void *ptr);
 
 struct MemoryArena {
-    OSMemoryBlock *current_block;
+    MemoryBlock *current_block;
     u32 minimum_block_size;
     u32 temp_count;
 };
@@ -71,7 +76,7 @@ void *alloc_(DEBUG_MEM_PARAM
                 block_size = size;
             }
             
-            OSMemoryBlock *new_block = os_alloc_block(block_size);
+            MemoryBlock *new_block = os_alloc_block(block_size);
             new_block->next = arena->current_block;
             arena->current_block = new_block;
             DEBUG_ARENA_BLOCK_ALLOCATE(new_block);
@@ -85,9 +90,9 @@ void *alloc_(DEBUG_MEM_PARAM
         arena->current_block->used += size;
         
         assert(size >= size_init);
-        
+#if !MEM_NO_MEMZERO
         memset(result, 0, size_init);
-        
+#endif 
         DEBUG_ARENA_ALLOCATE(__debug_name, arena->current_block, size, block_offset);
     }
     return result;
@@ -107,7 +112,7 @@ inline void *bootstrap_alloc_size(uptr size, uptr arena_offset) {
 }
 
 inline void free_last_block(MemoryArena *arena) {
-    OSMemoryBlock *block = arena->current_block;
+    MemoryBlock *block = arena->current_block;
     DEBUG_ARENA_BLOCK_FREE(block);
     arena->current_block = block->next;
     os_free(block);
@@ -126,7 +131,7 @@ void arena_clear(MemoryArena *arena) {
 
 struct TempMemory {
     MemoryArena *arena;
-    OSMemoryBlock *block;
+    MemoryBlock *block;
     u64 block_used;
 };
 
@@ -150,6 +155,9 @@ inline void end_temp_memory(TempMemory mem) {
     
     if (mem.arena->current_block) {
         assert(mem.arena->current_block->used >= mem.block_used);
+#if MEM_NO_MEMZERO
+        memset(mem.arena->current_block->base + mem.block_used, 0, mem.arena->current_block->used - mem.block_used);
+#endif 
         mem.arena->current_block->used = mem.block_used;
         DEBUG_ARENA_BLOCK_TRUNCATE(mem.arena->current_block);
     }

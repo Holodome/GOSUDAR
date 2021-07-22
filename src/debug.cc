@@ -148,7 +148,7 @@ static DebugValue *get_debug_value(DebugState *debug_state) {
     return value;
 }
 
-static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, OSMemoryBlock *block, b32 allow_creation = false) {
+static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, MemoryBlock *block, b32 allow_creation = false) {
     DebugArena *result = 0;
     uptr lookup_address = UPTR_FROM_PTR(block);
     
@@ -179,7 +179,7 @@ static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, OSMemoryBl
 }
 
 static void debug_arena_set_name(DebugState *debug_state, DebugEvent *event) {
-    OSMemoryBlock *lookup_block = event->mem_op.arena_lookup_block;
+    MemoryBlock *lookup_block = event->mem_op.arena_lookup_block;
     if (lookup_block) {
         DebugArena *arena = get_arena_by_lookup_block(debug_state, lookup_block);
         if (arena) {
@@ -535,55 +535,65 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
     }
 }
 
+static void display_profiler(DevUILayout *dev_ui, DebugState *debug_state) {
+    DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
+    f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
+    u64 record_count = frame->records_count;
+    TempMemory records_sort_temp = begin_temp_memory(&debug_state->arena);
+    SortEntry *sort_a = alloc_arr(&debug_state->arena, record_count, SortEntry);
+    SortEntry *sort_b = alloc_arr(&debug_state->arena, record_count, SortEntry);
+    for (uptr i = 0; i < record_count; ++i) {
+        sort_a[i].sort_key = frame->records[i].total_clocks;
+        sort_a[i].sort_index = i;
+    }
+    radix_sort(sort_a, sort_b, record_count);
+    dev_ui_labelf(dev_ui, "Frame %llu", frame->frame_index);    
+    dev_ui_checkbox(dev_ui, "Pause", &debug_state->is_paused);
+    dev_ui_begin_sizable(dev_ui, "ProfilerDisp");
+    for (uptr i = 0; i < Min_i32(frame->records_count, 20); ++i) {
+        DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
+        dev_ui_labelf(dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
+                      record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
+    }
+    dev_ui_end_sizable(dev_ui);
+    end_temp_memory(records_sort_temp);
+}
+
+static void display_memory(DevUILayout *dev_ui, DebugState *debug_state) {
+    dev_ui_begin_sizable(dev_ui, "MemoryDisp");
+    u64 total_memory = 0;
+    LLIST_ITER(arena, debug_state->first_arena) {
+        u32 blocks_count = 0;
+        uptr total_size = 0;
+        LLIST_ITER(block, arena->first_block) {
+            ++blocks_count;
+            total_size += block->size;
+        } 
+        dev_ui_labelf(dev_ui, "Arena %20s: %3ub %3llumb", arena->name, blocks_count, total_size >> 20);
+        
+        total_memory += total_size;
+        
+    }
+    dev_ui_labelf(dev_ui, "Debug table size: %llumb", sizeof(DebugTable) >> 20);
+    total_memory += sizeof(DebugTable);
+    dev_ui_labelf(dev_ui, "Total: %llumb", total_memory >> 20);
+    dev_ui_end_sizable(dev_ui);
+}
+
 void DEBUG_update(DebugState *debug_state, GameLinks links) {
+    TIMED_FUNCTION();
     InputManager *input = links.input;
     Assets *assets = links.assets;
     RendererCommands *commands = links.commands;
-    TIMED_FUNCTION();
     DevUILayout dev_ui = dev_ui_begin(&debug_state->dev_ui, input, assets, commands);
     dev_ui_labelf(&dev_ui, "FPS: %.3f; DT: %ums;", 1.0f / input->platform->frame_dt, (u32)(input->platform->frame_dt * 1000));
     display_values(&dev_ui, debug_state);
     if (dev_ui_section(&dev_ui, "Profiler")) {
-        DebugFrame *frame = debug_state->frames + (debug_state->frame_index ? debug_state->frame_index - 1: DEBUG_MAX_FRAME_COUNT - 1);
-        f32 frame_time = (f32)(frame->end_clock - frame->begin_clock);
-        u64 record_count = frame->records_count;
-        TempMemory records_sort_temp = begin_temp_memory(&debug_state->arena);
-        SortEntry *sort_a = alloc_arr(&debug_state->arena, record_count, SortEntry);
-        SortEntry *sort_b = alloc_arr(&debug_state->arena, record_count, SortEntry);
-        for (uptr i = 0; i < record_count; ++i) {
-            sort_a[i].sort_key = frame->records[i].total_clocks;
-            sort_a[i].sort_index = i;
-        }
-        radix_sort(sort_a, sort_b, record_count);
-        dev_ui_labelf(&dev_ui, "Frame %llu", frame->frame_index);    
-        dev_ui_checkbox(&dev_ui, "Pause", &debug_state->is_paused);
-        dev_ui_begin_sizable(&dev_ui);
-        for (uptr i = 0; i < Min_i32(frame->records_count, 20); ++i) {
-            DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
-            dev_ui_labelf(&dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
-                          record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
-        }
-        dev_ui_end_sizable(&dev_ui);
-        end_temp_memory(records_sort_temp);
+        display_profiler(&dev_ui, debug_state);
         dev_ui_end_section(&dev_ui);
     }
     if (dev_ui_section(&dev_ui, "Memory")) {
-        u64 total_memory = 0;
-        LLIST_ITER(arena, debug_state->first_arena) {
-            u32 blocks_count = 0;
-            uptr total_size = 0;
-            LLIST_ITER(block, arena->first_block) {
-                ++blocks_count;
-                total_size += block->size;
-            } 
-            dev_ui_labelf(&dev_ui, "Arena %s: %ub %llumb", arena->name, blocks_count, total_size >> 20);
-            
-            total_memory += total_size;
-            
-        }
-        dev_ui_labelf(&dev_ui, "Debug table size: %llumb", sizeof(DebugTable) >> 20);
-        total_memory += sizeof(DebugTable);
-        dev_ui_labelf(&dev_ui, "Total: %llumb", total_memory >> 20);
+        display_memory(&dev_ui, debug_state);
         dev_ui_end_section(&dev_ui);
     }
     

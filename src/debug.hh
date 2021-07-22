@@ -49,8 +49,8 @@ enum {
 };
 
 struct DebugMemoryOP {
-    struct OSMemoryBlock *block;
-    struct OSMemoryBlock *arena_lookup_block;
+    struct MemoryBlock *block;
+    struct MemoryBlock *arena_lookup_block;
     u32 allocated_size;
     u32 offset_in_block;
 };

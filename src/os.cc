@@ -774,11 +774,11 @@ size_t outf(const char *format, ...) {
 }
 
 #define WIN32_PAGE_SIZE 4096
-OSMemoryBlock *os_alloc_block(size_t size) {
+MemoryBlock *os_alloc_block(size_t size) {
     uintptr_t page_size = WIN32_PAGE_SIZE;
-    uintptr_t total_size = size + sizeof(OSMemoryBlock);
+    uintptr_t total_size = size + sizeof(MemoryBlock);
     
-    OSMemoryBlock *block = (OSMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    MemoryBlock *block = (MemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     assert(block);
     block->size = size;
     block->base = (u8 *)(block + 1);

@@ -133,5 +133,5 @@ void disband_order(OrderSystem *sys, OrderID id) {
     CDLIST_REMOVE(&slot->list_entry);
     hash->ptr = 0;
     hash->id = {};
-    LLIST_ADD_OR_CREATE(&sys->first_free_slot, slot);
+    LLIST_ADD(sys->first_free_slot, slot);
 }

@@ -1298,5 +1298,13 @@ struct GameLinks {
     struct UI *ui;
 };
 
+inline f32 area(Rect rect) {
+    return rect.w * rect.h;
+}
+
+inline b32 does_exist(Rect rect) {
+    return rect.w > 0 && rect.h > 0;
+}
+
 #define LIB_HH 1
 #endif

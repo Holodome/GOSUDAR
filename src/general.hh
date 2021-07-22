@@ -68,13 +68,8 @@ typedef uintptr_t uptr;
 #define LLIST_ITER(_name, _list) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
 #define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
 #define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
-#define LLIST_ADD_OR_CREATE(_list_ptr, _node) do { \
-if (*(_list_ptr)) { \
-LLIST_ADD(*(_list_ptr), (_node)); \
-} else { \
-*(_list_ptr) = (_node); \
-} \
-} while (0);
+// @TODO think if we can remove pointer here, since it is not function but a macro
+// is there a case where we will have problems?
 #define LLIST_REMOVE(_list_ptr, _node) \
 do { \
 if (*(_list_ptr) == (_node)) {\

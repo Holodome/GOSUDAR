@@ -169,12 +169,23 @@ void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
 }
 
 void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, AssetID texture_id) {
-    vec3 v[4]; 
-    rect.store_points(v);
-    vec2 uvs[4];
-    uv_rect.store_points(uvs);
-    Texture tex = get_texture(render_group, texture_id);
-    push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
+    Rect clip_rect = render_group->clip_rect_stack[render_group->clip_rect_stack_idx];
+    Rect clipped = clip_rect.clip(rect);
+    Rect clipped_uv;
+    clipped_uv.x = uv_rect.x + (clipped.x - rect.x) / rect.w * uv_rect.w;
+    clipped_uv.y = uv_rect.y + (clipped.y - rect.y) / rect.h * uv_rect.h;
+    clipped_uv.w = uv_rect.right() + (clipped.right() - rect.right()) / rect.w * uv_rect.w - clipped_uv.x;
+    clipped_uv.h = uv_rect.bottom() + (clipped.bottom() - rect.bottom()) / rect.h * uv_rect.h - clipped_uv.y;
+    
+    if (does_exist(clipped) && area(clipped) > 0.001) {
+        vec3 v[4]; 
+        clipped.store_points(v);
+        vec2 uvs[4];
+        clipped_uv.store_points(uvs);
+        
+        Texture tex = get_texture(render_group, texture_id);
+        push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
+    }
 }
 
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
@@ -246,3 +257,13 @@ void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *
 	}
 }
 
+
+void push_clip_rect(RenderGroup *render_group, Rect rect) {
+    assert(render_group->clip_rect_stack_idx < MAX_CLIP_RECT_STACK_SIZE);
+    render_group->clip_rect_stack[++render_group->clip_rect_stack_idx] = rect;
+}
+
+void pop_clip_rect(RenderGroup *render_group) {
+    assert(render_group->clip_rect_stack_idx);
+    --render_group->clip_rect_stack_idx;
+}

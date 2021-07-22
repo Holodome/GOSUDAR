@@ -56,7 +56,7 @@ void pack_entity_into_chunk(World *world, WorldChunk *chunk, Entity *src) {
     u32 pack_size = sizeof(*src);
     if (!chunk->first_entity_block || !entity_block_has_enough_space_for(chunk->first_entity_block, pack_size)) {
         WorldChunkEntityBlock *entity_block = get_new_entity_block(world);
-        LLIST_ADD_OR_CREATE(&chunk->first_entity_block, entity_block);
+        LLIST_ADD(chunk->first_entity_block, entity_block);
         clear_entity_block(entity_block);
     }
     
@@ -129,7 +129,7 @@ void add_id_to_free_list(World *world, EntityID id) {
     }
     
     entry->id = id;
-    LLIST_ADD_OR_CREATE(&world->first_id, entry);
+    LLIST_ADD(world->first_id, entry);
 }
 
 World *world_init() {

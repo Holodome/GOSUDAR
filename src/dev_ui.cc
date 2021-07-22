@@ -2,19 +2,10 @@
 
 #include "game.hh"
 
-#define DEV_UI_SECTION_OFFSET 20.0f
-#define DEV_UI_VERT_PADDING 2.0f
-#define DEV_UI_HORIZ_PADDING 10.0f
-#define RESIZE_BUTTON_SIZE 5.0f
-
 static DevUIID id_from_cstr(const char *cstr) {
     DevUIID result;
     result.value = crc32_cstr(cstr);
     return result;
-}
-
-static DevUIID id_empty() {
-    return {};
 }
 
 static void element_size(DevUILayout *layout, vec2 size) {
@@ -60,7 +51,7 @@ static ButtonState update_button(DevUILayout *layout, aarect rect, DevUIID id, b
             if (is_hot) {
                 is_pressed = true;
             }
-            layout->dev_ui->active_id = id_empty();
+            layout->dev_ui->active_id = {};
         }
     }
     
@@ -88,7 +79,7 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets, Ren
 void dev_ui_labelv(DevUILayout *layout, const char *format, va_list args) {
     char buffer[128];
     vsnprintf(buffer, sizeof(buffer), format, args);
-    DEBUG_push_text(&layout->render_group, layout->p, WHITE, buffer, layout->font_id, 1.0f);
+    DEBUG_push_text_clip_constrained(&layout->render_group, layout->p, DEV_UI_TEXT_COLOR, buffer, layout->font_id, 1.0f);
     AssetInfo *font = assets_get_info(layout->assets, layout->font_id);
     element_size(layout, DEBUG_get_text_size(layout->assets, layout->font_id, buffer));
 }
@@ -104,8 +95,8 @@ bool dev_ui_button(DevUILayout *layout, const char *label) {
     vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
     aarect button_rect = AARect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
-    vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
-    DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);  
+    vec4 color = (bstate.is_held ? DEV_UI_BUTTON_HELD : bstate.is_hot ? DEV_UI_BUTTON_HOT : DEV_UI_BUTTON_IDLE);    
+    DEBUG_push_text_clip_constrained(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);  
     element_size(layout, Size(button_rect));
     return bstate.is_pressed;    
 }
@@ -117,8 +108,8 @@ bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
     if (bstate.is_pressed) {
         *value = !*value;
     }
-    vec4 color = (*value ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
-    DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
+    vec4 color = (*value ? DEV_UI_BUTTON_HELD : bstate.is_hot ? DEV_UI_BUTTON_HOT : DEV_UI_BUTTON_IDLE);    
+    DEBUG_push_text_clip_constrained(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
     element_size(layout, Size(button_rect));
     return bstate.is_pressed;    
 }
@@ -160,15 +151,14 @@ bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value) {
     aarect whole_rect = AARect(layout->p, value_rect_size);
     ButtonState bstate = update_button(layout, whole_rect, id_from_cstr(label));
     if (bstate.is_held) {
-#define SPEED 0.1f
-        f32 new_value = *value + layout->input->platform->mdelta.x * SPEED;
+        f32 new_value = *value + layout->input->platform->mdelta.x * DEV_UI_SLIDER_SPEED;
         if (*value != new_value) {
             *value = new_value;
             result = true;
         }
     }
-    vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
-    DEBUG_push_text(&layout->render_group, layout->p, color, value_buffer, layout->font_id, 1.0f);
+    vec4 color = (bstate.is_held ? DEV_UI_BUTTON_HELD : bstate.is_hot ? DEV_UI_BUTTON_HOT : DEV_UI_BUTTON_IDLE);    
+    DEBUG_push_text_clip_constrained(&layout->render_group, layout->p, color, value_buffer, layout->font_id, 1.0f);
     element_size(layout, whole_rect.s);
     return result;
 }
@@ -182,8 +172,8 @@ bool dev_ui_section(DevUILayout *layout, const char *label) {
     if (bstate.is_pressed) {
         view->is_opened = !view->is_opened;
     }
-    vec4 color = (view->is_opened ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
-    DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
+    vec4 color = (view->is_opened ? DEV_UI_BUTTON_HELD : DEV_UI_BUTTON_IDLE);    
+    DEBUG_push_text_clip_constrained(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
     element_size(layout, button_rect.s);
     if (view->is_opened) {
         layout->p.x += DEV_UI_SECTION_OFFSET;
@@ -200,31 +190,31 @@ void dev_ui_end_section(DevUILayout *layout) {
 void dev_ui_end(DevUILayout *layout) {
 }
 
-void dev_ui_begin_sizable(DevUILayout *layout, const char *label) {
+void dev_ui_begin_sizeable(DevUILayout *layout, const char *label) {
     DevUIID id = id_from_cstr(label);
     DevUIView *view = get_dev_ui_view(layout->dev_ui, id);
     if (view->size.x * view->size.y < 0.001) {
-        view->size = Vec2(600, 400);
+        view->size = DEV_UI_DEFAULT_SIZEABLE_SIZE;
     }
-    vec4 color = Vec4(0.2, 0.2, 0.2, 1.0);
+    vec4 color = DEV_UI_SIZEABLE_COLOR;
     aarect section_rect = AARect(layout->p, view->size);
     
-    aarect resize_button_rect = AARect(BottomRight(section_rect) - Vec2(RESIZE_BUTTON_SIZE), Vec2(RESIZE_BUTTON_SIZE));
+    aarect resize_button_rect = AARect(BottomRight(section_rect) - Vec2(DEV_UI_RESIZE_BUTTON_SIZE), Vec2(DEV_UI_RESIZE_BUTTON_SIZE));
     ButtonState bstate = update_button(layout, resize_button_rect, id);
-    vec4 resize_color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
+    vec4 resize_color = (bstate.is_held ? DEV_UI_BUTTON_HELD : bstate.is_hot ? DEV_UI_BUTTON_HOT : DEV_UI_BUTTON_IDLE);    
     
-    push_rect(&layout->render_group, section_rect, color);
-    push_rect(&layout->render_group, resize_button_rect, resize_color);
+    push_rect_clip_constrained(&layout->render_group, section_rect, color);
+    push_rect_clip_constrained(&layout->render_group, resize_button_rect, resize_color);
     
     if (bstate.is_held) {
         view->size += layout->input->platform->mdelta;
-        view->size.x = Max(RESIZE_BUTTON_SIZE, view->size.x);
-        view->size.y = Max(RESIZE_BUTTON_SIZE, view->size.y);
+        view->size.x = Max(DEV_UI_RESIZE_BUTTON_SIZE, view->size.x);
+        view->size.y = Max(DEV_UI_RESIZE_BUTTON_SIZE, view->size.y);
     }
     layout->current_section_end_p = layout->p + Vec2(0, section_rect.h + DEV_UI_VERT_PADDING);
     push_clip_rect(&layout->render_group, section_rect);
 }
-void dev_ui_end_sizable(DevUILayout *layout) {
+void dev_ui_end_sizeable(DevUILayout *layout) {
     layout->p = layout->current_section_end_p;
     pop_clip_rect(&layout->render_group);
 }

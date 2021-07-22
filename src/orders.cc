@@ -17,7 +17,7 @@ OrderHash *get_order_hash(OrderSystem *sys, OrderID id) {
     OrderHash *result = 0;
     u32 hash_value = id.value;
     u32 hash_mask = ARRAY_SIZE(sys->order_hash) - 1;
-    for (size_t offset = 0; offset < ARRAY_SIZE(sys->order_hash); ++offset) {
+    for (uptr offset = 0; offset < ARRAY_SIZE(sys->order_hash); ++offset) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         OrderHash *test = sys->order_hash + hash_idx;
         if (IS_NULL(test->id) || IS_SAME(test->id, id)) {

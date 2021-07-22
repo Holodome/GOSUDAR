@@ -28,11 +28,12 @@ typedef float  f32;
 typedef double f64;
 // Bool type. When doing low-level simd stuff, things that C++ bool type does 
 // can actually hurt us (for example SSE comparsion functions use masks and not bools)
-// And it actually is little to do difference in using dedicated bool type and integer 
+// And it actually is little to no difference in using dedicated bool type and integer 
 // in terms of perfomance and interfacing (besides some corner cases in bit arithmetic)
 typedef u32 b32;
 #define TO_BOOL(_exp) ((b32)((_exp) ? true : false))
-
+// Type to use when manipulating with pointers 
+// In c++ difference between size_t and uintptr_t is uncertain, so we stick to one type instead
 typedef uintptr_t uptr;
 #define UPTR_FROM_PTR(_ptr) ((uptr)(_ptr))
 
@@ -45,7 +46,6 @@ typedef uintptr_t uptr;
 #define KILOBYTES(_n) (BYTES(_n) << 10) 
 #define MEGABYTES(_n) (KILOBYTES(_n) << 10) 
 
-// This is just to follow the style
 #define STRUCT_FIELD(_struct, _field) (((_struct *)(0))->_field)
 #define STRUCT_OFFSET(_struct, _field) ((uptr)((u8 *)(&STRUCT_FIELD(_struct, _field))))
 #define MAX_VALUE(_variable) ((1llu << (8llu * sizeof(_variable))) - 1)
@@ -65,44 +65,56 @@ typedef uintptr_t uptr;
 
 // Linked list
 // Linked list entries must have .next field
-#define LLIST_ITER(_name, _list) for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
-#define LLIST_ADD(_list, _node) do { (_node)->next = (_list); (_list) = (_node); } while (0);
+// @NOTE THIS ARE NOT FUNCTIONS! THEY OFTHEN MODIFY BASE LIST!!!
+#define LLIST_ITER(_name, _list) \
+for (auto (_name) = (_list); (_name); (_name) = (_name)->next)
+#define LLIST_ADD(_list, _node) \
+do {\
+(_node)->next = (_list); \
+(_list) = (_node); \
+} while (0);
 #define LLIST_POP(_list) do { (_list) = (_list)->next; } while(0);
-// @TODO think if we can remove pointer here, since it is not function but a macro
-// is there a case where we will have problems?
-#define LLIST_REMOVE(_list_ptr, _node) \
-do { \
-if (*(_list_ptr) == (_node)) {\
-*(_list_ptr) = (_node)->next; \
+#define LLIST_REMOVE(_list, _node) \
+do {\
+if ((_list) == (_node)) {\
+LLIST_POP((_list));\
 } else { \
-LLIST_ITER(scan, *(_list_ptr)) {\
-if (scan->next == (_node)) {\
-scan->next = (_node)->next;\
+LLIST_ITER(__scan, (_list)) {\
+if (__scan->next == (_node)) {\
+__scan->next = (_node)->next;\
 break;\
 }\
 }\
 }\
-} while(0);
+} while (0);
 // Double-linked list entries must have .next and .prev fields
 // Ciricular double-linked list
 // It works by defining single statically-allocated element, which serves as sentinel
 // in points to no data but is used to make function calls easier (no need for double pointers)
 // However, in more complex cases we want to first element still be pointer
-#define CDLIST_ITER(_name, _list) for (auto (_name) = (_list)->next; (_name) != (_list); (_name) = (_name)->next)
-#define CDLIST_INIT(_list) do { (_list)->next = (_list); (_list)->prev = (_list); } while (0);
-#define CDLIST_ADD(_list, _node) do { \
+#define CDLIST_ITER(_name, _list) \
+for (auto (_name) = (_list)->next; (_name) != (_list); (_name) = (_name)->next)
+#define CDLIST_INIT(_list) \
+do {\
+(_list)->next = (_list); \
+(_list)->prev = (_list); \
+} while (0);
+#define CDLIST_ADD(_list, _node) \
+do { \
 (_node)->next = (_list)->next; \
 (_node)->prev = (_list); \
 (_node)->next->prev = (_node); \
 (_node)->prev->next = (_node); \
 } while (0);
-#define CSLIST_ADD_LAST(_list, _node) do { \
+#define CDLIST_ADD_LAST(_list, _node) \
+do { \
 (_node)->next = (_list); \
 (_node)->prev = (_list)->prev; \
 (_node)->next->prev = (_node); \
 (_node)->prev->next = (_node); \
 } while (0);
-#define CDLIST_REMOVE(_node) do {\
+#define CDLIST_REMOVE(_node)\
+do {\
 (_node)->prev->next = (_node)->next;\
 (_node)->next->prev = (_node)->prev;\
 } while (0);
@@ -111,7 +123,8 @@ break;\
 // is_valid()
 // next()
 // This API allows use of this macro which saves space writing countless for loops
-#define ITERATE(_iter_name, _iterator) for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); next(&(_iter_name)) )
+#define ITERATE(_iter_name, _iterator) \
+for (auto (_iter_name) = (_iterator); is_valid(&(_iter_name)); next(&(_iter_name)) )
 
 #if BUILD_WITHOUT_CRT 
 
@@ -122,10 +135,6 @@ break;\
 #endif 
 
 #include "cephes.h"
-
-#include "stb_sprintf.h"
-#define snprintf stbsp_snprintf
-#define vsnprintf stbsp_vsnprintf
 
 extern "C" {
     void *__cdecl memset(void *ptr, int value, uptr num);
@@ -145,9 +154,10 @@ extern f32 F32_INFINITY;
 
 #include <math.h>
 #include <string.h>
-#include <stdio.h>
 
-#define F32_INFINITY INFINITY
+#include "stb_sprintf.h"
+#define snprintf stbsp_snprintf
+#define vsnprintf stbsp_vsnprintf
 #endif 
 
 uptr outf(const char *format, ...);

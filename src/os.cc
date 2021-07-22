@@ -84,7 +84,7 @@ static void fill_sound_buffer(OS *os, i16 *samples, u64 samples_to_write) {
     if (data) {
         i16 *dst = (i16 *)data;
         i16 *src = samples;
-        for (size_t i = 0; i < samples_to_write; ++i) {
+        for (uptr i = 0; i < samples_to_write; ++i) {
             *dst++ = *src++;
             *dst++ = *src++;
         }
@@ -614,7 +614,8 @@ Platform *os_begin_frame(OS *os) {
     RECT wr;
     GetClientRect(os->hwnd, &wr);
     vec2 display_size = Vec2((f32)(wr.right - wr.left), (f32)(wr.bottom - wr.top));
-    input->window_size_changed = display_size != input->display_size;
+    input->window_size_changed = (display_size.x != input->display_size.x) 
+        || (display_size.y != input->display_size.y);
     input->display_size = display_size;
     
     LARGE_INTEGER current_time;
@@ -695,12 +696,12 @@ bool file_handle_valid(FileHandle handle) {
     return handle.no_errors;
 }
 
-size_t get_file_size(FileHandle handle) {
+uptr get_file_size(FileHandle handle) {
     DWORD result = GetFileSize(*((HANDLE *)handle.storage), 0);
-    return (size_t)result;
+    return (uptr)result;
 }
 
-void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
+void read_file(FileHandle handle, uptr offset, uptr size, void *dest) {
     if (handle.no_errors) {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
@@ -721,7 +722,7 @@ void read_file(FileHandle handle, size_t offset, size_t size, void *dest) {
     }
 }
 
-void write_file(FileHandle handle, size_t offset, size_t size, const void *source) {
+void write_file(FileHandle handle, uptr offset, uptr size, const void *source) {
     if (handle.no_errors) {
         HANDLE win32handle = *((HANDLE *)handle.storage);
         OVERLAPPED overlapped = {};
@@ -751,7 +752,7 @@ void sleep(u32 ms) {
     Sleep(ms);
 }
 
-void *os_alloc(size_t size) {
+void *os_alloc(uptr size) {
     void *result = VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);    
     assert(result);
     return result;
@@ -763,24 +764,43 @@ void os_free(void *ptr) {
     }
 }
 
-size_t outf(const char *format, ...) {
+uptr outf(const char *format, ...) {
     va_list args;
     va_start(args, format);
     char buffer[4096];
-    size_t len = vsnprintf(buffer, sizeof(buffer), format, args);
+    uptr len = vsnprintf(buffer, sizeof(buffer), format, args);
     WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, 0, 0);
     va_end(args);
     return len;
 }
 
-MemoryBlock *os_alloc_block(size_t size) {
-    uintptr_t page_size = WIN32_PAGE_SIZE;
-    uintptr_t total_size = size;
+MemoryBlock *os_alloc_block(uptr size, u32 flags) {
+    uptr page_size = 4096;
+    uptr total_size = size + sizeof(MemoryBlock);
+    uptr base_offset = sizeof(MemoryBlock);
+    uptr protect_offset = 0;
+    if (flags & OS_BLOCK_ALLOC_UNDERFLOW_CHECK) {
+        total_size = size + 2 * page_size;
+        base_offset = 2 * page_size;
+        protect_offset = page_size;
+    }
+    if (flags & OS_BLOCK_ALLOC_OVERFLOW_CHECK) {
+        uptr size_round_up = align_forward(size, page_size);
+        total_size = size_round_up + 2 * page_size;
+        base_offset = page_size + size_round_up - size;
+        protect_offset = page_size + size_round_up;
+    }
     
     MemoryBlock *block = (MemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     assert(block);
-    block->size = size - sizeof(MemoryBlock);
+    block->size = size;
     block->base = (u8 *)(block + 1);
+    
+    if (flags & OS_BLOCK_ALLOC_BOUNDS_CHECK) {
+        DWORD old_protect = 0;
+        BOOL is_valid = VirtualProtect((u8 *)block + protect_offset, page_size, PAGE_NOACCESS, &old_protect);
+        assert(is_valid);
+    }
     
     return block;
 }

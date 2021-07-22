@@ -91,15 +91,17 @@ void push_quad(RenderGroup *render_group, vec3 v[4], vec4 c = WHITE, AssetID tex
 void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id = INVALID_ASSET_ID);
 
 void push_rect(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect = AARectUnit(), AssetID texture_id = INVALID_ASSET_ID);
-
-void push_clip_rect(RenderGroup *render_group, aarect rect);
-void pop_clip_rect(RenderGroup *render_group);
 #define DEFAULT_THICKNESS 0.05f
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v[4], vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_rect_outline(RenderGroup *render_group, aarect rect, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale = 1.0f);
+
+void push_clip_rect(RenderGroup *render_group, aarect rect);
+void pop_clip_rect(RenderGroup *render_group);
+void push_rect_clip_constrained(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect = AARectUnit(), AssetID texture_id = INVALID_ASSET_ID);
+void DEBUG_push_text_clip_constrained(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale = 1.0f);
 
 #define RENDER_GROUP_HH 1
 #endif

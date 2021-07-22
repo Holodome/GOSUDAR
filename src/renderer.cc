@@ -30,12 +30,12 @@ static GLuint create_shader(const char *source, const char *defines = "") {
         char shader_log[4096];
         if (!vertex_compiled) {
             glGetShaderInfoLog(vertex_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
+            outf("[ERROR] OpenGL vertex shader compilation failed: %s\n", shader_log);
             shader_failed = true;
         }
         if (!fragment_compiled) {
             glGetShaderInfoLog(fragment_shader, sizeof(shader_log), 0, shader_log);
-            fprintf(stderr, "[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
+            outf("[ERROR] OpenGL fragment shader compilation failed: %s\n", shader_log);
             shader_failed = true;
         }
     }
@@ -50,7 +50,7 @@ static GLuint create_shader(const char *source, const char *defines = "") {
     if (!link_success) {
         char program_log[4096];
         glGetProgramInfoLog(id, sizeof(program_log), 0, program_log);
-        fprintf(stderr, "[ERROR] OpenGL shader compilation failed: %s\n", program_log);
+        outf("[ERROR] OpenGL shader compilation failed: %s\n", program_log);
         shader_failed = true;
     }    
     
@@ -235,8 +235,8 @@ struct Renderer {
     GLuint vertex_array;
     GLuint vertex_buffer;
     GLuint index_buffer;
-    size_t max_texture_count;
-    size_t texture_count;
+    uptr max_texture_count;
+    uptr texture_count;
     GLuint texture_array;
     
     GLuint framebuffer_ids[RENDERER_FRAMEBUFFER_SENTINEL];
@@ -319,7 +319,7 @@ static void APIENTRY opengl_error_callback(GLenum source, GLenum type, GLenum id
             severity_str = "UNKNOWN"; 
         } break;
     }
-    fprintf(stderr, "OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n", source_str, type_str, severity_str, id, message);
+    outf("OpenGL Error Callback\n<Source: %s, type: %s, Severity: %s, ID: %u>:::\n%s\n", source_str, type_str, severity_str, id, message);
 }
 
 static void init_framebuffer(Renderer *renderer, u32 idx,
@@ -403,7 +403,7 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     
 #if 1
-    size_t white_data_size = get_total_size_for_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
+    uptr white_data_size = get_total_size_for_mips(RENDERER_TEXTURE_DIM, RENDERER_TEXTURE_DIM);
     TempMemory white_temp = begin_temp_memory(&renderer->arena);
     void *white_data = alloc(&renderer->arena, white_data_size);
     memset(white_data, 0xFF, white_data_size);

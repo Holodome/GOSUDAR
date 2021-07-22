@@ -20,9 +20,6 @@ struct FileHandle {
     u8 storage[8];
 };
 
-enum {
-};
-
 struct OS;
 
 // @CLEANUP do we really have to do this ugly display_size passing?
@@ -49,7 +46,8 @@ void DEBUG_out_string(const char *format, ...);
 void mkdir(const char *name);
 void sleep(u32 ms);
 
-MemoryBlock *os_alloc_block(uptr size);
+//#define DEFUAL_ALLOC_FLAGS OS_BLOCK_ALLOC_BOUNDS_CHECK
+//MemoryBlock *os_alloc_block(uptr size, u32 flags = DEFUAL_ALLOC_FLAGS);
 
 #define OS_H 1
 #endif

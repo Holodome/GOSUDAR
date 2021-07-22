@@ -43,11 +43,10 @@ extern "C" {
         return result;
     }
 }
+#endif 
 
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
-#endif 
-
 #include "mem.hh"
 #include "debug.cc"
 #include "mips.cc"

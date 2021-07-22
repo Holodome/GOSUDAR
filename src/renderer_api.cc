@@ -19,7 +19,7 @@ RendererSetup setup_2d(mat4x4 projection) {
 }
 
 // Data size is size of full request - with header and additional structures
-static RendererCommandHeader *get_command_buffer_memory(RendererCommands *commands, size_t data_size) {
+static RendererCommandHeader *get_command_buffer_memory(RendererCommands *commands, uptr data_size) {
     assert(data_size >= sizeof(RendererCommandHeader));
     RendererCommandHeader *result = 0;
     if (commands->command_memory_used + data_size <= commands->command_memory_size) {
@@ -32,7 +32,7 @@ static RendererCommandHeader *get_command_buffer_memory(RendererCommands *comman
 
 #define push_command_no_storage(_commands, _type) (push_command_(_commands, 0, _type), 0)
 #define push_command(_commands, _struct, _type) (_struct *)push_command_(_commands, sizeof(_struct), _type)
-static u8 *push_command_(RendererCommands *commands, size_t data_size, u32 type) {
+static u8 *push_command_(RendererCommands *commands, uptr data_size, u32 type) {
     u8 *result = 0;
     
     data_size += sizeof(RendererCommandHeader);
@@ -169,18 +169,13 @@ void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
 }
 
 void push_rect(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect, AssetID texture_id) {
-    aarect clip_rect = render_group->clip_rect_stack[render_group->clip_rect_stack_idx];
-    aarect clipped = Clip(clip_rect, rect);
-    if (DoesExist(clipped)) {
-        aarect clipped_uv = transform_rect_based_on_other(uv_rect, rect, clipped);
-        vec3 v[4]; 
-        store_points(clipped, v);
-        vec2 uvs[4];
-        store_points(clipped_uv, uvs);
-        
-        Texture tex = get_texture(render_group, texture_id);
-        push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
-    }
+    vec3 v[4]; 
+    store_points(rect, v);
+    vec2 uvs[4];
+    store_points(uv_rect, uvs);
+    
+    Texture tex = get_texture(render_group, texture_id);
+    push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
 }
 
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
@@ -252,7 +247,6 @@ void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *
 	}
 }
 
-
 void push_clip_rect(RenderGroup *render_group, aarect rect) {
     assert(render_group->clip_rect_stack_idx < MAX_CLIP_RECT_STACK_SIZE);
     render_group->clip_rect_stack[++render_group->clip_rect_stack_idx] = rect;
@@ -262,3 +256,63 @@ void pop_clip_rect(RenderGroup *render_group) {
     assert(render_group->clip_rect_stack_idx);
     --render_group->clip_rect_stack_idx;
 }
+
+
+void push_rect_clip_constrained(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect, AssetID texture_id) {
+    aarect clip_rect = render_group->clip_rect_stack[render_group->clip_rect_stack_idx];
+    aarect clipped = Clip(clip_rect, rect);
+    if (DoesExist(clipped)) {
+        aarect clipped_uv = transform_rect_based_on_other(uv_rect, rect, clipped);
+        vec3 v[4]; 
+        store_points(clipped, v);
+        vec2 uvs[4];
+        store_points(clipped_uv, uvs);
+        
+        Texture tex = get_texture(render_group, texture_id);
+        push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
+    }
+}
+
+void DEBUG_push_text_clip_constrained(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale) {
+    if (!text) {
+        return;
+    }
+    
+    AssetInfo *info = assets_get_info(render_group->assets, font_id);
+    AssetFont *font = assets_get_font(render_group->assets, font_id);
+    f32 font_height = info->size;
+    f32 line_height = font_height * scale;
+    AssetID texture_id = font_id;
+    
+	f32 rwidth  = 1.0f / (f32)font->texture.width;
+	f32 rheight = 1.0f / (f32)font->texture.height;
+    
+	vec3 offset = Vec3(p, 0);
+	offset.y += line_height;
+    
+	for (const char *scan = text; *scan; ++scan) {
+		u8 symbol = *scan;
+		if ((symbol >= info->first_codepoint)) {
+			FontGlyph *glyph = &font->glyphs[symbol - info->first_codepoint];
+            
+			f32 glyph_width  = (glyph->offset2_x - glyph->offset1_x) * scale;
+			f32 glyph_height = (glyph->offset2_y - glyph->offset1_y) * scale;
+            
+			f32 y1 = offset.y + glyph->offset1_y * scale;
+			f32 y2 = y1 + glyph_height;
+			f32 x1 = offset.x + glyph->offset1_x * scale;
+			f32 x2 = x1 + glyph_width;
+            
+			f32 s1 = glyph->min_x * rwidth;
+			f32 t1 = glyph->min_y * rheight;
+			f32 s2 = glyph->max_x * rwidth;
+			f32 t2 = glyph->max_y * rheight;
+            
+            push_rect_clip_constrained(render_group, AARect(x1, y1, x2 - x1, y2 - y1), color, AARect(s1, t1, s2 - s1, t2 - t1), texture_id);
+			f32 char_advance = glyph->x_advance * scale;
+			offset.x += char_advance;
+		}
+	}
+}
+
+

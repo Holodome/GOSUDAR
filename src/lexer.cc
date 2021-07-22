@@ -1,6 +1,6 @@
 #include "lexer.hh"
 
-void lexer_init(Lexer *lexer, const void *buffer, size_t buffer_size) {
+void lexer_init(Lexer *lexer, const void *buffer, uptr buffer_size) {
     lexer->file_data = (u8 *)alloc_copy(&lexer->arena, buffer, buffer_size);
     lexer->file_data_size = buffer_size;
     lexer->cursor = lexer->file_data;

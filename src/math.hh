@@ -218,13 +218,6 @@ struct vec2G {
     vec2G<T> &operator/=(T s) {
         return (*this = *this / v);
     }
-    
-    bool operator==(vec2G<T> other) {
-        return this->x == other.x && this->y == other.y;
-    }
-    bool operator!=(vec2G<T> other) {
-        return !(*this == other);
-    }
 };
 
 using vec2 = vec2G<f32>;
@@ -327,20 +320,16 @@ struct vec4G {
         return *this;
     }
     
-    template <typename S>
-        vec4G<T> operator+(vec4G<S> v) {
+    vec4G<T> operator+(vec4G<T> v) {
         return {x + v.x, y + v.y, z + v.z, w + v.w};
     }
-    template <typename S>
-        vec4G<T> operator-(vec4G<S> v) {
+    vec4G<T> operator-(vec4G<T> v) {
         return {x - v.x, y - v.y, z - v.z, w - v.w};
     }
-    template <typename S>
-        vec4G<T> operator*(vec4G<S> v) {
+    vec4G<T> operator*(vec4G<T> v) {
         return {x * v.x, y * v.y, z * v.z, w * v.w};
     }
-    template <typename S>
-        vec4G<T> operator/(vec4G<S> v) {
+    vec4G<T> operator/(vec4G<T> v) {
         return {x / v.x, y / v.y, z / v.z, w / v.w};
     }
     vec4G<T> operator*(T s) {
@@ -350,20 +339,16 @@ struct vec4G {
         return {x / s, y / s, z / s, w / s};
     }
     
-    template <typename S>
-        vec4G<T> &operator+=(vec4G<S> v) {
+    vec4G<T> &operator+=(vec4G<T> v) {
         return (*this = *this + v);
     }
-    template <typename S>
-        vec4G<T> &operator-=(vec4G<S> v) {
+    vec4G<T> &operator-=(vec4G<T> v) {
         return (*this = *this - v);
     }
-    template <typename S>
-        vec4G<T> &operator*=(vec4G<S> v) {
+    vec4G<T> &operator*=(vec4G<T> v) {
         return (*this = *this * v);
     }
-    template <typename S>
-        vec4G<T> &operator/=(vec4G<S> v) {
+    vec4G<T> &operator/=(vec4G<T> v) {
         return (*this = *this / v);
     }
     vec4G<T> &operator*=(T s) {
@@ -1001,6 +986,15 @@ inline vec3 xz(vec2 xz, f32 y = 0.0f) {
 
 inline vec2 Floor(vec2 v) {
     return Vec2(Floor(v.x), Floor(v.y));
+}
+
+inline vec4 Sqrt(vec4 v) {
+    vec4 result;
+    result.x = Sqrt(v.x);
+    result.y = Sqrt(v.y);
+    result.z = Sqrt(v.z);
+    result.w = Sqrt(v.w);
+    return result;
 }
 
 inline vec4 rgba_unpack_linear1(u32 rgba) {

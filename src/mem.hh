@@ -22,6 +22,27 @@
 // whole page is allocated and other 2048 bytes are totally wasted
 #define MEM_BLOCK_ALIGN 4096
 
+// Things used to track memory allocations
+// Basically depending on type of build (debug enalbed or disabled)
+// different allocation functions are compiled and debug ones can capture source locations
+// to get call sites at debug display
+#if INTERNAL_BUILD
+#define DEBUG_MEM_PARAM const char *__debug_name,
+#define DEBUG_MEM_PASS __debug_name,
+#define DEBUG_MEM_LOC DEBUG_NAME(),
+#else 
+#define DEBUG_MEM_PARAM
+#define DEBUG_MEM_PASS
+#define DEBUG_MEM_LOC
+#endif 
+
+enum {
+    OS_BLOCK_ALLOC_OVERFLOW_CHECK = 0x1,
+    OS_BLOCK_ALLOC_UNDERFLOW_CHECK = 0x2,
+    
+    OS_BLOCK_ALLOC_BOUNDS_CHECK = OS_BLOCK_ALLOC_UNDERFLOW_CHECK | OS_BLOCK_ALLOC_OVERFLOW_CHECK,
+};
+
 struct MemoryBlock {
     u64 size;
     u64 used;
@@ -29,7 +50,11 @@ struct MemoryBlock {
     MemoryBlock *next;
 };
 
-MemoryBlock *os_alloc_block(uptr size);
+// @NOTE: Forward-declare this to OS layer
+
+//#define DEFUAL_ALLOC_FLAGS OS_BLOCK_ALLOC_BOUNDS_CHECK
+#define DEFUAL_ALLOC_FLAGS OS_BLOCK_ALLOC_OVERFLOW_CHECK
+MemoryBlock *os_alloc_block(uptr size, u32 flags = DEFUAL_ALLOC_FLAGS);
 void os_free(void *ptr);
 
 struct MemoryArena {
@@ -53,18 +78,15 @@ inline uptr get_effective_size(MemoryArena *arena, uptr size_init) {
     return size_init + get_alignment_offset(arena, DEFAULT_ALIGNMENT);
 }
 
-#if INTERNAL_BUILD
-#define DEBUG_MEM_PARAM const char *__debug_name,
-#define DEBUG_MEM_PASS __debug_name,
-#define DEBUG_MEM_LOC DEBUG_NAME(),
-#endif 
-
-#define alloc_struct(_arena, _type, ...) (_type *)alloc_(DEBUG_MEM_LOC _arena, sizeof(_type), ##__VA_ARGS__)
-#define alloc_arr(_arena, _count, _type, ...) (_type *)alloc_(DEBUG_MEM_LOC _arena, _count * sizeof(_type), ##__VA_ARGS__)
-#define alloc_string(_arena, _string, ...) (char *)alloc_copy_(DEBUG_MEM_LOC _arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
-#define alloc(_arena, _size) alloc_(DEBUG_MEM_LOC _arena, _size)
-void *alloc_(DEBUG_MEM_PARAM
-             MemoryArena *arena, uptr size_init) {
+#define alloc_struct(_arena, _type, ...) \
+(_type *)alloc_(DEBUG_MEM_LOC _arena, sizeof(_type), ##__VA_ARGS__)
+#define alloc_arr(_arena, _count, _type, ...) \
+(_type *)alloc_(DEBUG_MEM_LOC _arena, _count * sizeof(_type), ##__VA_ARGS__)
+#define alloc_string(_arena, _string, ...) \
+(char *)alloc_copy_(DEBUG_MEM_LOC _arena, _string, strlen(_string) + 1, ##__VA_ARGS__)
+#define alloc(_arena, _size) \
+alloc_(DEBUG_MEM_LOC _arena, _size)
+void *alloc_(DEBUG_MEM_PARAM MemoryArena *arena, uptr size_init) {
     void *result = 0;
     
     if (size_init) {
@@ -84,14 +106,17 @@ void *alloc_(DEBUG_MEM_PARAM
             if (size > block_size) {
                 block_size = size;
             }
+            // @TODO fix fragmentation problem
+#if 0
             // @TODO this is kinda an implementation detail and shouldn't be accounted for here
             block_size += sizeof(MemoryBlock);
             block_size = align_forward(block_size, MEM_BLOCK_ALIGN);
+#endif 
             
             MemoryBlock *new_block = os_alloc_block(block_size);
             new_block->next = arena->current_block;
             arena->current_block = new_block;
-            DEBUG_ARENA_BLOCK_ALLOCATE(new_block);
+            DEBUG_ARENA_BLOCK_ALLOCATE(__debug_name, new_block);
         }
         
         assert(arena->current_block->used + size <= arena->current_block->size);
@@ -110,15 +135,14 @@ void *alloc_(DEBUG_MEM_PARAM
     return result;
 }
 
-void arena_init(MemoryArena *arena, uptr minimum_block_size = 0) {
-    arena->minimum_block_size = minimum_block_size;
-    
-}
-
-#define bootstrap_alloc_struct(_type, _field, ...) (_type *)bootstrap_alloc_size(sizeof(_type), STRUCT_OFFSET(_type, _field), __VA_ARGS__)
-inline void *bootstrap_alloc_size(uptr size, uptr arena_offset) {
+// Allocte memory block and write arena in it
+#define bootstrap_alloc_struct(_type, _field, ...) \
+(_type *)bootstrap_alloc_(DEBUG_MEM_LOC sizeof(_type), STRUCT_OFFSET(_type, _field), __VA_ARGS__)
+#define bootstrap_alloc(_size, _arena_offset) \
+bootstrap_alloc_(DEBUG_MEM_LOC _size, _arena_offset)
+inline void *bootstrap_alloc_(DEBUG_MEM_PARAM uptr size, uptr arena_offset) {
     MemoryArena bootstrap = {};
-    void *struct_ptr = alloc(&bootstrap, size);
+    void *struct_ptr = alloc_(DEBUG_MEM_PASS &bootstrap, size);
     *(MemoryArena *)((u8 *)struct_ptr + arena_offset) = bootstrap;
     return struct_ptr;
 }
@@ -132,7 +156,7 @@ inline void free_last_block(MemoryArena *arena) {
 
 void arena_clear(MemoryArena *arena) {
     while (arena->current_block) {
-        // In case arena itself is stored in last block
+        // @NOTE: In case arena itself is stored in last block
         b32 is_last_block = (arena->current_block->next == 0);
         free_last_block(arena);
         if (is_last_block) {
@@ -146,7 +170,6 @@ struct TempMemory {
     MemoryBlock *block;
     u64 block_used;
 };
-
 
 inline TempMemory begin_temp_memory(MemoryArena *arena) {
     ++arena->temp_count;

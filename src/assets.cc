@@ -10,7 +10,7 @@ AssetID assets_get_closest_match(Assets *assets, AssetType type, AssetTagList *w
     assert(type && type <= ASSET_TYPE_SENTINEL);
     AssetID result = INVALID_ASSET_ID;
     
-    f32 best_diff = F32_INFINITY;
+    f32 best_diff = INFINITY;
     u32 best_idx = 0;
     
     AssetTypeInfo *info = assets->type_infos + type;

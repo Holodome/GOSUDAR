@@ -120,7 +120,7 @@ static void add_font_asset(AssetBuilder *builder, const char *filename) {
     
     u8 *font_atlas = (u8 *)data + sizeof(FontGlyph) * FONT_CODEPOINT_COUNT;
     memset(font_atlas, 0xFF, FONT_ATLAS_WIDTH * FONT_ATLAS_HEIGHT * 4);
-    for (size_t i = 0; i < FONT_ATLAS_WIDTH * FONT_ATLAS_HEIGHT; ++i) {
+    for (uptr i = 0; i < FONT_ATLAS_WIDTH * FONT_ATLAS_HEIGHT; ++i) {
         font_atlas[i * 4 + 3] = font_atlas_single_channel[i];
     }
     
@@ -346,7 +346,7 @@ int main(int argc, char **argv) {
     arena_init(&lexer->arena, malloc(LEXER_ARENA_SIZE), LEXER_ARENA_SIZE);
     
     fseek(in_file, 0, SEEK_END);
-    size_t in_file_size = ftell(in_file);
+    uptr in_file_size = ftell(in_file);
     fseek(in_file, 0, SEEK_SET);
     void *in_file_data = malloc(in_file_size + 1);
     fread(in_file_data, 1, in_file_size, in_file);
@@ -391,7 +391,7 @@ int main(int argc, char **argv) {
     
     fseek(out, data_base_offset, SEEK_SET);
     u64 data_offset = data_base_offset;
-    for (size_t i = 0; i < builder->info_count; ++i) {
+    for (uptr i = 0; i < builder->info_count; ++i) {
         AssetFileBuilderAssetInfo *src = builder->infos + i;
         AssetInfo *dst = builder->file_infos + i;
         dst->data_offset = data_offset;

@@ -2,15 +2,15 @@
 
 static void downsample2x(u32 src_width, u32 src_height, u32 *src_px,
                          u32 dest_width, u32 dest_height, u32 *dest_px) {
-    size_t DEBUG_n_written = 0;
-    for (size_t y = 0; y < dest_height; ++y) {
+    uptr DEBUG_n_written = 0;
+    for (uptr y = 0; y < dest_height; ++y) {
         u32 *src_px0 = src_px;
         u32 *src_px1 = src_px;
         if (y + 1 < src_height) {
             src_px1 += src_width;
         }
         
-        for (size_t x = 0; x < dest_width; ++x) {
+        for (uptr x = 0; x < dest_width; ++x) {
             vec4 p00 = rgba_unpack_linear1(*src_px0++);
             vec4 p01 = rgba_unpack_linear1(*src_px1++);
             vec4 p10 = p00;
@@ -19,14 +19,14 @@ static void downsample2x(u32 src_width, u32 src_height, u32 *src_px,
                 p10 = rgba_unpack_linear1(*src_px0++);
                 p11 = rgba_unpack_linear1(*src_px1++);
             }
-#if 0
-            // Straigt averags
-            vec4 c = (p00 + p10 + p01 + p11) * 0.25f;
-#else 
+#if 1
             // Weighted based on alpha average
             f32 alpha_sum = p00.a + p01.a + p10.a + p11.a;
             vec4 c = Vec4((p00.xyz * p00.a + p01.xyz * p01.a + p10.xyz * p10.a + p11.xyz * p11.a) / alpha_sum,
                           alpha_sum * 0.25f);
+#else 
+            // Gamma-correct average
+            vec4 c = Sqrt((p00 * p00 + p10 * p10 + p01 * p01 + p11 * p11) * 0.25f);
 #endif 
             *dest_px++ = rgba_pack_4x8_linear1(c);
             ++DEBUG_n_written;
@@ -65,8 +65,8 @@ void next(MipIterator *iter) {
     }
 }
 
-size_t get_total_size_for_mips(u32 width, u32 height) {
-    size_t result = 0;
+uptr get_total_size_for_mips(u32 width, u32 height) {
+    uptr result = 0;
     ITERATE(iter, iterate_mips(width, height)) {
         result += iter.width * iter.height * 4;
     }

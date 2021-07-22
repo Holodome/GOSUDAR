@@ -249,7 +249,7 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     }
     // Find entity to be selected with mouse
     world_state->mouse_selected_entity = {};
-    f32 min_distance = F32_INFINITY;
+    f32 min_distance = INFINITY;
     ITERATE(iter, iterate_entities(sim, iter_radius(world_state->mouse_projection, DISTANCE_TO_MOUSE_SELECT))) {
         Entity *entity = get_entity_by_id(sim, *iter.ptr);
         f32 distance_to_mouse_sq = LengthSq(world_state->mouse_projection - entity->p);
@@ -400,7 +400,7 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     BEGIN_BLOCK("Render entities");
     vec3 cam_x = GetX(world_state->mvp);
     vec3 cam_y = GetY(world_state->mvp);
-    for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
+    for (uptr entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         Entity *entity = sim->entities + entity_idx;
         AssetID texture_id;
         switch (entity->kind) {

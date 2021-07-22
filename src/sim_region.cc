@@ -146,7 +146,7 @@ bool remove_entity_from_chunk(SimRegion *sim, SimRegionChunk *chunk, EntityID id
     for (SimRegionChunkEntityBlock *block = first_block;
          block && not_found;
          block = block->next) {
-        for (size_t entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
+        for (uptr entity_idx = 0; entity_idx < block->entity_count; ++entity_idx) {
             if (IS_SAME(block->ids[entity_idx], id)) {
                 assert(first_block->entity_count);
                 block->ids[entity_idx] = first_block->ids[--first_block->entity_count];
@@ -188,7 +188,7 @@ SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id) {
     u32 hash_value = id.value;
     u32 hash_mask = sim->max_entity_count - 1;
     assert(is_pow2(hash_mask + 1));
-    for (size_t offset = 0; offset < sim->entity_count; ++offset) {
+    for (uptr offset = 0; offset < sim->entity_count; ++offset) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         SimRegionEntityHash *entry = sim->entity_hash + hash_idx;
         if (IS_NULL(entry->id) || IS_SAME(entry->id, id)) {
@@ -385,7 +385,7 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
 
 void end_sim(SimRegion *sim, struct WorldState *world_state) {
     TIMED_FUNCTION();
-    for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
+    for (uptr entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         Entity *src = sim->entities + entity_idx;
         if (!(src->flags & ENTITY_FLAG_IS_DELETED)) {
             i32 chunk_x, chunk_y;

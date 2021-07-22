@@ -2,16 +2,17 @@
 
 #include "general.hh"
 
-#include <intrin.h>
-
 #if INTERNAL_BUILD
 
+#include <intrin.h>
 #define DEBUG_MAX_EVENT_ARRAY_COUNT 2
 #define DEBUG_MAX_FRAME_COUNT 4
 #define DEBUG_MAX_EVENT_COUNT (1 << 16)
+// This defines how many seprate regions (blocks) can be per frame
 #define DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME 128
 CT_ASSERT(IS_POW2(DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME));
 
+// This is used to automatically declare similar value-related functions
 #define DEBUG_VALUE_TYPE_LIST() \
 DEBUG_VALUE_TYPE(u8)            \
 DEBUG_VALUE_TYPE(u16)           \
@@ -51,8 +52,8 @@ enum {
 struct DebugMemoryOP {
     struct MemoryBlock *block;
     struct MemoryBlock *arena_lookup_block;
-    u32 allocated_size;
     u32 offset_in_block;
+    u32 allocated_size;
 };
 
 struct DebugEvent {
@@ -80,10 +81,6 @@ struct DebugTable {
 
 extern DebugTable *debug_table;
 
-#define DEBUG_NAME__(a, b, c) a "|" #b "|" #c
-#define DEBUG_NAME_(a, b, c) DEBUG_NAME__(a, b, c)
-#define DEBUG_NAME() DEBUG_NAME_(__FILE__, __LINE__, __COUNTER__)
-
 // @TODO(hl): Can actualy replace interlocked_add with interlocked_increment
 #define RECORD_DEBUG_EVENT_INTERNAL(event_type, debug_name_init, name_init)                   \
 u64 array_index_event_index = debug_table->event_array_index_event_index++;               \
@@ -100,18 +97,35 @@ do {                                                                        \
 RECORD_DEBUG_EVENT_INTERNAL(_event_type, _debug_name_init, _name_init); \
 } while (0);
 
-#define TIMED_BLOCK__(debug_name, name, number) DebugTimedBlock __timed_block_##number(debug_name, name)
-#define TIMED_BLOCK_(debug_name, name, number) TIMED_BLOCK__(debug_name, name, number)
-#define TIMED_BLOCK(name) TIMED_BLOCK_(DEBUG_NAME(), name, __LINE__)
+// Debug name
+#define DEBUG_NAME__(a, b, c) a "|" #b "|" #c
+#define DEBUG_NAME_(a, b, c) DEBUG_NAME__(a, b, c)
+#define DEBUG_NAME() DEBUG_NAME_(__FILE__, __LINE__, __COUNTER__)
 
+// Frame marker
+#define FRAME_MARKER() RECORD_DEBUG_EVENT(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
+
+// Profiler
 #define BEGIN_BLOCK_(debug_name, name) RECORD_DEBUG_EVENT(DEBUG_EVENT_BEGIN_BLOCK, debug_name, name)
 #define BEGIN_BLOCK(name) BEGIN_BLOCK_(DEBUG_NAME(), name)
 #define END_BLOCK_(debug_name, name) RECORD_DEBUG_EVENT(DEBUG_EVENT_END_BLOCK, debug_name, name)
 #define END_BLOCK() END_BLOCK_(DEBUG_NAME(), "#END_BLOCK")
+#define TIMED_BLOCK__(debug_name, name, number) DebugTimedBlock __timed_block_##number(debug_name, name)
+#define TIMED_BLOCK_(debug_name, name, number) TIMED_BLOCK__(debug_name, name, number)
+#define TIMED_BLOCK(name) TIMED_BLOCK_(DEBUG_NAME(), name, __LINE__)
 #define TIMED_FUNCTION() TIMED_BLOCK((const char *)__FUNCTION__)
 
-#define FRAME_MARKER() RECORD_DEBUG_EVENT(DEBUG_EVENT_FRAME_MARKER, DEBUG_NAME(), "#FRAME_MARKER")
+struct DebugTimedBlock {
+    DebugTimedBlock(const char *debug_name, const char *name) {
+        BEGIN_BLOCK_(debug_name, name);
+    }
+    
+    ~DebugTimedBlock() {
+        END_BLOCK();
+    }
+};
 
+// Values
 #define DEBUG_VALUE_PROC_DEF(_type)                                                \
 inline void DEBUG_VALUE_(const char *debug_name, const char *name, _type value) {  \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_VALUE_##_type, debug_name, name);      \
@@ -136,15 +150,27 @@ event->value_drag = _value;\
 #define DEBUG_VALUE_BLOCK__(_debug_name, _name, _number) DebugValueBlockHelper __value_block__##_number(_debug_name, _name);
 #define DEBUG_VALUE_BLOCK_(_debug_name, _name, _number) DEBUG_VALUE_BLOCK__(_debug_name, _name, _number)
 #define DEBUG_VALUE_BLOCK(_name) DEBUG_VALUE_BLOCK_(DEBUG_NAME(), _name, __LINE__)
+
+struct DebugValueBlockHelper {
+    DebugValueBlockHelper(const char *debug_name, const char *name) {
+        DEBUG_BEGIN_VALUE_BLOCK_(debug_name, name);
+    }
+    
+    ~DebugValueBlockHelper() {
+        DEBUG_END_VALUE_BLOCK();
+    }
+};
+
+// Arenas
 #define DEBUG_ARENA_NAME(_arena, _name) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_NAME, DEBUG_NAME(), _name);\
-event->mem_op.arena_lookup_block = (_arena)->current_block; \
+event->mem_op.block = (_arena)->current_block; \
 } while(0);
 #define DEBUG_ARENA_SUPRESS(_arena) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_SUPRESS, DEBUG_NAME(), "Supress");\
-event->mem_op.arena_lookup_block = (_arena)->current_block;\
+event->mem_op.block = (_arena)->current_block;\
 } while (0);
 
 #define DEBUG_ARENA_ALLOCATE(_debug_name, _block, _size, _block_offset) \
@@ -155,9 +181,9 @@ event->mem_op.allocated_size = (_size); \
 event->mem_op.offset_in_block = (_block_offset);\
 } while(0);
 
-#define DEBUG_ARENA_BLOCK_ALLOCATE(_block) \
+#define DEBUG_ARENA_BLOCK_ALLOCATE(_debug_name, _block) \
 do { \
-RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_ALLOCATE, DEBUG_NAME(), "BlockAllocate");\
+RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_ALLOCATE, _debug_name, "BlockAllocate");\
 event->mem_op.arena_lookup_block = (_block)->next;\
 event->mem_op.block = (_block);\
 event->mem_op.allocated_size = (_block)->size;\
@@ -176,26 +202,6 @@ RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_FREE, DEBUG_NAME(), "BlockFr
 event->mem_op.block = (_block);\
 } while(0);
 
-struct DebugValueBlockHelper {
-    DebugValueBlockHelper(const char *debug_name, const char *name) {
-        DEBUG_BEGIN_VALUE_BLOCK_(debug_name, name);
-    }
-    
-    ~DebugValueBlockHelper() {
-        DEBUG_END_VALUE_BLOCK();
-    }
-};
-
-struct DebugTimedBlock {
-    DebugTimedBlock(const char *debug_name, const char *name) {
-        BEGIN_BLOCK_(debug_name, name);
-    }
-    
-    ~DebugTimedBlock() {
-        END_BLOCK();
-    }
-};
-
 // Debug system is defined in that way that game itself has no access to it - everything has to go
 // through event system
 struct DebugState;
@@ -207,10 +213,10 @@ void DEBUG_frame_end(DebugState *debug_state);
 #else 
 
 struct DebugState;
-#define DEBUG_init(...) 0
-#define DEBUG_begin_frame(...) ((void)0)
-#define DEBUG_update(...) ((void)0)
-#define DEBUG_frame_end(...) ((void)0)
+#define DEBUG_init(...) (DebugState *)0
+#define DEBUG_begin_frame(...) 
+#define DEBUG_update(...) 
+#define DEBUG_frame_end(...) 
 
 #define DEBUG_NAME()
 #define TIMED_BLOCK(...)
@@ -224,6 +230,12 @@ struct DebugState;
 #define DEBUG_BEGIN_VALUE_BLOCK(...)
 #define DEBUG_END_VALUE_BLOC(...)
 #define DEBUG_VALUE_BLOCK(...)
+#define DEBUG_ARENA_NAME(...) 
+#define DEBUG_ARENA_SUPRESS(...) 
+#define DEBUG_ARENA_ALLOCATE(...) 
+#define DEBUG_ARENA_BLOCK_ALLOCATE(...) 
+#define DEBUG_ARENA_BLOCK_TRUNCATE(...) 
+#define DEBUG_ARENA_BLOCK_FREE(...) 
 
 #endif 
 

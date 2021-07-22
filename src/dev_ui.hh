@@ -8,6 +8,18 @@
 #define DEVUI_HASH_SIZE 128
 CT_ASSERT(IS_POW2(DEVUI_HASH_SIZE));
 
+#define DEV_UI_SECTION_OFFSET 20.0f
+#define DEV_UI_VERT_PADDING 2.0f
+#define DEV_UI_HORIZ_PADDING 10.0f
+#define DEV_UI_RESIZE_BUTTON_SIZE 5.0f
+#define DEV_UI_SLIDER_SPEED 0.1f
+#define DEV_UI_BUTTON_HELD Vec4(1, 1, 0, 1)
+#define DEV_UI_BUTTON_HOT  Vec4(0.6, 0.6, 0, 1)
+#define DEV_UI_BUTTON_IDLE Vec4(1, 1, 1, 1)
+#define DEV_UI_SIZEABLE_COLOR Vec4(0.2, 0.2, 0.2, 0.95)
+#define DEV_UI_TEXT_COLOR WHITE
+#define DEV_UI_DEFAULT_SIZEABLE_SIZE Vec2(600, 400)
+
 struct DevUIID {
     u32 value;
 };  
@@ -59,8 +71,8 @@ bool dev_ui_section(DevUILayout *layout, const char *name);
 void dev_ui_end_section(DevUILayout *layout);
 void dev_ui_last_line(DevUILayout *layout);
 void dev_ui_end(DevUILayout *layout);
-void dev_ui_begin_sizable(DevUILayout *layout, const char *label);
-void dev_ui_end_sizable(DevUILayout *layout);
+void dev_ui_begin_sizeable(DevUILayout *layout, const char *label);
+void dev_ui_end_sizeable(DevUILayout *layout);
 
 #define DEVUI_HH 1
 #endif

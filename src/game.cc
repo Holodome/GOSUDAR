@@ -58,6 +58,9 @@ void game_update_and_render(Game *game) {
     DEBUG_ARENA_NAME(&game->frame_arena, "FrameArena");
     DEBUG_begin_frame(game->debug_state);
     
+    DEBUG_SWITCH(&game->renderer_settings.mipmapping, "M");
+    DEBUG_SWITCH(&game->renderer_settings.filtered, "F");
+    
     Platform *platform = os_begin_frame(game->os);
     game->input = create_input_manager(platform);
     

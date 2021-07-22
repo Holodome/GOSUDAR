@@ -179,7 +179,7 @@ static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, MemoryBloc
 }
 
 static void debug_arena_set_name(DebugState *debug_state, DebugEvent *event) {
-    MemoryBlock *lookup_block = event->mem_op.arena_lookup_block;
+    MemoryBlock *lookup_block = event->mem_op.block;
     if (lookup_block) {
         DebugArena *arena = get_arena_by_lookup_block(debug_state, lookup_block);
         if (arena) {
@@ -244,7 +244,7 @@ static void free_allocations(DebugState *debug_state, DebugArenaAllocation *firs
 }
 
 static void remove_arena(DebugState *debug_state, DebugArena *arena) {
-    LLIST_REMOVE(&debug_state->first_arena, arena);
+    LLIST_REMOVE(debug_state->first_arena, arena);
     LLIST_ADD(debug_state->first_free_arena, arena);
 }
 
@@ -290,7 +290,7 @@ static void debug_arena_block_free(DebugState *debug_state, DebugEvent *event) {
 }
 
 static void supress_arena(DebugState *debug_state, DebugEvent *event) {
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, event->mem_op.arena_lookup_block);
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, event->mem_op.block);
     arena->is_supressed = true;
 }
 
@@ -379,7 +379,7 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
                     // Get debug record from frame hash
                     DebugRecord *record = 0;
 #if 1
-                    u32 hash_value = (u32)(uintptr_t)opening_event->debug_name;
+                    u32 hash_value = (u32)(uptr)opening_event->debug_name;
 #else 
                     u32 hash_value = crc32_cstr(opening_event->debug_name);
 #endif 
@@ -522,6 +522,7 @@ static void display_values(DevUILayout *dev_ui, DebugState *debug_state) {
                 }
                 
                 if (value->value_kind == DEBUG_VALUE_SWITCH) {
+                    // @TODO THIS IS WRONG!! id is not generated correctly
                     dev_ui_checkbox(dev_ui, buffer, value->value_switch);
                 } else if (value->value_kind == DEBUG_VALUE_DRAG) {
                     dev_ui_drag(dev_ui, buffer, value->value_drag);
@@ -549,18 +550,18 @@ static void display_profiler(DevUILayout *dev_ui, DebugState *debug_state) {
     radix_sort(sort_a, sort_b, record_count);
     dev_ui_labelf(dev_ui, "Frame %llu", frame->frame_index);    
     dev_ui_checkbox(dev_ui, "Pause", &debug_state->is_paused);
-    dev_ui_begin_sizable(dev_ui, "ProfilerDisp");
+    dev_ui_begin_sizeable(dev_ui, "ProfilerDisp");
     for (uptr i = 0; i < Mini(frame->records_count, 20); ++i) {
         DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
         dev_ui_labelf(dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                       record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));
     }
-    dev_ui_end_sizable(dev_ui);
+    dev_ui_end_sizeable(dev_ui);
     end_temp_memory(records_sort_temp);
 }
 
 static void display_memory(DevUILayout *dev_ui, DebugState *debug_state) {
-    dev_ui_begin_sizable(dev_ui, "MemoryDisp");
+    dev_ui_begin_sizeable(dev_ui, "MemoryDisp");
     u64 total_memory = 0;
     LLIST_ITER(arena, debug_state->first_arena) {
         u32 blocks_count = 0;
@@ -577,7 +578,7 @@ static void display_memory(DevUILayout *dev_ui, DebugState *debug_state) {
     dev_ui_labelf(dev_ui, "Debug table size: %llumb", sizeof(DebugTable) >> 20);
     total_memory += sizeof(DebugTable);
     dev_ui_labelf(dev_ui, "Total: %llumb", total_memory >> 20);
-    dev_ui_end_sizable(dev_ui);
+    dev_ui_end_sizeable(dev_ui);
 }
 
 void DEBUG_update(DebugState *debug_state, GameLinks links) {

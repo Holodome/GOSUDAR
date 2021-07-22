@@ -156,6 +156,7 @@ void assets_purge_textures(Assets *assets) {
 
 Assets *assets_init(Renderer *renderer, MemoryArena *frame_arena) {
     Assets *assets = bootstrap_alloc_struct(Assets, arena);
+    DEBUG_ARENA_NAME(&assets->arena, "Assets");
     assets->renderer = renderer;
     assets->frame_arena = frame_arena;
     

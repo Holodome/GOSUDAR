@@ -446,6 +446,7 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
 
 Renderer *renderer_init(RendererSettings settings) {
     Renderer *renderer = bootstrap_alloc_struct(Renderer, arena);
+    DEBUG_ARENA_NAME(&renderer->arena, "renderer");
     
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     glDebugMessageCallback(opengl_error_callback, 0);

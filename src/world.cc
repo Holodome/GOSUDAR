@@ -91,7 +91,7 @@ WorldChunk *get_new_chunk(World *world) {
     WorldChunk *chunk = world->first_free_chunk;
     if (!chunk) {
         ++world->chunks_allocated;
-        chunk = alloc_struct(world->arena, WorldChunk);
+        chunk = alloc_struct(&world->arena, WorldChunk);
     } else {
         LLIST_POP(world->first_free_chunk);
     }
@@ -103,7 +103,7 @@ WorldChunkEntityBlock *get_new_entity_block(World *world) {
     WorldChunkEntityBlock *entity_block = world->first_free_entity_block;
     if (!entity_block) {
         ++world->entity_blocks_allocated;
-        entity_block = alloc_struct(world->arena, WorldChunkEntityBlock);
+        entity_block = alloc_struct(&world->arena, WorldChunkEntityBlock);
     } else {
         LLIST_POP(world->first_free_entity_block);
     }
@@ -123,11 +123,18 @@ void add_id_to_free_list(World *world, EntityID id) {
     WorldIDListEntry *entry = world->first_free_id;
     if (!entry) {
         ++world->entity_ids_allocated;
-        entry = alloc_struct(world->arena, WorldIDListEntry);
+        entry = alloc_struct(&world->arena, WorldIDListEntry);
     } else {
         LLIST_POP(world->first_free_id);
     }
     
     entry->id = id;
     LLIST_ADD_OR_CREATE(&world->first_id, entry);
+}
+
+World *world_init() {
+    World *result = bootstrap_alloc_struct(World, arena);
+    result->max_entity_id = 1;
+    DEBUG_ARENA_NAME(&result->arena, "World");
+    return result;
 }

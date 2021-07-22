@@ -2,7 +2,124 @@
 
 #if INTERNAL_BUILD
 
+#include "mem.hh"
 #include "os.hh"
+#include "dev_ui.hh"
+
+struct DebugRecord {
+    const char *debug_name;
+    const char *name;
+    u32 times_called;
+    u64 total_clocks;
+};  
+
+struct DebugRecordHash {
+    u32 debug_name_hash;
+    u32 index;
+};
+
+struct DebugFrame {
+    u64 frame_index;
+    u64 begin_clock;
+    u64 end_clock;
+    
+    u32 records_count;
+    DebugRecord records         [DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
+    DebugRecordHash records_hash[DEBUG_MAX_UNIQUE_REGIONS_PER_FRAME];
+};
+
+struct DebugOpenBlock {
+    u32 frame_index;
+    DebugEvent *opening_event;
+    DebugOpenBlock *parent;
+    DebugOpenBlock *next_free;
+};
+
+enum {
+    DEBUG_VALUE_NONE,  
+    DEBUG_VALUE_SWITCH,  
+    DEBUG_VALUE_DRAG,  
+#define DEBUG_VALUE_TYPE(_name) DEBUG_VALUE_##_name,
+    DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
+};
+
+struct DebugValue {
+    const char *name;
+    u32 value_kind;
+    union {
+        bool *value_switch;
+        f32 *value_drag;
+#define DEBUG_VALUE_TYPE(_name) _name value_##_name;
+        DEBUG_VALUE_TYPE_LIST()
+#undef DEBUG_VALUE_TYPE
+    };
+    DebugValue *next;
+};  
+
+#define DEBUG_VALUE_BLOCK_MAX_DEPTH 8
+
+struct DebugValueBlock {
+    const char *name;
+    DebugValue *first_value;
+    DebugValueBlock *first_child;
+    DebugValueBlock *next;
+};
+
+struct DebugArenaAllocation {
+    const char *debug_name;
+    uptr block_offset;
+    uptr size;
+    
+    DebugArenaAllocation *next;
+};
+
+struct DebugArenaBlock {
+    uptr mem_address;
+    uptr size;
+    
+    DebugArenaAllocation *first_allocation;
+    DebugArenaAllocation *last_allocation;
+    DebugArenaBlock *next;
+};
+
+struct DebugArena {
+    const char *name;
+    DebugArenaBlock *first_block;
+    
+    DebugArena *next;
+    b32 is_supressed;
+};
+
+struct DebugState {
+    MemoryArena arena;
+    
+    DebugArena *first_arena;
+    DebugArena *first_free_arena;
+    DebugArenaBlock *first_free_arena_block;
+    DebugArenaAllocation *first_free_arena_allocation;
+    u32 arenas_allocted;
+    u32 arena_blocks_allocated;
+    u32 arena_allocations_allocated;
+    
+    u32 frame_index;
+    DebugFrame frames[DEBUG_MAX_FRAME_COUNT];
+    u64 debug_open_blocks_allocated;
+    DebugOpenBlock *first_free_block;
+    DebugOpenBlock *current_open_block;
+    u32 collation_array_index;
+    bool is_paused;
+    
+    u64 debug_values_allocated;
+    DebugValue *first_free_value;
+    u64 value_blocks_allocated;
+    DebugValueBlock *first_free_value_block;
+    DebugValueBlock *global_value_block;
+    
+    u64 total_frame_count;
+    
+    DevUI dev_ui;
+};
 
 DebugTable *debug_table;
 
@@ -29,6 +146,152 @@ static DebugValue *get_debug_value(DebugState *debug_state) {
         value = alloc_struct(&debug_state->arena, DebugValue); 
     }
     return value;
+}
+
+static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, OSMemoryBlock *block, b32 allow_creation = false) {
+    DebugArena *result = 0;
+    uptr lookup_address = UPTR_FROM_PTR(block);
+    
+    LLIST_ITER(test, debug_state->first_arena) {
+        assert(test->first_block);
+        if (test->first_block->mem_address == lookup_address) {
+            result = test;
+            break;
+        }
+    }
+    
+    if (!result) {
+        assert(allow_creation);
+        result = debug_state->first_free_arena;
+        if (!result) {
+            ++debug_state->arenas_allocted;
+            result = alloc_struct(&debug_state->arena, DebugArena);
+        } else {
+            LLIST_POP(debug_state->first_free_arena);
+        }
+        
+        result->name = "(unnamed)";
+        result->first_block = 0;
+        LLIST_ADD(debug_state->first_arena, result);
+    }
+    
+    return result;
+}
+
+static void debug_arena_set_name(DebugState *debug_state, DebugEvent *event) {
+    OSMemoryBlock *lookup_block = event->mem_op.arena_lookup_block;
+    if (lookup_block) {
+        DebugArena *arena = get_arena_by_lookup_block(debug_state, lookup_block);
+        if (arena) {
+            arena->name = event->name;
+        }
+    }
+}
+
+static void debug_arena_allocate(DebugState *debug_state, DebugEvent *event) {
+    DebugMemoryOP *op = &event->mem_op;
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    if (!arena->is_supressed) {
+        DebugArenaBlock *block = arena->first_block;
+        assert(block->mem_address == UPTR_FROM_PTR(op->block));
+        
+        DebugArenaAllocation *allocation = debug_state->first_free_arena_allocation;
+        if (!allocation) {
+            ++debug_state->arena_allocations_allocated;
+            allocation = alloc_struct(&debug_state->arena, DebugArenaAllocation);
+        } else {
+            LLIST_POP(debug_state->first_free_arena_allocation);
+        }
+        
+        allocation->debug_name = event->debug_name;
+        allocation->block_offset = op->offset_in_block;
+        allocation->size = op->allocated_size;
+        
+        LLIST_ADD(block->first_allocation, allocation);
+        if (!block->last_allocation) {
+            block->last_allocation = allocation;
+        }
+    }
+}
+
+static void debug_arena_block_allocate(DebugState *debug_state, DebugEvent *event) {
+    DebugMemoryOP *op = &event->mem_op;
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->arena_lookup_block, true);
+    DebugArenaBlock *block = debug_state->first_free_arena_block;
+    if (!block) {
+        ++debug_state->arena_blocks_allocated;
+        block = alloc_struct(&debug_state->arena, DebugArenaBlock);
+    } else {
+        LLIST_POP(debug_state->first_free_arena_block);
+    }
+    
+    block->first_allocation = 0;
+    block->last_allocation = 0;
+    block->mem_address = UPTR_FROM_PTR(op->block);
+    block->size = op->allocated_size;
+    
+    LLIST_ADD(arena->first_block, block);
+}
+
+static void free_allocations(DebugState *debug_state, DebugArenaAllocation *first, DebugArenaAllocation *last) {
+    if (first) {
+        assert(last);
+        last->next = debug_state->first_free_arena_allocation;
+        debug_state->first_free_arena_allocation = first;
+    } else {
+        assert(!last);
+    }
+}
+
+static void remove_arena(DebugState *debug_state, DebugArena *arena) {
+    LLIST_REMOVE(&debug_state->first_arena, arena);
+    LLIST_ADD(debug_state->first_free_arena, arena);
+}
+
+static void debug_arena_block_truncate(DebugState *debug_state, DebugEvent *event) {
+    DebugMemoryOP *op = &event->mem_op;
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    DebugArenaBlock *block = arena->first_block;
+    assert(block->mem_address == UPTR_FROM_PTR(op->block));
+    
+    DebugArenaAllocation *last_free = 0;
+    DebugArenaAllocation *first_valid = block->first_allocation;
+    while (first_valid) {
+        if (first_valid->block_offset < op->allocated_size) {
+            break;
+        }
+        
+        last_free = first_valid;
+        first_valid = first_valid->next;
+    }
+    
+    if (block->first_allocation != first_valid) {
+        free_allocations(debug_state, block->first_allocation, last_free);
+        block->first_allocation = first_valid;
+        if (block->last_allocation == last_free) {
+            block->last_allocation = 0;
+        }
+    }
+}
+
+static void debug_arena_block_free(DebugState *debug_state, DebugEvent *event) {
+    DebugMemoryOP *op = &event->mem_op;
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    DebugArenaBlock *free_block = arena->first_block;
+    assert(free_block->mem_address == UPTR_FROM_PTR(op->block));
+    
+    free_allocations(debug_state, free_block->first_allocation, free_block->last_allocation);
+    
+    LLIST_POP(arena->first_block);
+    LLIST_ADD(debug_state->first_free_arena_block, free_block);
+    if (arena->first_block == 0) {
+        remove_arena(debug_state, arena);
+    }
+}
+
+static void supress_arena(DebugState *debug_state, DebugEvent *event) {
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, event->mem_op.arena_lookup_block);
+    arena->is_supressed = true;
 }
 
 static void debug_collate_events(DebugState *debug_state, u32 invalid_event_array_index) {
@@ -79,7 +342,9 @@ static void debug_collate_events(DebugState *debug_state, u32 invalid_event_arra
         value_block_stack[0] = debug_state->global_value_block = get_value_block(debug_state);
         value_block_stack[0]->name = "Values";
         
-        for (u32 event_index = 0; event_index < debug_table->event_counts[event_array_index]; ++event_index) {
+        for (u32 event_index = 0;
+             event_index < debug_table->event_counts[event_array_index];
+             ++event_index) {
             DebugEvent *event = debug_table->events[event_array_index] + event_index;
             switch (event->type) {
                 case DEBUG_EVENT_FRAME_MARKER: {
@@ -183,6 +448,24 @@ LLIST_ADD(value_block_stack[current_value_block_stack_index]->first_value, value
                     assert(current_value_block_stack_index);
                     --current_value_block_stack_index;
                 } break;
+                case DEBUG_EVENT_ARENA_NAME: {
+                    debug_arena_set_name(debug_state, event);
+                } break;
+                case DEBUG_EVENT_ARENA_BLOCK_ALLOCATE: {
+                    debug_arena_block_allocate(debug_state, event);
+                } break;
+                case DEBUG_EVENT_ARENA_BLOCK_TRUNCATE: {
+                    debug_arena_block_truncate(debug_state, event);
+                } break;
+                case DEBUG_EVENT_ARENA_BLOCK_FREE: {
+                    debug_arena_block_free(debug_state, event);
+                } break;
+                case DEBUG_EVENT_ARENA_ALLOCATE: {
+                    debug_arena_allocate(debug_state, event);
+                } break;
+                case DEBUG_EVENT_ARENA_SUPRESS: {
+                    supress_arena(debug_state, event);
+                } break;
                 INVALID_DEFAULT_CASE;
             }
         }
@@ -284,6 +567,25 @@ void DEBUG_update(DebugState *debug_state, GameLinks links) {
         end_temp_memory(records_sort_temp);
         dev_ui_end_section(&dev_ui);
     }
+    if (dev_ui_section(&dev_ui, "Memory")) {
+        u64 total_memory = 0;
+        LLIST_ITER(arena, debug_state->first_arena) {
+            u32 blocks_count = 0;
+            uptr total_size = 0;
+            LLIST_ITER(block, arena->first_block) {
+                ++blocks_count;
+                total_size += block->size;
+            } 
+            dev_ui_labelf(&dev_ui, "Arena %s: %ub %llumb", arena->name, blocks_count, total_size >> 20);
+            
+            total_memory += total_size;
+            
+        }
+        dev_ui_labelf(&dev_ui, "Debug table size: %llumb", sizeof(DebugTable) >> 20);
+        total_memory += sizeof(DebugTable);
+        dev_ui_labelf(&dev_ui, "Total: %llumb", total_memory >> 20);
+        dev_ui_end_section(&dev_ui);
+    }
     
     dev_ui_end(&dev_ui);
 }
@@ -293,6 +595,14 @@ void DEBUG_begin_frame(DebugState *debug_state) {
 
 void DEBUG_frame_end(DebugState *debug_state) {
     TIMED_FUNCTION();
+    DEBUG_BEGIN_VALUE_BLOCK("DEBUG");
+    DEBUG_VALUE(debug_state->arenas_allocted, "Arenas allocated");
+    DEBUG_VALUE(debug_state->arena_blocks_allocated, "Arena blocks allocated");
+    DEBUG_VALUE(debug_state->arena_allocations_allocated, "Arena allocations allocated");
+    f32 cur_ec = (debug_table->event_counts[debug_table->current_event_array_index]);
+    DEBUG_VALUE(cur_ec * 100 / DEBUG_MAX_EVENT_COUNT, "Event array fill");
+    DEBUG_END_VALUE_BLOCK();
+    
     ++debug_state->total_frame_count;
     ++debug_table->current_event_array_index;
     if (debug_table->current_event_array_index >= DEBUG_MAX_EVENT_ARRAY_COUNT) {
@@ -305,14 +615,17 @@ void DEBUG_frame_end(DebugState *debug_state) {
     u32 event_count       = event_array_index_event_index & UINT32_MAX;
     debug_table->event_counts[event_array_index] = event_count;
     
-    if (!debug_state->is_paused) {
-        debug_collate_events(debug_state, debug_table->current_event_array_index);
-    }
+    //if (!debug_state->is_paused) {
+    debug_collate_events(debug_state, debug_table->current_event_array_index);
+    //}
 }
 
 DebugState *DEBUG_init() {
+    debug_table = (DebugTable *)os_alloc(sizeof(DebugTable));
+    
     DebugState *debug_state = bootstrap_alloc_struct(DebugState, arena);
-    debug_table = &debug_state->debug_table;
+    DEBUG_ARENA_SUPRESS(&debug_state->arena);
+    DEBUG_ARENA_NAME(&debug_state->arena, "Debug");
     return debug_state;
 }
 

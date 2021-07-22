@@ -34,6 +34,7 @@ typedef u32 b32;
 #define TO_BOOL(_exp) ((b32)((_exp) ? true : false))
 
 typedef uintptr_t uptr;
+#define UPTR_FROM_PTR(_ptr) ((uptr)(_ptr))
 
 #define ARRAY_SIZE(_a) ((uptr)(sizeof(_a) / sizeof(*(_a))))
 #define SQ(_a) ((_a) * (_a))
@@ -74,6 +75,19 @@ LLIST_ADD(*(_list_ptr), (_node)); \
 *(_list_ptr) = (_node); \
 } \
 } while (0);
+#define LLIST_REMOVE(_list_ptr, _node) \
+do { \
+if (*(_list_ptr) == (_node)) {\
+*(_list_ptr) = (_node)->next; \
+} else { \
+LLIST_ITER(scan, *(_list_ptr)) {\
+if (scan->next == (_node)) {\
+scan->next = (_node)->next;\
+break;\
+}\
+}\
+}\
+} while(0);
 // Double-linked list entries must have .next and .prev fields
 // Ciricular double-linked list
 // It works by defining single statically-allocated element, which serves as sentinel

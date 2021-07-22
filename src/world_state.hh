@@ -34,7 +34,7 @@ struct Camera {
 // Structure that defines all data related to game world - anythting that can or should
 // be saved is placed here
 struct WorldState {
-    MemoryArena *arena;
+    MemoryArena arena;
     
     World *world;
     
@@ -62,7 +62,7 @@ struct WorldState {
     u32 wood_count;
 };
 
-void world_state_init(WorldState *world_state, MemoryArena *arena);
+WorldState *world_state_init();
 void update_and_render_world_state(WorldState *world_state, GameLinks links);
 
 #define WORLD_STATE_HH 1

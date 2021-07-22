@@ -252,6 +252,7 @@ static void check_for_sse() {
 
 OS *os_init(vec2 *display_size) {
     OS *os = bootstrap_alloc_struct(OS, arena);
+    DEBUG_ARENA_NAME(&os->arena, "OS");
     
     check_for_sse();
     

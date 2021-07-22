@@ -1,12 +1,13 @@
 #include "game.hh"
 
-void game_init(Game *game) {
+Game *game_init() {
+    DebugState *debug_state = DEBUG_init();
+    Game *game = bootstrap_alloc_struct(Game, arena);
+    DEBUG_ARENA_NAME(&game->arena, "Game");
+    game->debug_state = debug_state;
+    
     game->is_running = true;   
-#define GAME_ARENA_SIZE MEGABYTES(256)
-    arena_init(&game->arena, GAME_ARENA_SIZE);
-#define FRAME_ARENA_SIZE MEGABYTES(256)
-    arena_init(&game->frame_arena, FRAME_ARENA_SIZE);
-    game->debug_state = DEBUG_init();
+    
 #define COMMAND_MEMORY_SIZE MEGABYTES(4)
 #define MAX_VERTEX_COUNT (1 << 16)
 #define MAX_INDEX_COUNT (MAX_VERTEX_COUNT / 2 * 3)
@@ -29,13 +30,14 @@ void game_init(Game *game) {
     game->commands.max_index_count = MAX_INDEX_COUNT;
     game->commands.indices = alloc_arr(&game->arena, MAX_INDEX_COUNT, RENDERER_INDEX_TYPE);
     
-    world_state_init(&game->play_state.world_state, &game->arena);
+    game->play_state.world_state = world_state_init();
     game->state = STATE_PLAY;
+    return game;
 }
 
 static void update_game_state(PlayState *play_state, GameLinks links) {
     begin_separated_rendering(links.commands);
-    update_and_render_world_state(&play_state->world_state, links);
+    update_and_render_world_state(play_state->world_state, links);
     
     bool blur_game = false;
     if (blur_game) {
@@ -51,6 +53,9 @@ static void update_main_menu_state(MainMenuState *main_menu_state, GameLinks lin
 void game_update_and_render(Game *game) {
     FRAME_MARKER();
     arena_clear(&game->frame_arena);
+    // @TODO this is stupid
+    alloc(&game->frame_arena, 1);
+    DEBUG_ARENA_NAME(&game->frame_arena, "FrameArena");
     DEBUG_begin_frame(game->debug_state);
     
     Platform *platform = os_begin_frame(game->os);

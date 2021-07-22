@@ -64,7 +64,7 @@ struct MainMenuState {
 
 struct PlayState {
     u32 game_state;
-    WorldState world_state;
+    WorldState *world_state;
 };
 
 // Game is a object that decribes program as one element 
@@ -94,7 +94,7 @@ struct Game {
     PlayState play_state;
 };
 
-void game_init(Game *game);
+Game *game_init();
 void game_cleanup(Game *game);
 void game_update_and_render(Game *game);
 

@@ -67,7 +67,7 @@ struct WorldChunkEntityBlock {
 struct WorldChunk {
     i32 chunk_x;
     i32 chunk_y;
-   
+    
     WorldChunkEntityBlock *first_entity_block;
     
     WorldChunk *next;
@@ -89,9 +89,7 @@ struct WorldIDListEntry {
 // what is the optimal way of storing chunks when using world parts
 //
 struct World {
-    // Arena on which chunks and entity blocks are allocated
-    // this can be just game state arena
-    MemoryArena *arena;
+    MemoryArena arena;
     // This is actually what sim regions need pointer to world - 
     // they want to be able to create unique ids even when multithreading
     // So when one thread want to get new ids it needs to lock world one
@@ -100,7 +98,7 @@ struct World {
     // We don't know how many entities there will be in the world and how many of them are going to 
     // be deleted, so this may go away some time
     WorldIDListEntry *first_id;
-
+    
     WorldChunkEntityBlock *first_free_entity_block;
     WorldChunk *first_free_chunk;
     WorldIDListEntry *first_free_id;
@@ -115,6 +113,8 @@ struct World {
     u32 chunks_allocated;
     u32 entity_ids_allocated;
 };
+
+World *world_init();
 
 WorldChunk *get_world_chunk(World *world, i32 chunk_x, i32 chunk_y);
 // Returns world chunk and removes it from storage - since all 

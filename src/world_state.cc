@@ -45,28 +45,26 @@ inline WorldObjectSpec building_spec() {
     return spec;
 }
 
-void world_state_init(WorldState *world_state, MemoryArena *arena) {    
-    world_state->arena = arena;
-    // @TODO initialize world properly
-    world_state->world = alloc_struct(arena, World);
-    world_state->world->arena = arena;
-    world_state->world->max_entity_id = 1;
+WorldState *world_state_init() {    
+    WorldState *world_state = bootstrap_alloc_struct(WorldState, arena);
+    DEBUG_ARENA_NAME(&world_state->arena, "WorldState");
+    world_state->world = world_init();
     // Set spec settings
     world_state->world_object_specs[WORLD_OBJECT_KIND_TREE_FOREST] = tree_spec(4);
     world_state->world_object_specs[WORLD_OBJECT_KIND_TREE_JUNGLE] = tree_spec(2);
     world_state->world_object_specs[WORLD_OBJECT_KIND_TREE_DESERT] = tree_spec(1);
     world_state->world_object_specs[WORLD_OBJECT_KIND_BUILDING1] = building_spec();
     world_state->world_object_specs[WORLD_OBJECT_KIND_BUILDING2] = building_spec();
-    init_order_system(&world_state->order_system, world_state->arena);
-    init_particle_system(&world_state->particle_system, world_state->arena);
+    init_order_system(&world_state->order_system, &world_state->arena);
+    init_particle_system(&world_state->particle_system, &world_state->arena);
     world_state->particle_system.emitter.spec.p = Vec3(0);
     world_state->particle_system.emitter.spec.spawn_rate = 10;
     
     // Generate world
-    TempMemory gen_temp = begin_temp_memory(arena);
+    TempMemory gen_temp = begin_temp_memory(&world_state->arena);
     Entropy gen_entropy { 123456789 };
-    SimRegion *creation_sim = alloc_struct(arena, SimRegion);
-    begin_sim(creation_sim, arena, world_state->world, 100, 100, 25);
+    SimRegion *creation_sim = alloc_struct(gen_temp.arena, SimRegion);
+    begin_sim(creation_sim, gen_temp.arena, world_state->world, 100, 100, 25);
     vec2 player_pos = Vec2(0);
     world_state->camera_followed_entity = add_player(creation_sim, player_pos);    
     world_state->pawns[world_state->pawn_count++] = add_pawn(creation_sim, Vec2(5, 5));
@@ -85,6 +83,7 @@ void world_state_init(WorldState *world_state, MemoryArena *arena) {
     }
     end_sim(creation_sim, world_state);
     end_temp_memory(gen_temp);
+    return world_state;
 }
 
 static vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, vec2 uv) {

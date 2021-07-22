@@ -29,7 +29,6 @@ void stop_audio(AudioSystem *sys, AudioID id) {
 }
 
 void update_audio(AudioSystem *sys, Assets *assets, Platform *platform) {
-    TIMED_FUNCTION();
     for (u32 i = 0; i < MAX_SOUNDS; ++i) {
         if (!sys->sounds_play[i]) {
             continue;

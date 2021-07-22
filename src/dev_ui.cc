@@ -35,12 +35,12 @@ struct ButtonState {
     bool is_held;  
 };
 
-static ButtonState update_button(DevUILayout *layout, Rect rect, DevUIID id, bool repeat_when_held = false) {
-    if (rect.collide(layout->input->platform->mpos)) {
+static ButtonState update_button(DevUILayout *layout, aarect rect, DevUIID id, bool repeat_when_held = false) {
+    if (Collide(rect, layout->input->platform->mpos)) {
         layout->is_focused = true;
     }
     
-    bool is_hot = IS_NULL(layout->hot_id) && rect.collide(layout->input->platform->mpos);
+    bool is_hot = IS_NULL(layout->hot_id) && Collide(rect, layout->input->platform->mpos);
     if (is_hot) {
         layout->hot_id = id;
         if (is_key_pressed(layout->input, KEY_MOUSE_LEFT) && IS_NULL(layout->dev_ui->active_id)) {
@@ -77,7 +77,7 @@ DevUILayout dev_ui_begin(DevUI *dev_ui, InputManager *input, Assets *assets, Ren
     layout.input = input;
     layout.assets = assets;
     layout.font_id = assets_get_first_of_type(assets, ASSET_TYPE_FONT);
-    RendererSetup setup = setup_2d(Mat4x4::ortographic_2d(0, input->platform->display_size.x, input->platform->display_size.y, 0));
+    RendererSetup setup = setup_2d(Ortographic2d(0, input->platform->display_size.x, input->platform->display_size.y, 0));
     set_setup(commands, &setup);
     
     RenderGroup interface_render_group = create_render_group(commands, assets);
@@ -102,24 +102,24 @@ void dev_ui_labelf(DevUILayout *layout, const char *format, ...) {
 
 bool dev_ui_button(DevUILayout *layout, const char *label) {
     vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
-    Rect button_rect = Rect(layout->p, text_size);
+    aarect button_rect = AARect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);  
-    element_size(layout, button_rect.size());
+    element_size(layout, Size(button_rect));
     return bstate.is_pressed;    
 }
 
 bool dev_ui_checkbox(DevUILayout *layout, const char *label, bool *value) {
     vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
-    Rect button_rect = Rect(layout->p, text_size);
+    aarect button_rect = AARect(layout->p, text_size);
     ButtonState bstate = update_button(layout, button_rect, id_from_cstr(label));
     if (bstate.is_pressed) {
         *value = !*value;
     }
     vec4 color = (*value ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
-    element_size(layout, button_rect.size());
+    element_size(layout, Size(button_rect));
     return bstate.is_pressed;    
 }
 
@@ -157,8 +157,7 @@ bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value) {
     char value_buffer[128];
     snprintf(value_buffer, sizeof(value_buffer), "%s: %.2f", label, *value);
     vec2 value_rect_size = DEBUG_get_text_size(layout->assets, layout->font_id, value_buffer);
-    Rect whole_rect = Rect(layout->p, value_rect_size);
-    
+    aarect whole_rect = AARect(layout->p, value_rect_size);
     ButtonState bstate = update_button(layout, whole_rect, id_from_cstr(label));
     if (bstate.is_held) {
 #define SPEED 0.1f
@@ -170,13 +169,13 @@ bool dev_ui_drag(DevUILayout *layout, const char *label, f32 *value) {
     }
     vec4 color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, value_buffer, layout->font_id, 1.0f);
-    element_size(layout, whole_rect.size());
+    element_size(layout, whole_rect.s);
     return result;
 }
 
 bool dev_ui_section(DevUILayout *layout, const char *label) {
     vec2 text_size = DEBUG_get_text_size(layout->assets, layout->font_id, label);
-    Rect button_rect = Rect(layout->p, text_size);
+    aarect button_rect = AARect(layout->p, text_size);
     DevUIID id = id_from_cstr(label);
     ButtonState bstate = update_button(layout, button_rect, id);
     DevUIView *view = get_dev_ui_view(layout->dev_ui, id);
@@ -185,7 +184,7 @@ bool dev_ui_section(DevUILayout *layout, const char *label) {
     }
     vec4 color = (view->is_opened ? Vec4(1, 1, 0, 1) : Vec4(1, 1, 1, 1));    
     DEBUG_push_text(&layout->render_group, layout->p, color, label, layout->font_id, 1.0f);
-    element_size(layout, button_rect.size());
+    element_size(layout, button_rect.s);
     if (view->is_opened) {
         layout->p.x += DEV_UI_SECTION_OFFSET;
         layout->horizontal_offset += DEV_UI_SECTION_OFFSET;
@@ -208,9 +207,9 @@ void dev_ui_begin_sizable(DevUILayout *layout, const char *label) {
         view->size = Vec2(600, 400);
     }
     vec4 color = Vec4(0.2, 0.2, 0.2, 1.0);
-    Rect section_rect = Rect(layout->p, view->size);
+    aarect section_rect = AARect(layout->p, view->size);
     
-    Rect resize_button_rect = Rect(section_rect.bottom_right() - Vec2(RESIZE_BUTTON_SIZE), Vec2(RESIZE_BUTTON_SIZE));
+    aarect resize_button_rect = AARect(BottomRight(section_rect) - Vec2(RESIZE_BUTTON_SIZE), Vec2(RESIZE_BUTTON_SIZE));
     ButtonState bstate = update_button(layout, resize_button_rect, id);
     vec4 resize_color = (bstate.is_held ? Vec4(1, 1, 0, 1) : bstate.is_hot ? Vec4(0.6, 0.6, 0, 1) : Vec4(1, 1, 1, 1));    
     

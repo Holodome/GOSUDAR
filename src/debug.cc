@@ -550,7 +550,7 @@ static void display_profiler(DevUILayout *dev_ui, DebugState *debug_state) {
     dev_ui_labelf(dev_ui, "Frame %llu", frame->frame_index);    
     dev_ui_checkbox(dev_ui, "Pause", &debug_state->is_paused);
     dev_ui_begin_sizable(dev_ui, "ProfilerDisp");
-    for (uptr i = 0; i < Min_i32(frame->records_count, 20); ++i) {
+    for (uptr i = 0; i < Mini(frame->records_count, 20); ++i) {
         DebugRecord *record = frame->records + sort_a[record_count - i - 1].sort_index;
         dev_ui_labelf(dev_ui, "%2llu %32s %8llu %4u %8llu %.2f%%\n", i, record->name, record->total_clocks, 
                       record->times_called, record->total_clocks / (u64)record->times_called, ((f32)record->total_clocks / frame_time * 100));

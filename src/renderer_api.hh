@@ -26,13 +26,13 @@ enum {
 };
 
 struct RendererSetup {
-    Mat4x4 view;
-    Mat4x4 projection;
-    Mat4x4 mvp;
+    mat4x4 view;
+    mat4x4 projection;
+    mat4x4 mvp;
 };
 
-inline RendererSetup setup_3d(u32 framebuffer, Mat4x4 view, Mat4x4 projection);
-inline RendererSetup setup_2d(u32 framebuffer, Mat4x4 projection);
+inline RendererSetup setup_3d(u32 framebuffer, mat4x4 view, mat4x4 projection);
+inline RendererSetup setup_2d(u32 framebuffer, mat4x4 projection);
 
 struct RendererCommandHeader {
     u32 type;
@@ -71,16 +71,17 @@ void end_depth_peel(RendererCommands *commands);
 struct RenderGroup {
     RendererCommands *commands;
     struct Assets *assets;
-    
+    // This only affects push_rect calls and their derivatives!
+    // @TODO Probably should rename calls using this in push_rect_clip_constrained or something
     u32 clip_rect_stack_idx;
-    Rect clip_rect_stack[MAX_CLIP_RECT_STACK_SIZE];
+    aarect clip_rect_stack[MAX_CLIP_RECT_STACK_SIZE];
 };
 
 inline RenderGroup create_render_group(RendererCommands *commands, struct Assets *assets) {
     RenderGroup result = {};
     result.commands = commands;
     result.assets = assets;
-    result.clip_rect_stack[0] = Rect(Vec2(-INFINITY), Vec2(INFINITY));
+    result.clip_rect_stack[0] = AARectInfinite();
     return result;
 }
 
@@ -89,15 +90,15 @@ void push_quad(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11
 void push_quad(RenderGroup *render_group, vec3 v[4], vec4 c = WHITE, AssetID texture_id = INVALID_ASSET_ID);
 void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id = INVALID_ASSET_ID);
 
-void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect = Rect(0, 0, 1, 1), AssetID texture_id = INVALID_ASSET_ID);
+void push_rect(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect = AARectUnit(), AssetID texture_id = INVALID_ASSET_ID);
 
-void push_clip_rect(RenderGroup *render_group, Rect rect);
+void push_clip_rect(RenderGroup *render_group, aarect rect);
 void pop_clip_rect(RenderGroup *render_group);
 #define DEFAULT_THICKNESS 0.05f
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v00, vec3 v01, vec3 v10, vec3 v11, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v[4], vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
-void DEBUG_push_rect_outline(RenderGroup *render_group, Rect rect, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
+void DEBUG_push_rect_outline(RenderGroup *render_group, aarect rect, vec4 color = BLACK, f32 thickness = DEFAULT_THICKNESS);
 void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *text, AssetID font_id, f32 scale = 1.0f);
 
 #define RENDER_GROUP_HH 1

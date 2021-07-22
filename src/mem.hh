@@ -12,6 +12,15 @@
 // where we recycle memory - like in temp memory
 // Lets see if this approach works
 #define MEM_NO_MEMZERO 1
+// For getting sizes of blocks
+// Since we use virutall memory allocations, we must take care of possible fragmentation
+// All virual allocation are done in whole pages, each of which are 4KB in most cases 
+// (we probable won't even take care of corner ones). So in order not to waste virtual memory
+// we align all block sizes on page size
+// If we don't do this step some memory will be unracted at all - for example
+// we allocate 2048 bytes and game thinks that returned block size equals 2048, while in reality
+// whole page is allocated and other 2048 bytes are totally wasted
+#define MEM_BLOCK_ALIGN 4096
 
 struct MemoryBlock {
     u64 size;
@@ -30,7 +39,7 @@ struct MemoryArena {
 };
 
 inline uptr get_alignment_offset(MemoryArena *arena, uptr align) {
-    assert(is_power_of_two(align));
+    assert(is_pow2(align));
     uptr result_ptr = (uptr)arena->current_block->base + arena->current_block->used;
     uptr align_mask = align - 1;
     uptr offset = 0;
@@ -75,6 +84,9 @@ void *alloc_(DEBUG_MEM_PARAM
             if (size > block_size) {
                 block_size = size;
             }
+            // @TODO this is kinda an implementation detail and shouldn't be accounted for here
+            block_size += sizeof(MemoryBlock);
+            block_size = align_forward(block_size, MEM_BLOCK_ALIGN);
             
             MemoryBlock *new_block = os_alloc_block(block_size);
             new_block->next = arena->current_block;

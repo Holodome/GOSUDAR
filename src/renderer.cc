@@ -97,10 +97,10 @@ OpenGLQuadShader compile_quad_shader(bool depth_peel) {
     return result;
 }
 
-static void bind_shader(OpenGLQuadShader *shader, Mat4x4 *view, Mat4x4 *projection, u32 tex, u32 depth = 1) {
+static void bind_shader(OpenGLQuadShader *shader, mat4x4 view, mat4x4 projection, u32 tex, u32 depth = 1) {
     glUseProgram(shader->id);
-    glUniformMatrix4fv(shader->view_location, 1, false, view->value_ptr());
-    glUniformMatrix4fv(shader->projection_location, 1, false, projection->value_ptr());
+    glUniformMatrix4fv(shader->view_location, 1, false, ValuePtr(view));
+    glUniformMatrix4fv(shader->projection_location, 1, false, ValuePtr(projection));
     glUniform1i(shader->tex_location, tex);
     if (shader->is_depth_peeling) {
         glUniform1i(shader->depth_location, depth);
@@ -590,11 +590,11 @@ void renderer_end_frame(Renderer *renderer, RendererCommands *commands) {
                 
                 assert(current_setup);
                 if (peel_count) {
-                    bind_shader(&renderer->depth_peel_shader, &current_setup->view, &current_setup->projection, 0, 1);
+                    bind_shader(&renderer->depth_peel_shader, current_setup->view, current_setup->projection, 0, 1);
                     u32 framebuffer_idx = RENDERER_FRAMEBUFFER_PEEL1 + peel_count - 1;
                     bind_framebuffer_texture(renderer, framebuffer_idx, 1, true);
                 } else {
-                    bind_shader(&renderer->quad_shader, &current_setup->view, &current_setup->projection, 0);
+                    bind_shader(&renderer->quad_shader, current_setup->view, current_setup->projection, 0);
                 }
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, renderer->texture_array);

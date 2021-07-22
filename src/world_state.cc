@@ -86,18 +86,6 @@ WorldState *world_state_init() {
     return world_state;
 }
 
-static vec3 uv_to_world(Mat4x4 projection, Mat4x4 view, vec2 uv) {
-    f32 x = uv.x;
-    f32 y = uv.y;
-    vec3 ray_dc = Vec3(x, y, 1.0f);
-    vec4 ray_clip = Vec4(ray_dc.xy, -1.0f, 1.0f);
-    vec4 ray_eye = Mat4x4::inverse(projection) * ray_clip;
-    ray_eye.z = -1.0f;
-    ray_eye.w = 0.0f;
-    vec3 ray_world = normalize((Mat4x4::inverse(view) * ray_eye).xyz);
-    return ray_world;
-}
-
 static void init_particles_for_interaction(WorldState *world_state, SimRegion *sim, InputManager *input, Interaction *interaction) {
     if (interaction->kind == INTERACTION_KIND_MINE_RESOURCE) {
         Entity *interactable = get_entity_by_id(sim, interaction->entity);
@@ -149,7 +137,7 @@ static void update_interaction(WorldState *world_state, SimRegion *sim, Entity *
         EntityID order_entity_id = order->destination_id;
         Entity *dest_entity = get_entity_by_id(sim, order_entity_id);
         assert(dest_entity->kind == ENTITY_KIND_WORLD_OBJECT);
-        assert(length_sq(dest_entity->p - entity->p) < DISTANCE_TO_INTERACT_SQ);
+        assert(LengthSq(dest_entity->p - entity->p) < DISTANCE_TO_INTERACT_SQ);
         WorldObjectSpec dest_spec = get_spec_for_type(world_state, dest_entity->world_object_kind);
         // Get ineraction settings from order and whatever
         u32 interaction_kind = 0;
@@ -242,9 +230,9 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     world_state->cam_p = cam_p;
     
     f32 aspect_ratio = input->platform->display_size.x / input->platform->display_size.y;
-    world_state->projection = Mat4x4::perspective(CAMERA_FOV, aspect_ratio, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
-    world_state->view = Mat4x4::identity() * Mat4x4::rotation(world_state->cam.pitch, Vec3(1, 0, 0)) * Mat4x4::rotation(world_state->cam.yaw, Vec3(0, 1, 0))
-        * Mat4x4::translate(-cam_p);
+    world_state->projection = Perspective(CAMERA_FOV, aspect_ratio, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    world_state->view = Identity() * Rotation(world_state->cam.pitch, Vec3(1, 0, 0)) * Rotation(world_state->cam.yaw, Vec3(0, 1, 0))
+        * Translate(-cam_p);
     world_state->mvp = world_state->projection * world_state->view;
     
     if (is_key_held(links.input, KEY_X)) {
@@ -264,7 +252,7 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     f32 min_distance = F32_INFINITY;
     ITERATE(iter, iterate_entities(sim, iter_radius(world_state->mouse_projection, DISTANCE_TO_MOUSE_SELECT))) {
         Entity *entity = get_entity_by_id(sim, *iter.ptr);
-        f32 distance_to_mouse_sq = length_sq(world_state->mouse_projection - entity->p);
+        f32 distance_to_mouse_sq = LengthSq(world_state->mouse_projection - entity->p);
         if (distance_to_mouse_sq < DISTANCE_TO_MOUSE_SELECT_SQ && distance_to_mouse_sq < min_distance) {
             world_state->mouse_selected_entity = entity->id;
             min_distance = distance_to_mouse_sq;
@@ -311,8 +299,8 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
                     // @TODO what do we do if entity is outside of sim region - 
                     // set new state for order like out of bounds and request new one
                     vec2 delta = to_chop->p - entity->p;
-                    if (length_sq(delta) > DISTANCE_TO_INTERACT_SQ) {
-                        vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                    if (LengthSq(delta) > DISTANCE_TO_INTERACT_SQ) {
+                        vec2 delta_p = Normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
                         vec2 new_pawn_p = entity->p + delta_p;
                         change_entity_position(sim, entity, new_pawn_p);
                     } else {
@@ -324,8 +312,8 @@ void update_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
                 }
             } else { 
                 vec2 delta = player_pos - entity->p;
-                if (length_sq(delta) > PAWN_DISTANCE_TO_PLAYER_SQ) {
-                    vec2 delta_p = normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
+                if (LengthSq(delta) > PAWN_DISTANCE_TO_PLAYER_SQ) {
+                    vec2 delta_p = Normalize(delta) * PAWN_SPEED * input->platform->frame_dt;
                     vec2 new_pawn_p = entity->p + delta_p;
                     change_entity_position(sim, entity, new_pawn_p);
                 }
@@ -410,8 +398,8 @@ void render_game(WorldState *world_state, SimRegion *sim, GameLinks links) {
     // Entities
     //
     BEGIN_BLOCK("Render entities");
-    vec3 cam_x = world_state->mvp.get_x();
-    vec3 cam_y = world_state->mvp.get_y();
+    vec3 cam_x = GetX(world_state->mvp);
+    vec3 cam_y = GetY(world_state->mvp);
     for (size_t entity_idx = 0; entity_idx < sim->entity_count; ++entity_idx) {
         Entity *entity = sim->entities + entity_idx;
         AssetID texture_id;

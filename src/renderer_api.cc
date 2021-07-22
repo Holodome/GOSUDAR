@@ -2,7 +2,7 @@
 
 #include "renderer.hh"
 
-RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection) {
+RendererSetup setup_3d(mat4x4 view, mat4x4 projection) {
     RendererSetup result;
     result.view = view;
     result.projection = projection;
@@ -10,10 +10,10 @@ RendererSetup setup_3d(Mat4x4 view, Mat4x4 projection) {
     return result;
 }
 
-RendererSetup setup_2d(Mat4x4 projection) {
+RendererSetup setup_2d(mat4x4 projection) {
     RendererSetup result;
     result.projection = projection;
-    result.view = Mat4x4::identity();
+    result.view = Identity();
     result.mvp = projection;
     return result;
 }
@@ -168,20 +168,15 @@ void push_quad(RenderGroup *render_group, vec3 v[4], AssetID texture_id) {
     push_quad(render_group, v, WHITE, texture_id);
 }
 
-void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, AssetID texture_id) {
-    Rect clip_rect = render_group->clip_rect_stack[render_group->clip_rect_stack_idx];
-    Rect clipped = clip_rect.clip(rect);
-    Rect clipped_uv;
-    clipped_uv.x = uv_rect.x + (clipped.x - rect.x) / rect.w * uv_rect.w;
-    clipped_uv.y = uv_rect.y + (clipped.y - rect.y) / rect.h * uv_rect.h;
-    clipped_uv.w = uv_rect.right() + (clipped.right() - rect.right()) / rect.w * uv_rect.w - clipped_uv.x;
-    clipped_uv.h = uv_rect.bottom() + (clipped.bottom() - rect.bottom()) / rect.h * uv_rect.h - clipped_uv.y;
-    
-    if (does_exist(clipped) && area(clipped) > 0.001) {
+void push_rect(RenderGroup *render_group, aarect rect, vec4 color, aarect uv_rect, AssetID texture_id) {
+    aarect clip_rect = render_group->clip_rect_stack[render_group->clip_rect_stack_idx];
+    aarect clipped = Clip(clip_rect, rect);
+    if (DoesExist(clipped)) {
+        aarect clipped_uv = transform_rect_based_on_other(uv_rect, rect, clipped);
         vec3 v[4]; 
-        clipped.store_points(v);
+        store_points(clipped, v);
         vec2 uvs[4];
-        clipped_uv.store_points(uvs);
+        store_points(clipped_uv, uvs);
         
         Texture tex = get_texture(render_group, texture_id);
         push_quad(render_group->commands, v[0], v[1], v[2], v[3], color, color, color, color, uvs[0], uvs[1], uvs[2], uvs[3], tex);
@@ -189,11 +184,11 @@ void push_rect(RenderGroup *render_group, Rect rect, vec4 color, Rect uv_rect, A
 }
 
 void DEBUG_push_line(RenderGroup *render_group, vec3 a, vec3 b, vec4 color, f32 thickness) {
-    vec3 cam_z = render_group->commands->last_setup->mvp.get_z();
+    vec3 cam_z = GetZ(render_group->commands->last_setup->mvp);
     vec3 line = (b - a);
-    line -= cam_z * dot(cam_z, line);
-    vec3 line_perp = cross(line, cam_z);
-    line_perp = normalize(line_perp);
+    line -= cam_z * Dot(cam_z, line);
+    vec3 line_perp = Cross(line, cam_z);
+    line_perp = Normalize(line_perp);
     line_perp *= thickness;
     push_quad(render_group, a - line_perp, a + line_perp, b - line_perp, b + line_perp, color);
 }
@@ -209,9 +204,9 @@ void DEBUG_push_quad_outline(RenderGroup *render_group, vec3 v[4], vec4 color, f
     DEBUG_push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
 }
 
-void DEBUG_push_rect_outline(RenderGroup *render_group, Rect rect, vec4 color, f32 thickness) {
+void DEBUG_push_rect_outline(RenderGroup *render_group, aarect rect, vec4 color, f32 thickness) {
     vec3 v[4]; 
-    rect.store_points(v);
+    store_points(rect, v);
     DEBUG_push_quad_outline(render_group, v[0], v[1], v[2], v[3], color, thickness);
 }
 
@@ -250,7 +245,7 @@ void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *
 			f32 s2 = glyph->max_x * rwidth;
 			f32 t2 = glyph->max_y * rheight;
             
-            push_rect(render_group, Rect(x1, y1, x2 - x1, y2 - y1), color, Rect(s1, t1, s2 - s1, t2 - t1), texture_id);
+            push_rect(render_group, AARect(x1, y1, x2 - x1, y2 - y1), color, AARect(s1, t1, s2 - s1, t2 - t1), texture_id);
 			f32 char_advance = glyph->x_advance * scale;
 			offset.x += char_advance;
 		}
@@ -258,7 +253,7 @@ void DEBUG_push_text(RenderGroup *render_group, vec2 p, vec4 color, const char *
 }
 
 
-void push_clip_rect(RenderGroup *render_group, Rect rect) {
+void push_clip_rect(RenderGroup *render_group, aarect rect) {
     assert(render_group->clip_rect_stack_idx < MAX_CLIP_RECT_STACK_SIZE);
     render_group->clip_rect_stack[++render_group->clip_rect_stack_idx] = rect;
 }

@@ -23,8 +23,8 @@ void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group,
         dest->e = F32_4x(4.0f);
     }
     
-    vec3 cam_x = render_group->commands->last_setup->mvp.get_x();
-    vec3 cam_y = render_group->commands->last_setup->mvp.get_y();
+    vec3 cam_x = GetX(render_group->commands->last_setup->mvp);
+    vec3 cam_y = GetY(render_group->commands->last_setup->mvp);
     f32_4x lower_e = F32_4x(0);
     f32_4x de = F32_4x(dt);
     vec3_4x dp = Vec3_4x(Vec3(0, 1.0, 0) * dt);
@@ -36,7 +36,7 @@ void update_and_render_particles(ParticleSystem *sys, RenderGroup *render_group,
             particle->p += dp;
             
             for (u32 local_idx = 0; local_idx < 4; ++local_idx) {
-                vec3 p = get_component(particle->p, local_idx);
+                vec3 p = GetComponent(particle->p, local_idx);
                 f32 e = particle->e.e[local_idx];
                 
                 if (e > 0.0) {

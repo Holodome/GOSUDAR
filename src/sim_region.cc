@@ -187,7 +187,7 @@ SimRegionEntityHash *get_entity_hash(SimRegion *sim, EntityID id) {
     SimRegionEntityHash *result = 0;
     u32 hash_value = id.value;
     u32 hash_mask = sim->max_entity_count - 1;
-    assert(is_power_of_two(hash_mask + 1));
+    assert(is_pow2(hash_mask + 1));
     for (size_t offset = 0; offset < sim->entity_count; ++offset) {
         u32 hash_idx = ((hash_value + offset) & hash_mask);
         SimRegionEntityHash *entry = sim->entity_hash + hash_idx;
@@ -254,7 +254,6 @@ Entity *create_new_entity(SimRegion *sim, vec2 p, Entity *src) {
 }
 
 void change_entity_position(SimRegion *sim, Entity *entity, vec2 p) {
-    TIMED_FUNCTION();
     i32 old_chunk_x, old_chunk_y;
     p_to_chunk_coord(entity->p, &old_chunk_x, &old_chunk_y);
     i32 new_chunk_x, new_chunk_y;

@@ -49,9 +49,9 @@ struct WorldState {
     EntityID camera_followed_entity;
     EntityID mouse_selected_entity;
     
-    Mat4x4 view;
-    Mat4x4 projection;
-    Mat4x4 mvp;
+    mat4x4 view;
+    mat4x4 projection;
+    mat4x4 mvp;
     vec3 cam_p;
     vec2 mouse_projection;
     

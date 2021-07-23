@@ -50,8 +50,8 @@ enum {
 };
 
 struct DebugMemoryOP {
-    struct MemoryBlock *block;
-    struct MemoryBlock *arena_lookup_block;
+    u32 block_hash;
+    u32 arena_lookup_block_hash;
     u32 offset_in_block;
     u32 allocated_size;
 };
@@ -161,22 +161,26 @@ struct DebugValueBlockHelper {
     }
 };
 
+// Used to pack pointer in u32
+#define DEBUG_HASH_PTR(_ptr) ((u32)(((u64)(_ptr) >> 32) ^ ((u64)(_ptr) & UINT32_MAX)))
+CT_ASSERT(DEBUG_HASH_PTR(0) == 0);
+
 // Arenas
 #define DEBUG_ARENA_NAME(_arena, _name) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_NAME, DEBUG_NAME(), _name);\
-event->mem_op.block = (_arena)->current_block; \
+event->mem_op.block_hash = DEBUG_HASH_PTR((_arena)->current_block); \
 } while(0);
 #define DEBUG_ARENA_SUPRESS(_arena) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_SUPRESS, DEBUG_NAME(), "Supress");\
-event->mem_op.block = (_arena)->current_block;\
+event->mem_op.block_hash = DEBUG_HASH_PTR((_arena)->current_block);\
 } while (0);
 
 #define DEBUG_ARENA_ALLOCATE(_debug_name, _block, _size, _block_offset) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_ALLOCATE, _debug_name, "Allocate");\
-event->mem_op.block = (_block); \
+event->mem_op.block_hash = DEBUG_HASH_PTR(_block); \
 event->mem_op.allocated_size = (_size); \
 event->mem_op.offset_in_block = (_block_offset);\
 } while(0);
@@ -184,23 +188,23 @@ event->mem_op.offset_in_block = (_block_offset);\
 #define DEBUG_ARENA_BLOCK_ALLOCATE(_debug_name, _block) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_ALLOCATE, _debug_name, "BlockAllocate");\
-event->mem_op.arena_lookup_block = (_block)->next;\
-event->mem_op.block = (_block);\
+event->mem_op.arena_lookup_block_hash = DEBUG_HASH_PTR((_block)->next);\
+event->mem_op.block_hash = DEBUG_HASH_PTR(_block);\
 event->mem_op.allocated_size = (_block)->size;\
 } while(0);
 
 #define DEBUG_ARENA_BLOCK_TRUNCATE(__debug_name, _block) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_TRUNCATE, __debug_name, "BlockTruncate");\
-event->mem_op.block = (_block);\
+event->mem_op.block_hash = DEBUG_HASH_PTR(_block);\
 event->mem_op.allocated_size = (_block)->used;\
 } while(0);
 
 #define DEBUG_ARENA_BLOCK_FREE(__debug_name, _block, _new_block) \
 do { \
 RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_FREE, __debug_name, "BlockFree");\
-event->mem_op.arena_lookup_block = (_block);\
-event->mem_op.block = (_new_block);\
+event->mem_op.arena_lookup_block_hash = DEBUG_HASH_PTR(_block);\
+event->mem_op.block_hash = DEBUG_HASH_PTR(_new_block);\
 } while(0);
 
 // Debug system is defined in that way that game itself has no access to it - everything has to go

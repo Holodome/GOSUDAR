@@ -400,6 +400,10 @@ void init_renderer_for_settings(Renderer *renderer, RendererSettings settings) {
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, mag_filter);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#if 0
+    glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_LOD_BIAS, 0);
+    glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
+#endif
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     
 #if 1
@@ -541,7 +545,7 @@ static void unbind_framebuffer_texture(Renderer *renderer, u32 idx) {
 
 static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = false) {
     bind_framebuffer(renderer, to, clear);
-    
+#if 1
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -556,6 +560,20 @@ static void blit_framebuffer(Renderer *renderer, u32 from, u32 to, bool clear = 
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
+#else 
+    // @TODO !!!
+    GLuint from_id = from == RENDERER_FRAMEBUFFER_MAIN ? 0 : renderer->framebuffer_ids[from];
+    GLuint to_id = to == RENDERER_FRAMEBUFFER_MAIN ? 0 : renderer->framebuffer_ids[to];
+    vec2 from_size = from == RENDERER_FRAMEBUFFER_MAIN ? renderer->settings.display_size : renderer->framebuffers[from].size;
+    vec2 to_size = to == RENDERER_FRAMEBUFFER_MAIN ? renderer->settings.display_size : renderer->framebuffers[to].size;
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, from_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, to_id);
+    glBlitFramebuffer(0, 0, from_size.x, from_size.y, 
+                      0, 0, to_size.y, to_size.y, 
+                      GL_COLOR_BUFFER_BIT,
+                      GL_NEAREST);
+    bind_framebuffer(renderer, to, false);
+#endif
 }
 
 void renderer_end_frame(Renderer *renderer, RendererCommands *commands) {

@@ -75,7 +75,7 @@ struct DebugArenaAllocation {
 };
 
 struct DebugArenaBlock {
-    uptr mem_address;
+    u32 hash;
     uptr size;
     
     DebugArenaAllocation *first_allocation;
@@ -176,13 +176,11 @@ static DebugValue *get_debug_value(DebugState *debug_state) {
     return value;
 }
 
-static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, MemoryBlock *block, b32 allow_creation = false) {
+static DebugArena *get_arena_by_lookup_block_hash(DebugState *debug_state, u32 hash, b32 allow_creation = false) {
     DebugArena *result = 0;
-    uptr lookup_address = UPTR_FROM_PTR(block);
-    
     LLIST_ITER(test, debug_state->first_arena) {
         assert(test->first_block);
-        if (test->first_block->mem_address == lookup_address) {
+        if (test->first_block->hash == hash) {
             result = test;
             break;
         }
@@ -207,9 +205,9 @@ static DebugArena *get_arena_by_lookup_block(DebugState *debug_state, MemoryBloc
 }
 
 static void debug_arena_set_name(DebugState *debug_state, DebugEvent *event) {
-    MemoryBlock *lookup_block = event->mem_op.block;
-    if (lookup_block) {
-        DebugArena *arena = get_arena_by_lookup_block(debug_state, lookup_block);
+    u32 lookup_hash = event->mem_op.block_hash;
+    if (lookup_hash) {
+        DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, lookup_hash);
         if (arena) {
             arena->name = event->name;
         }
@@ -218,10 +216,10 @@ static void debug_arena_set_name(DebugState *debug_state, DebugEvent *event) {
 
 static void debug_arena_allocate(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, op->block_hash);
     if (!arena->is_supressed) {
         DebugArenaBlock *block = arena->first_block;
-        assert(block->mem_address == UPTR_FROM_PTR(op->block));
+        assert(block->hash == op->block_hash);
         
         DebugArenaAllocation *allocation = debug_state->first_free_arena_allocation;
         if (!allocation) {
@@ -244,7 +242,7 @@ static void debug_arena_allocate(DebugState *debug_state, DebugEvent *event) {
 
 static void debug_arena_block_allocate(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->arena_lookup_block, true);
+    DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, op->arena_lookup_block_hash, true);
     if (!arena->is_supressed
 #if !MEM_DO_HARD_BOUNDS_CHECKING
         || true
@@ -260,12 +258,12 @@ static void debug_arena_block_allocate(DebugState *debug_state, DebugEvent *even
         
         block->first_allocation = 0;
         block->last_allocation = 0;
-        block->mem_address = UPTR_FROM_PTR(op->block);
+        block->hash = op->block_hash;
         block->size = op->allocated_size;
         
         LLIST_ADD(arena->first_block, block);
     } else {
-        arena->first_block->mem_address = UPTR_FROM_PTR(op->block);
+        arena->first_block->hash = op->block_hash;
     }
 }
 
@@ -286,9 +284,9 @@ static void remove_arena(DebugState *debug_state, DebugArena *arena) {
 
 static void debug_arena_block_truncate(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, op->block_hash);
     DebugArenaBlock *block = arena->first_block;
-    assert(block->mem_address == UPTR_FROM_PTR(op->block));
+    assert(block->hash == op->block_hash);
     
     DebugArenaAllocation *last_free = 0;
     DebugArenaAllocation *first_valid = block->first_allocation;
@@ -312,9 +310,9 @@ static void debug_arena_block_truncate(DebugState *debug_state, DebugEvent *even
 
 static void debug_arena_block_free(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->arena_lookup_block);
+    DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, op->arena_lookup_block_hash);
     DebugArenaBlock *free_block = arena->first_block;
-    assert(free_block->mem_address == UPTR_FROM_PTR(op->arena_lookup_block));
+    assert(free_block->hash == op->arena_lookup_block_hash);
     
     free_allocations(debug_state, free_block->first_allocation, free_block->last_allocation);
     
@@ -329,12 +327,12 @@ static void debug_arena_block_free(DebugState *debug_state, DebugEvent *event) {
             remove_arena(debug_state, arena);
         }
     } else {
-        arena->first_block->mem_address = UPTR_FROM_PTR(op->block);
+        arena->first_block->hash = op->block_hash;
     }
 }
 
 static void supress_arena(DebugState *debug_state, DebugEvent *event) {
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, event->mem_op.block);
+    DebugArena *arena = get_arena_by_lookup_block_hash(debug_state, event->mem_op.block_hash);
     arena->is_supressed = true;
 }
 

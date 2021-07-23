@@ -29,7 +29,7 @@ CT_ASSERT(IS_POW2(MEM_DEFAULT_ALIGNMENT));
 // @NOTE: DEBUG STUFF
 // Flag if all block allocations should have guarded pages around them
 #define MEM_DO_BOUNDS_CHECKING 0
-#define MEM_BOUNDS_CHECKING_POLICY MEM_ALLOC_UNDERFLOW_CHECK
+#define MEM_BOUNDS_CHECKING_POLICY MEM_ALLOC_OVERFLOW_CHECK
 // Flag if all allocations are done in separate blocks each of which is guarded
 // This is highly ineffective and it is even not certain that we will be able to do so 
 // with a lot of allocations because we could simply run out of memory
@@ -40,7 +40,7 @@ CT_ASSERT(IS_POW2(MEM_DEFAULT_ALIGNMENT));
 // flag and don't record hard bounds-checked allocation in debug system
 // We may want to switch having this as an option in contrast to global flag if running out of 
 // memory becomes a problem
-// But really without hard checks bounds checking makes no sence
+// But really without hard checks bounds checking makes little sence
 #define MEM_DO_HARD_BOUNDS_CHECKING_INTERNAL 1
 #define MEM_DO_HARD_BOUNDS_CHECKING (MEM_DO_HARD_BOUNDS_CHECKING_INTERNAL && MEM_DO_BOUNDS_CHECKING)
 CT_ASSERT((u32)MEM_DO_HARD_BOUNDS_CHECKING <= MEM_DO_BOUNDS_CHECKING);
@@ -64,8 +64,9 @@ CT_ASSERT((u32)TO_BOOL(MEM_BOUNDS_CHECKING_POLICY & MEM_ALLOC_OVERFLOW_CHECK) + 
 // different allocation functions are compiled and debug ones can capture source locations
 // to get call sites at debug display
 #if INTERNAL_BUILD
-#define DEBUG_MEM_PARAM const char *__debug_name,
-#define DEBUG_MEM_PASS __debug_name,
+#define DEBUG_MEM_PARAM_NAME __debug_name
+#define DEBUG_MEM_PARAM const char *DEBUG_MEM_PARAM_NAME,
+#define DEBUG_MEM_PASS DEBUG_MEM_PARAM_NAME,
 #define DEBUG_MEM_LOC DEBUG_NAME(),
 #else 
 #define DEBUG_MEM_PARAM
@@ -145,7 +146,7 @@ void *alloc_(DEBUG_MEM_PARAM MemoryArena *arena, uptr size_init) {
             MemoryBlock *new_block = os_alloc_block(block_size);
             new_block->next = arena->current_block;
             arena->current_block = new_block;
-            DEBUG_ARENA_BLOCK_ALLOCATE(__debug_name, new_block);
+            DEBUG_ARENA_BLOCK_ALLOCATE(DEBUG_MEM_PARAM_NAME, new_block);
         }
         
         assert(arena->current_block->used + size <= arena->current_block->size);
@@ -160,7 +161,7 @@ void *alloc_(DEBUG_MEM_PARAM MemoryArena *arena, uptr size_init) {
 #if !MEM_NO_MEMZERO
         memset(result, 0, size_init);
 #endif 
-        DEBUG_ARENA_ALLOCATE(__debug_name, arena->current_block, size, block_offset);
+        DEBUG_ARENA_ALLOCATE(DEBUG_MEM_PARAM_NAME, arena->current_block, size, block_offset);
     }
     return result;
 }
@@ -179,7 +180,7 @@ inline void *bootstrap_alloc_(DEBUG_MEM_PARAM uptr size, uptr arena_offset) {
 
 inline void free_last_block_(DEBUG_MEM_PARAM MemoryArena *arena) {
     MemoryBlock *block = arena->current_block;
-    DEBUG_ARENA_BLOCK_FREE(__debug_name, block, block->next);
+    DEBUG_ARENA_BLOCK_FREE(DEBUG_MEM_PARAM_NAME, block, block->next);
     arena->current_block = block->next;
     os_free(block);
 }
@@ -226,7 +227,7 @@ inline void end_temp_memory_(DEBUG_MEM_PARAM TempMemory mem) {
         memset(mem.arena->current_block->base + mem.block_used, 0, mem.arena->current_block->used - mem.block_used);
 #endif 
         mem.arena->current_block->used = mem.block_used;
-        DEBUG_ARENA_BLOCK_TRUNCATE(__debug_name, mem.arena->current_block);
+        DEBUG_ARENA_BLOCK_TRUNCATE(DEBUG_MEM_PARAM_NAME, mem.arena->current_block);
     }
 }
 

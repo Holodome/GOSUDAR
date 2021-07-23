@@ -44,6 +44,7 @@ typedef uintptr_t uptr;
 #define SQ(_a) ((_a) * (_a))
 #define ADD_MODULO(_a, _b, _modulo) (((_a) + (_b)) % _modulo)
 #define INC_MODULO(_a, _modulo) ADD_MODULO(_a, 1, _modulo)
+#define SAFE_RATIO(_a, _b) ((_b != 0) ? ((_a) / (_b)) : 0)
 
 #define BYTES(_n) ((uptr)_n)
 #define KILOBYTES(_n) (BYTES(_n) << 10) 

@@ -117,8 +117,36 @@ struct DebugState {
     DebugValueBlock *global_value_block;
     
     u64 total_frame_count;
+    bool memory_fragmentation_detailed;
     
     DevUI dev_ui;
+};
+
+struct DebugMemoryArenaBlockInfo {
+    u32 idx;
+    u32 allocation_count;
+    u32 size;
+    u32 used;
+    DebugMemoryArenaBlockInfo *next;
+};
+
+struct DebugMemoryArenaInfo {
+    DebugArena *arena;
+    const char *name;
+    u32 blocks_count;
+    u32 total_size;
+    u32 allocation_count;
+    
+    DebugMemoryArenaBlockInfo *first_block;
+};
+
+struct DebugMemoryCallsiteInfo {
+    DebugArena *arena;
+    const char *debug_name;
+    u32 allocation_count;
+    u64 total_allocated;
+    
+    DebugMemoryCallsiteInfo *next;
 };
 
 DebugTable *debug_table;
@@ -577,24 +605,151 @@ static void display_profiler(DevUILayout *dev_ui, DebugState *debug_state) {
 }
 
 static void display_memory(DevUILayout *dev_ui, DebugState *debug_state) {
-    dev_ui_begin_sizeable(dev_ui, "MemoryDisp");
-    u64 total_memory = 0;
+#define DEBUG_MEMORY_CALLSITES_HASH_SIZE 128
+    CT_ASSERT(IS_POW2(DEBUG_MEMORY_CALLSITES_HASH_SIZE));
+    
+    TempMemory temp = begin_temp_memory(&debug_state->arena);
+    u32 arena_count = 0;
     LLIST_ITER(arena, debug_state->first_arena) {
-        u32 blocks_count = 0;
-        uptr total_size = 0;
-        LLIST_ITER(block, arena->first_block) {
-            ++blocks_count;
-            total_size += block->size;
-        } 
-        dev_ui_labelf(dev_ui, "Arena %20s: %3ub %3llumb", arena->name, blocks_count, total_size >> 20);
-        
-        total_memory += total_size;
-        
+        ++arena_count;
     }
-    dev_ui_labelf(dev_ui, "Debug table size: %llumb", sizeof(DebugTable) >> 20);
-    total_memory += sizeof(DebugTable);
-    dev_ui_labelf(dev_ui, "Total: %llumb", total_memory >> 20);
-    dev_ui_end_sizeable(dev_ui);
+    
+    DebugMemoryCallsiteInfo **callsite_hash = alloc_arr(temp.arena, DEBUG_MEMORY_CALLSITES_HASH_SIZE, DebugMemoryCallsiteInfo *);
+    DebugMemoryArenaInfo *arena_infos = alloc_arr(temp.arena, arena_count, DebugMemoryArenaInfo);
+    
+    u32 total_game_memory = sizeof(DebugTable);
+    u32 arena_cursor = 0;
+    LLIST_ITER(arena, debug_state->first_arena) {
+        DebugMemoryArenaInfo *arena_info = arena_infos + arena_cursor++;
+        
+        u32 arena_blocks_count = 0;
+        u32 arena_total_size = 0;
+        u32 arena_allocation_count = 0;
+        LLIST_ITER(block, arena->first_block) {
+            ++arena_blocks_count;
+            arena_total_size += block->size;
+            
+            u32 block_used = 0;
+            u32 block_allocation_count = 0;
+            LLIST_ITER(allocation, block->first_allocation) {
+                block_used += allocation->size;
+                ++block_allocation_count;
+                
+                u32 hash_mask = DEBUG_MEMORY_CALLSITES_HASH_SIZE - 1;
+                u32 hash_slot_idx = ((u32)(uptr)allocation->debug_name & hash_mask);
+                DebugMemoryCallsiteInfo *site = 0;
+                LLIST_ITER(test, callsite_hash[hash_slot_idx]) {
+                    if (test->arena == arena && 
+                        test->debug_name == allocation->debug_name) {
+                        site = test;
+                        break;
+                    }
+                }
+                
+                if (!site) {
+                    site = alloc_struct(temp.arena, DebugMemoryCallsiteInfo);
+                    site->arena = arena;
+                    site->debug_name = allocation->debug_name;
+                    LLIST_ADD(callsite_hash[hash_slot_idx], site);
+                }
+                
+                site->allocation_count += 1;
+                site->total_allocated += allocation->size;
+            }
+            arena_allocation_count += block_allocation_count;
+            
+            DebugMemoryArenaBlockInfo *block_info = alloc_struct(temp.arena, DebugMemoryArenaBlockInfo);
+            block_info->idx = arena_blocks_count - 1;
+            block_info->allocation_count = block_allocation_count;
+            block_info->size = block->size;
+            block_info->used = block_used;
+            LLIST_ADD(arena_info->first_block, block_info);
+        } 
+        total_game_memory += arena_total_size;
+        
+        arena_info->arena = arena;
+        arena_info->name = arena->name;
+        arena_info->blocks_count = arena_blocks_count;
+        arena_info->total_size = arena_total_size;
+        arena_info->allocation_count = arena_allocation_count;
+    }
+    
+    if (dev_ui_section(dev_ui, "Overview")) {
+        dev_ui_begin_sizeable(dev_ui, "OverviewDisp");
+        for (u32 i = 0; i < arena_count; ++i) {
+            DebugMemoryArenaInfo *arena_info = arena_infos + i;
+            dev_ui_labelf(dev_ui, "%-15s %4umb(%5.2f%%) %4ub %4ua", 
+                          arena_info->name,
+                          arena_info->total_size >> 20,
+                          (f32)arena_info->total_size / total_game_memory * 100,
+                          arena_info->blocks_count,
+                          arena_info->allocation_count);
+        }
+        dev_ui_labelf(dev_ui, "Debug table size: %llumb(%.2f%%)", 
+                      sizeof(DebugTable) >> 20,
+                      (f32)sizeof(DebugTable) / total_game_memory * 100);
+        dev_ui_labelf(dev_ui, "Total: %llumb", total_game_memory >> 20);
+        dev_ui_end_sizeable(dev_ui);
+        dev_ui_end_section(dev_ui);
+    }
+    if (dev_ui_section(dev_ui, "Call sites")) {
+        dev_ui_begin_sizeable(dev_ui, "CallsiteDisp");
+        for (u32 i = 0; i < arena_count; ++i) {
+            DebugMemoryArenaInfo *arena_info = arena_infos + i;
+            dev_ui_labelf(dev_ui, "%15s", arena_info->name);
+            for (u32 hash_slot_idx = 0;
+                 hash_slot_idx < DEBUG_MEMORY_CALLSITES_HASH_SIZE;
+                 ++hash_slot_idx) {
+                LLIST_ITER(callsite, callsite_hash[hash_slot_idx]) {
+                    if (callsite->arena == arena_info->arena) {
+                        dev_ui_labelf(dev_ui, " %4umb(%5.2f%%) %4ua %-s",
+                                      callsite->total_allocated >> 20,
+                                      (f32)callsite->total_allocated / total_game_memory * 100,
+                                      callsite->allocation_count,
+                                      callsite->debug_name);
+                    }
+                }
+            }
+        }
+        dev_ui_end_sizeable(dev_ui);
+        dev_ui_end_section(dev_ui);
+    }
+    if (dev_ui_section(dev_ui, "Fragmentation")) {
+        dev_ui_checkbox(dev_ui, "Detailed", &debug_state->memory_fragmentation_detailed);
+        dev_ui_begin_sizeable(dev_ui, "FragmentationDisp");
+        for (u32 i = 0; i < arena_count; ++i) {
+            DebugMemoryArenaInfo *arena_info = arena_infos + i;
+            u32 arena_total_used = 0;
+            u32 arena_commited_used = 0;
+            u32 arena_commited_size = 0;
+            LLIST_ITER(block, arena_info->first_block) {
+                arena_total_used += block->used;
+                if (block->next) {
+                    arena_commited_used += block->used;
+                    arena_commited_size += block->size;
+                }
+            }
+            dev_ui_labelf(dev_ui, "%15s %4u/%-4umb(%5.2f%% total %5.2f%% commited)", 
+                          arena_info->name,
+                          arena_total_used >> 20, 
+                          arena_info->total_size >> 20,
+                          (f32)arena_total_used / arena_info->total_size * 100,
+                          SAFE_RATIO((f32)arena_commited_used, arena_commited_size) * 100);
+            if (debug_state->memory_fragmentation_detailed) {
+                LLIST_ITER(block, arena_info->first_block) {
+                    dev_ui_labelf(dev_ui, "  %2u %8u/%-8ukb(%5.2f%%) %4ua",
+                                  block->idx,
+                                  block->used >> 10, block->size >> 10,
+                                  (f32)block->used / block->size * 100,
+                                  block->allocation_count);
+                }
+            }
+        }
+        dev_ui_end_sizeable(dev_ui);
+        dev_ui_end_section(dev_ui);
+    }
+    
+    end_temp_memory(temp);
 }
 
 void DEBUG_update(DebugState *debug_state, GameLinks links) {

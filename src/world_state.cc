@@ -1,6 +1,5 @@
 #include "world_state.hh"
 
-
 inline WorldObjectSpec get_spec_for_type(WorldState *world_state, u32 type) {
     assert(type < WORLD_OBJECT_KIND_SENTINEL);
     return world_state->world_object_specs[type];

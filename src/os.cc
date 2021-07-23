@@ -107,7 +107,7 @@ static void set_pixel_format(OS *os, HDC hdc) {
 			WGL_COLOR_BITS_ARB,					32,
 			WGL_DEPTH_BITS_ARB,					24,
 			WGL_ALPHA_BITS_ARB,					8,
-            WGL_SAMPLES_ARB, 4,
+            //WGL_SAMPLES_ARB, 4,
 			WGL_SAMPLE_BUFFERS_ARB,				true,
 			0
         };
@@ -764,6 +764,7 @@ void os_free(void *ptr) {
     }
 }
 
+#if INTERNAL_BUILD
 uptr outf(const char *format, ...) {
     va_list args;
     va_start(args, format);
@@ -773,32 +774,52 @@ uptr outf(const char *format, ...) {
     va_end(args);
     return len;
 }
+#endif
 
 MemoryBlock *os_alloc_block(uptr size, u32 flags) {
     uptr page_size = 4096;
-    uptr total_size = size + sizeof(MemoryBlock);
-    uptr base_offset = sizeof(MemoryBlock);
+    // @NOTE: size must account for alignment, so when 
+    uptr request_size = align_forward_pow2(size + sizeof(MemoryBlock), MEM_DEFAULT_ALIGNMENT);
+    uptr request_size_page_aligned = align_forward_pow2(request_size, page_size);
+    
+    uptr total_size;
+    uptr usable_size;
+    uptr base_offset;
     uptr protect_offset = 0;
-    if (flags & OS_BLOCK_ALLOC_UNDERFLOW_CHECK) {
-        total_size = size + 2 * page_size;
+    if (flags & MEM_ALLOC_OVERFLOW_CHECK) {
+        // Padded memory
+        // Requested memory aligned 
+        // Protected page
+        total_size = request_size_page_aligned + page_size;
+        usable_size = size;
+        base_offset = align_backward_pow2(request_size_page_aligned - size, MEM_DEFAULT_ALIGNMENT);
+        protect_offset = request_size_page_aligned;
+    } else if (flags & MEM_ALLOC_UNDERFLOW_CHECK) {
+        // Page 1: MemoryBlock
+        // Page 2: Protected
+        // Pages 2+: Memory
+        // @NOTE this layout is so verbose because memory block should be in head of everything
+        total_size = request_size_page_aligned + 2 * page_size;
+        usable_size = request_size_page_aligned;
         base_offset = 2 * page_size;
         protect_offset = page_size;
+    } else {
+        total_size = request_size_page_aligned;
+        usable_size = total_size - sizeof(MemoryBlock);
+        base_offset = sizeof(MemoryBlock);
     }
-    if (flags & OS_BLOCK_ALLOC_OVERFLOW_CHECK) {
-        uptr size_round_up = align_forward(size, page_size);
-        total_size = size_round_up + 2 * page_size;
-        base_offset = page_size + size_round_up - size;
-        protect_offset = page_size + size_round_up;
-    }
+    assert(usable_size >= size);
+    assert((total_size & (page_size - 1)) == 0);
     
-    MemoryBlock *block = (MemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    assert(block);
-    block->size = size;
-    block->base = (u8 *)(block + 1);
+    LPVOID memory = VirtualAlloc(0, total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    assert(memory);
     
-    if (flags & OS_BLOCK_ALLOC_BOUNDS_CHECK) {
+    MemoryBlock *block = (MemoryBlock *)memory;
+    block->size = usable_size;
+    block->base = (u8 *)memory + base_offset;
+    if (flags & (MEM_ALLOC_OVERFLOW_CHECK | MEM_ALLOC_UNDERFLOW_CHECK)) {
         DWORD old_protect = 0;
-        BOOL is_valid = VirtualProtect((u8 *)block + protect_offset, page_size, PAGE_NOACCESS, &old_protect);
+        BOOL is_valid = VirtualProtect((u8 *)memory + protect_offset, page_size, PAGE_NOACCESS, &old_protect);
         assert(is_valid);
     }
     

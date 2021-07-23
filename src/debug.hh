@@ -189,17 +189,18 @@ event->mem_op.block = (_block);\
 event->mem_op.allocated_size = (_block)->size;\
 } while(0);
 
-#define DEBUG_ARENA_BLOCK_TRUNCATE(_block) \
+#define DEBUG_ARENA_BLOCK_TRUNCATE(__debug_name, _block) \
 do { \
-RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_TRUNCATE, DEBUG_NAME(), "BlockTruncate");\
+RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_TRUNCATE, __debug_name, "BlockTruncate");\
 event->mem_op.block = (_block);\
 event->mem_op.allocated_size = (_block)->used;\
 } while(0);
 
-#define DEBUG_ARENA_BLOCK_FREE(_block) \
+#define DEBUG_ARENA_BLOCK_FREE(__debug_name, _block, _new_block) \
 do { \
-RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_FREE, DEBUG_NAME(), "BlockFree");\
-event->mem_op.block = (_block);\
+RECORD_DEBUG_EVENT_INTERNAL(DEBUG_EVENT_ARENA_BLOCK_FREE, __debug_name, "BlockFree");\
+event->mem_op.arena_lookup_block = (_block);\
+event->mem_op.block = (_new_block);\
 } while(0);
 
 // Debug system is defined in that way that game itself has no access to it - everything has to go

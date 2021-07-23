@@ -5,6 +5,9 @@
 #define BUILD_WITHOUT_CRT 0
 #endif 
 
+// Build dedicated to debugging.
+// Allows error messages, enables debug system 
+// This has nothing to do with build optimizations
 #ifndef INTERNAL_BUILD
 #define INTERNAL_BUILD 1
 #endif
@@ -160,7 +163,11 @@ extern f32 F32_INFINITY;
 #define vsnprintf stbsp_vsnprintf
 #endif 
 
+#if INTERNAL_BUILD
 uptr outf(const char *format, ...);
+#else 
+#define outf(...)
+#endif 
 
 #define GENERAL_H 1
 #endif

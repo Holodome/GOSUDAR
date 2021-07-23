@@ -5,22 +5,59 @@
 
 #include "debug.hh"
 
-#define DEFUALT_ARENA_BLOCK_SIZE (1024 * 1024)
-#define DEFAULT_ALIGNMENT (2 * sizeof(uptr))
-// @TODO since all os allocation functions return memory all set to zero,
+#define MEM_ALLOC_UNDERFLOW_CHECK 0x1
+#define MEM_ALLOC_OVERFLOW_CHECK  0x2
+
+// @NOTE: current memory system allows dynamically created and growing arenas
+// Other option is to preallocate memory for whole game and allocate from it 
+// selectively using subarens (for example let game use 8G, 4G be assets, 2G game world etc.)
+// This is actually way more faster and effective and dynamic arenas
+// Dynamic arenas have some problems like memory fragmentation, but allow not to care about arena sizes
+// and tweak only default size
+// In end of development we may want to switch to preallocating memory for whole game to be more
+// effective and fast and let user specify amounth of memory that game can allocate
+// @NOTE: Also using individual arenas can help catch memory access bugs, like overflow or underflow
+#define MEM_DEFUALT_ARENA_BLOCK_SIZE (1024 * 1024)
+#define MEM_DEFAULT_ALIGNMENT (2 * sizeof(uptr))
+CT_ASSERT(IS_POW2(MEM_DEFAULT_ALIGNMENT));
+#define MEM_DEFAULT_ALLOC_FLAGS 0
+// @NOTE since all os allocation functions return memory all set to zero,
 // we can try to avoid having need to memset it and only do that in cases 
 // where we recycle memory - like in temp memory
 // Lets see if this approach works
 #define MEM_NO_MEMZERO 1
-// For getting sizes of blocks
-// Since we use virutall memory allocations, we must take care of possible fragmentation
-// All virual allocation are done in whole pages, each of which are 4KB in most cases 
-// (we probable won't even take care of corner ones). So in order not to waste virtual memory
-// we align all block sizes on page size
-// If we don't do this step some memory will be unracted at all - for example
-// we allocate 2048 bytes and game thinks that returned block size equals 2048, while in reality
-// whole page is allocated and other 2048 bytes are totally wasted
-#define MEM_BLOCK_ALIGN 4096
+// @NOTE: DEBUG STUFF
+// Flag if all block allocations should have guarded pages around them
+#define MEM_DO_BOUNDS_CHECKING 0
+#define MEM_BOUNDS_CHECKING_POLICY MEM_ALLOC_UNDERFLOW_CHECK
+// Flag if all allocations are done in separate blocks each of which is guarded
+// This is highly ineffective and it is even not certain that we will be able to do so 
+// with a lot of allocations because we could simply run out of memory
+// Basically only this option enables us to do full bounds check, because bounds only for blocks
+// may not be able to catch a lot of memory access errors within blocks, and even allow overflows
+// up to alignment size
+// @TODO: there is a way to reliably do hard bounds checking selectively if we pass this down as a 
+// flag and don't record hard bounds-checked allocation in debug system
+// We may want to switch having this as an option in contrast to global flag if running out of 
+// memory becomes a problem
+// But really without hard checks bounds checking makes no sence
+#define MEM_DO_HARD_BOUNDS_CHECKING_INTERNAL 1
+#define MEM_DO_HARD_BOUNDS_CHECKING (MEM_DO_HARD_BOUNDS_CHECKING_INTERNAL && MEM_DO_BOUNDS_CHECKING)
+CT_ASSERT((u32)MEM_DO_HARD_BOUNDS_CHECKING <= MEM_DO_BOUNDS_CHECKING);
+
+#if MEM_DO_BOUNDS_CHECKING
+// @NOTE: There is no way to do both overflow and underflow check simulateously due
+// to page size limitations.
+// We don't raise errors in platform layer but do it here
+CT_ASSERT((u32)TO_BOOL(MEM_BOUNDS_CHECKING_POLICY & MEM_ALLOC_OVERFLOW_CHECK) + (u32)TO_BOOL(MEM_BOUNDS_CHECKING_POLICY & MEM_ALLOC_UNDERFLOW_CHECK) == 1);
+#undef MEM_DEFAULT_ALLOC_FLAGS
+#define MEM_DEFAULT_ALLOC_FLAGS MEM_BOUNDS_CHECKING_POLICY
+#endif 
+
+#if MEM_DO_HARD_BOUNDS_CHECKING
+#undef MEM_DEFAULT_ALIGNMENT
+#define MEM_DEFAULT_ALIGNMENT 1
+#endif 
 
 // Things used to track memory allocations
 // Basically depending on type of build (debug enalbed or disabled)
@@ -36,13 +73,6 @@
 #define DEBUG_MEM_LOC
 #endif 
 
-enum {
-    OS_BLOCK_ALLOC_OVERFLOW_CHECK = 0x1,
-    OS_BLOCK_ALLOC_UNDERFLOW_CHECK = 0x2,
-    
-    OS_BLOCK_ALLOC_BOUNDS_CHECK = OS_BLOCK_ALLOC_UNDERFLOW_CHECK | OS_BLOCK_ALLOC_OVERFLOW_CHECK,
-};
-
 struct MemoryBlock {
     u64 size;
     u64 used;
@@ -51,10 +81,13 @@ struct MemoryBlock {
 };
 
 // @NOTE: Forward-declare this to OS layer
-
-//#define DEFUAL_ALLOC_FLAGS OS_BLOCK_ALLOC_BOUNDS_CHECK
-#define DEFUAL_ALLOC_FLAGS OS_BLOCK_ALLOC_OVERFLOW_CHECK
-MemoryBlock *os_alloc_block(uptr size, u32 flags = DEFUAL_ALLOC_FLAGS);
+// Request to os to get memory block. Size of returned memory block can be greater than requested size
+// Returned block memory is aligned on MEM_DEFAULT_ALIGNMENT
+// If underflow/overflow checking is specified, regions guarding returned blocks are protected
+// and access violation error is raised when they are touched.
+// Protected region can start at most after MEM_DEFAULT_ALIGNMENT - 1 bytes after block end
+// Returned block can be freed with os_free call
+MemoryBlock *os_alloc_block(uptr size, u32 flags = MEM_DEFAULT_ALLOC_FLAGS);
 void os_free(void *ptr);
 
 struct MemoryArena {
@@ -75,7 +108,7 @@ inline uptr get_alignment_offset(MemoryArena *arena, uptr align) {
 }
 
 inline uptr get_effective_size(MemoryArena *arena, uptr size_init) {
-    return size_init + get_alignment_offset(arena, DEFAULT_ALIGNMENT);
+    return size_init + get_alignment_offset(arena, MEM_DEFAULT_ALIGNMENT);
 }
 
 #define alloc_struct(_arena, _type, ...) \
@@ -99,18 +132,14 @@ void *alloc_(DEBUG_MEM_PARAM MemoryArena *arena, uptr size_init) {
             (arena->current_block->used + size > arena->current_block->size)) {
             size = size_init;
             if (!arena->minimum_block_size) {
-                arena->minimum_block_size = DEFUALT_ARENA_BLOCK_SIZE;
+                arena->minimum_block_size = MEM_DEFUALT_ARENA_BLOCK_SIZE;
             }
             
-            uptr block_size = arena->minimum_block_size;
-            if (size > block_size) {
-                block_size = size;
+            uptr block_size = size;
+#if !MEM_DO_HARD_BOUNDS_CHECKING
+            if (arena->minimum_block_size > block_size) {
+                block_size = arena->minimum_block_size;
             }
-            // @TODO fix fragmentation problem
-#if 0
-            // @TODO this is kinda an implementation detail and shouldn't be accounted for here
-            block_size += sizeof(MemoryBlock);
-            block_size = align_forward(block_size, MEM_BLOCK_ALIGN);
 #endif 
             
             MemoryBlock *new_block = os_alloc_block(block_size);
@@ -121,10 +150,11 @@ void *alloc_(DEBUG_MEM_PARAM MemoryArena *arena, uptr size_init) {
         
         assert(arena->current_block->used + size <= arena->current_block->size);
         
-        uptr align_offset = get_alignment_offset(arena, 16);
+        uptr align_offset = get_alignment_offset(arena, MEM_DEFAULT_ALIGNMENT);
         uptr block_offset = arena->current_block->used + align_offset;
         result = arena->current_block->base + block_offset;
         arena->current_block->used += size;
+        assert(block_offset + size <= arena->current_block->size);
         
         assert(size >= size_init);
 #if !MEM_NO_MEMZERO
@@ -147,18 +177,19 @@ inline void *bootstrap_alloc_(DEBUG_MEM_PARAM uptr size, uptr arena_offset) {
     return struct_ptr;
 }
 
-inline void free_last_block(MemoryArena *arena) {
+inline void free_last_block_(DEBUG_MEM_PARAM MemoryArena *arena) {
     MemoryBlock *block = arena->current_block;
-    DEBUG_ARENA_BLOCK_FREE(block);
+    DEBUG_ARENA_BLOCK_FREE(__debug_name, block, block->next);
     arena->current_block = block->next;
     os_free(block);
 }
 
-void arena_clear(MemoryArena *arena) {
+#define arena_clear(_arena) arena_clear_(DEBUG_MEM_LOC _arena)
+void arena_clear_(DEBUG_MEM_PARAM MemoryArena *arena) {
     while (arena->current_block) {
         // @NOTE: In case arena itself is stored in last block
         b32 is_last_block = (arena->current_block->next == 0);
-        free_last_block(arena);
+        free_last_block_(DEBUG_MEM_PASS arena);
         if (is_last_block) {
             break;
         }
@@ -180,12 +211,13 @@ inline TempMemory begin_temp_memory(MemoryArena *arena) {
     return result;
 }
 
-inline void end_temp_memory(TempMemory mem) {
+#define end_temp_memory(_mem) end_temp_memory_(DEBUG_MEM_LOC _mem)
+inline void end_temp_memory_(DEBUG_MEM_PARAM TempMemory mem) {
     assert(mem.arena->temp_count);
     --mem.arena->temp_count;
     
     while (mem.arena->current_block != mem.block) {
-        free_last_block(mem.arena);
+        free_last_block_(DEBUG_MEM_PASS mem.arena);
     }
     
     if (mem.arena->current_block) {
@@ -194,7 +226,7 @@ inline void end_temp_memory(TempMemory mem) {
         memset(mem.arena->current_block->base + mem.block_used, 0, mem.arena->current_block->used - mem.block_used);
 #endif 
         mem.arena->current_block->used = mem.block_used;
-        DEBUG_ARENA_BLOCK_TRUNCATE(mem.arena->current_block);
+        DEBUG_ARENA_BLOCK_TRUNCATE(__debug_name, mem.arena->current_block);
     }
 }
 

@@ -217,20 +217,28 @@ static void debug_arena_allocate(DebugState *debug_state, DebugEvent *event) {
 static void debug_arena_block_allocate(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
     DebugArena *arena = get_arena_by_lookup_block(debug_state, op->arena_lookup_block, true);
-    DebugArenaBlock *block = debug_state->first_free_arena_block;
-    if (!block) {
-        ++debug_state->arena_blocks_allocated;
-        block = alloc_struct(&debug_state->arena, DebugArenaBlock);
+    if (!arena->is_supressed
+#if !MEM_DO_HARD_BOUNDS_CHECKING
+        || true
+#endif
+        ) {
+        DebugArenaBlock *block = debug_state->first_free_arena_block;
+        if (!block) {
+            ++debug_state->arena_blocks_allocated;
+            block = alloc_struct(&debug_state->arena, DebugArenaBlock);
+        } else {
+            LLIST_POP(debug_state->first_free_arena_block);
+        }
+        
+        block->first_allocation = 0;
+        block->last_allocation = 0;
+        block->mem_address = UPTR_FROM_PTR(op->block);
+        block->size = op->allocated_size;
+        
+        LLIST_ADD(arena->first_block, block);
     } else {
-        LLIST_POP(debug_state->first_free_arena_block);
+        arena->first_block->mem_address = UPTR_FROM_PTR(op->block);
     }
-    
-    block->first_allocation = 0;
-    block->last_allocation = 0;
-    block->mem_address = UPTR_FROM_PTR(op->block);
-    block->size = op->allocated_size;
-    
-    LLIST_ADD(arena->first_block, block);
 }
 
 static void free_allocations(DebugState *debug_state, DebugArenaAllocation *first, DebugArenaAllocation *last) {
@@ -276,16 +284,24 @@ static void debug_arena_block_truncate(DebugState *debug_state, DebugEvent *even
 
 static void debug_arena_block_free(DebugState *debug_state, DebugEvent *event) {
     DebugMemoryOP *op = &event->mem_op;
-    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->block);
+    DebugArena *arena = get_arena_by_lookup_block(debug_state, op->arena_lookup_block);
     DebugArenaBlock *free_block = arena->first_block;
-    assert(free_block->mem_address == UPTR_FROM_PTR(op->block));
+    assert(free_block->mem_address == UPTR_FROM_PTR(op->arena_lookup_block));
     
     free_allocations(debug_state, free_block->first_allocation, free_block->last_allocation);
     
-    LLIST_POP(arena->first_block);
-    LLIST_ADD(debug_state->first_free_arena_block, free_block);
-    if (arena->first_block == 0) {
-        remove_arena(debug_state, arena);
+    if (!arena->is_supressed
+#if !MEM_DO_HARD_BOUNDS_CHECKING
+        || true
+#endif
+        ) {
+        LLIST_POP(arena->first_block);
+        LLIST_ADD(debug_state->first_free_arena_block, free_block);
+        if (arena->first_block == 0) {
+            remove_arena(debug_state, arena);
+        }
+    } else {
+        arena->first_block->mem_address = UPTR_FROM_PTR(op->block);
     }
 }
 

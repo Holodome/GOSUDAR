@@ -348,7 +348,7 @@ void begin_sim(SimRegion *sim, MemoryArena *arena, World *world,
     
     u32 chunk_count = get_chunk_count_for_radius(chunk_radius);
 #define MAX_ENTITIES_PER_CHUNK 512
-    sim->max_entity_count = align_forward_pow2(chunk_count * MAX_ENTITIES_PER_CHUNK);
+    sim->max_entity_count = align_to_next_pow2(chunk_count * MAX_ENTITIES_PER_CHUNK);
     sim->entity_count = 0;
     sim->chunks = alloc_arr(arena, chunk_count, SimRegionChunk);
     sim->entities = alloc_arr(arena, sim->max_entity_count, Entity);

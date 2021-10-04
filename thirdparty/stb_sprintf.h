@@ -404,7 +404,7 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
          for (;;) {
             // Check if the next 4 bytes contain %(0x25) or end of string.
             // Using the 'hasless' trick:
-            // https://graphics.stanford.edu/~seander/bithacks.hhtml#HasLessInWord
+            // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
             stbsp__uint32 v, c;
             v = *(stbsp__uint32 *)f;
             c = (~v) & 0x80808080;

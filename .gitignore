@@ -266,9 +266,9 @@ AutoTest.Net/
 DocProject/buildhelp/
 DocProject/Help/*.HxT
 DocProject/Help/*.HxC
-DocProject/Help/*.hhc
-DocProject/Help/*.hhk
-DocProject/Help/*.hhp
+DocProject/Help/*.hc
+DocProject/Help/*.hk
+DocProject/Help/*.hp
 DocProject/Help/Html2
 DocProject/Help/html
 

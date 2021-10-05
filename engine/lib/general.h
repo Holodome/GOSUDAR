@@ -86,7 +86,7 @@ typedef float f32;
 typedef double f64;
 #ifndef __cplusplus
 #ifndef bool
-typedef u8 bool;
+typedef _Bool bool;
 #endif // bool 
 #define true 1
 #define false 0
@@ -97,8 +97,8 @@ typedef u8 bool;
 #define ARRAY_SIZE(_a) ((uptr)(sizeof(_a) / sizeof(*(_a))))
 
 #ifndef __cplusplus
-#define CT_ASSERT(_expr) char __ctassert ## __LINE__ [!!(_expr)]
-// #define CT_ASSERT(_expr) _Static_assert(_expr, "Assertion " #_expr " failed")
+// #define CT_ASSERT(_expr) char __ctassert ## __LINE__ [!!(_expr)]
+#define CT_ASSERT(_expr) _Static_assert(_expr, "Assertion " #_expr " failed")
 #else 
 #define CT_ASSERT(_expr) static_assert(_expr, "Assertion " #_expr " failed")
 #endif 

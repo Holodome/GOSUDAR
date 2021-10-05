@@ -43,10 +43,15 @@ Otherwise there should be two platform APIs: One for game layer, other for platf
 typedef struct {
     void *game_data; 
     
+    char *executable_folder;
+    
     struct Logging_State *logging_state;
     struct FS_Ctx *filesystem;
     Window_State win_state;
 } Engine_Ctx;
+
+uptr engine_ctx_fmt_local_filepath(char *bf, uptr bf_sz, 
+    Engine_Ctx *ctx, const char *local_path);
 
 #define GAME_UPDATE_SIGNATURE(_name) bool _name(Engine_Ctx *ctx)
 typedef GAME_UPDATE_SIGNATURE(Game_Update_Func);
@@ -55,6 +60,5 @@ typedef struct {
     Game_Update_Func *update;
 } Game_Module_Functions;
 
-const char *GAME_MODULE_FUNCTION_NAMES[] = {
-    "game_update"
-};
+extern const char *GAME_MODULE_FUNCTION_NAMES[];
+extern const uptr GAME_MODULE_FUNCTIONS_COUNT;

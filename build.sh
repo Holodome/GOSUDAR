@@ -1,9 +1,9 @@
 #!/bin/sh
 mkdir -p build
 # get list of all .c files
-engine_filenames=$(find engine/ -type f -name "*.c" -o -name "*.c" -o -name "*.m")
-shared_filenames=$(find shared/ -type f -name "*.c" -o -name "*.c" -o -name "*.m")
-filenames="$engine_filenames $shared_filenames"
+engine_filenames=$(find engine/ -type f -name "*.c" -o -name "*.m")
+game_filenames="$(find game/ -type f -name "*.c" -o -name "*.m") $engine_filenames"
+filenames="$engine_filenames"
 echo Filenames: $filenames
 
 vulkan_path="/opt/homebrew/Cellar/molten-vk/1.1.5/include"
@@ -19,4 +19,4 @@ frameworks="-framework AppKit
 defines=""
 vulkan_lib="/opt/homebrew/Cellar/molten-vk/1.1.5/lib/libMoltenVK.a"
 clang -g $build_options $error_policy $frameworks $defines -o build/game $vulkan_lib $filenames
-#cp test.txt build/
+clang -g $build_options $error_policy $frameworks $defines -DCOMPILE_GAME -o build/game.dylib -dynamiclib $vulkan_lib $game_filenames

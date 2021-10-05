@@ -4,11 +4,29 @@
 #include "lib/memory.h"
 #include "lib/hashing.h"
 
+#include "logging.h"
+
 #include <sys/syslimits.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h> // strerror
+#include <copyfile.h> // copyfile
+#include <dlfcn.h> // dlopen, dlclose, dlsymb
+
+#define posix_dump_errno() \
+posix_dump_errno_(__FILE__, __LINE__)
+static void
+posix_dump_errno_(const char *filename, u32 line) {
+    int err_no = errno;
+    if (err_no) {
+        char *err_str = strerror(err_no);
+        log_debug("errno at %s:%u %u: %s",
+            filename, line,
+            err_no, err_str);    
+    }
+}
 
 void os_open_file(OS_File_Handle *handle, const char *filename, u32 mode) {
     handle->flags = 0;
@@ -221,20 +239,76 @@ os_poll_window_events(Window_State *state) {
 
 uptr 
 os_fmt_executable_path(char *bf, uptr bf_sz) {
-    uptr result = bf_sz;
-    if (_NSGetExecutablePath(bf, &result) != 0) {
-        result = 0;
-    }
+    uptr result = 0;
+    if (_NSGetExecutablePath(bf, &bf_sz) == 0) {
+        result = str_len(bf);
+    } 
     return result;
 }
 
 void 
 os_chdir(const char *dir) {
-    int result = chdir(dir);    
-    assert(result == 0);
+    int result = chdir(dir);   
+    UNUSED(result);
+    if (result != 0) {
+        posix_dump_errno();
+    } 
 }
 
 void 
 os_fmt_cwd(char *bf, uptr bf_sz) {
     getcwd(bf, bf_sz);    
+}
+
+File_Time 
+os_get_file_write_time(const char *filename) {
+    File_Time result = {0};
+    struct stat file_stat;
+    if (stat(filename, &file_stat) == 0) {
+        CT_ASSERT(sizeof(file_stat.st_mtimespec.tv_sec) <= sizeof(result.storage));
+        mem_copy(&result.storage, &file_stat.st_mtimespec.tv_sec, sizeof(file_stat.st_mtimespec.tv_sec));
+    }
+    return result;    
+}
+
+int 
+os_cmp_file_write_time(File_Time a, File_Time b) {
+    int result = 0;
+    if (a.storage < b.storage) {
+        result = -1;
+    } else if (a.storage > b.storage) {
+        result = 1;
+    }
+    return result;
+}
+
+bool 
+os_copy_file(const char *a, const char *b) {
+    int result = copyfile(a, b, 0, COPYFILE_ALL);
+    return result == 0;
+}
+
+void *
+os_load_dll(const char *dllname) {
+    void *result = dlopen(dllname, RTLD_LAZY | RTLD_GLOBAL);
+    return result;
+}
+
+void 
+os_unload_dll(void *dll) {
+    dlclose(dll);
+}
+
+void *
+os_dll_symb(void *dll, const char *symb) {
+    void *result = dlsym(dll, symb);
+    return result;
+}
+
+void 
+os_delete_file(const char *filename) {
+    int result = unlink(filename);
+    if (result != 0) {
+        posix_dump_errno();
+    }
 }

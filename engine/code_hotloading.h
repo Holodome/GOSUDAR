@@ -9,12 +9,14 @@ Version: 0
 
 #include "platform/os.h"
 
+struct Engine_Ctx;
+
 typedef struct {
     bool is_valid;
     u32 temp_dll_number;
     
-    char *const dll_path;
-    char *const lock_path;
+    const char *dll_path;
+    const char *lock_path;
     
     void *dll; 
     File_Time dll_write_time;
@@ -23,3 +25,6 @@ typedef struct {
     void **functions; 
     const char **function_names; 
 } Code_Hotloading_Module;
+
+void code_hotload(Code_Hotloading_Module *module);
+void code_hotload_unload(Code_Hotloading_Module *module);

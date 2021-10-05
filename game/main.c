@@ -7,6 +7,11 @@
 
 static Engine_Ctx ctx;
 
+const char *GAME_MODULE_FUNCTION_NAMES[] = {
+    "game_update"
+};
+const uptr GAME_MODULE_FUNCTIONS_COUNT = ARRAY_SIZE(GAME_MODULE_FUNCTION_NAMES);
+
 static void 
 init_ctx() {
     ctx.filesystem = create_filesystem();
@@ -37,7 +42,7 @@ static void
 init_game_hotloading(Game_Module_Functions *game_functions, Code_Hotloading_Module *module) {
     module->function_names = GAME_MODULE_FUNCTION_NAMES;
     module->function_count = GAME_MODULE_FUNCTIONS_COUNT;
-    module->functions = (void **)&game_functions;
+    module->functions = (void **)game_functions;
     char buffer[4096];
     engine_ctx_fmt_local_filepath(buffer, sizeof(buffer), 
         &ctx, "game.dylib");
@@ -52,6 +57,7 @@ init_game_hotloading(Game_Module_Functions *game_functions, Code_Hotloading_Modu
     code_hotload(module);
 }
 
+
 int main(void) {
     init_ctx();
     
@@ -65,9 +71,14 @@ int main(void) {
     
     for (;;) {
         os_poll_window_events(&ctx.win_state);
-        if (ctx.win_state.is_quit_requested) {
+        bool should_end = false;
+        if (game_module.is_valid) {
+            should_end = game_functions.update(&ctx);
+        }
+        if (should_end) {
             break;
         }
+        code_hotload_update(&game_module);
     }
         
     return 0;

@@ -1,7 +1,7 @@
 #include "strings.h"
 
 #include "memory.h"
-// #include "stream.h"
+#include "stream.h"
 
 #include <stdlib.h>
 #define STB_SPRINTF_IMPLEMENTATION
@@ -169,12 +169,10 @@ uptr outf(const char *msg, ...) {
 }
 
 uptr outv(const char *msg, va_list args) {
-    UNUSED(msg);
-    UNUSED(args);
-    // OutStream *stream = get_stdout_stream();
-    // uptr result = out_streamv(stream, msg, args);
-    // out_stream_flush(stream);
-    // return result;
+    OutStream *stream = get_stdout_stream();
+    uptr result = out_streamv(stream, msg, args);
+    out_stream_flush(stream);
+    return result;
     return 0;
 }
 
@@ -187,12 +185,10 @@ uptr erroutf(const char *msg, ...) {
 }
 
 uptr erroutv(const char *msg, va_list args) {
-    UNUSED(msg);
-    UNUSED(args);
-    // OutStream *stream = get_stderr_stream();
-    // uptr result = out_streamv(stream, msg, args);
-    // out_stream_flush(stream);
-    // return result;
+    OutStream *stream = get_stderr_stream();
+    uptr result = out_streamv(stream, msg, args);
+    out_stream_flush(stream);
+    return result;
     return 0;
 }
 

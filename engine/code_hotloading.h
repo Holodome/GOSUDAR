@@ -26,5 +26,6 @@ typedef struct {
     const char **function_names; 
 } Code_Hotloading_Module;
 
-void code_hotload(Code_Hotloading_Module *module);
-void code_hotload_unload(Code_Hotloading_Module *module);
+ENGINE_PUB void code_hotload(Code_Hotloading_Module *module);
+ENGINE_PUB void code_hotload_unload(Code_Hotloading_Module *module);
+ENGINE_PUB void code_hotload_update(Code_Hotloading_Module *module);

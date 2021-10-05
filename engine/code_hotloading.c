@@ -49,3 +49,13 @@ code_hotload(Code_Hotloading_Module *module) {
         code_hotload_unload(module);
     }
 }
+
+void 
+code_hotload_update(Code_Hotloading_Module *module) {
+    File_Time current_file_time = os_get_file_write_time(module->dll_path);
+    if (os_cmp_file_write_time(current_file_time, module->dll_write_time) != 0) {
+        code_hotload_unload(module);
+        module->dll_write_time = current_file_time;
+        code_hotload(module);
+    }    
+}

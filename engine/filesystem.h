@@ -27,26 +27,26 @@ typedef struct {
 } File_ID;
 
 
-struct FS_Ctx *create_filesystem(void);
-void init_filesystem(struct FS_Ctx *ctx);
+ENGINE_PUB struct FS_Ctx *create_filesystem(void);
+ENGINE_PUB void init_filesystem(struct FS_Ctx *ctx);
 
 // id.value != 0
-bool fs_is_file_valid(File_ID id);
+ENGINE_PUB bool fs_is_file_valid(File_ID id);
 // @NOTE The only way to create new File_ID. So all files that need to be accounted in filesystem
 // need to be abtained through this routine
-File_ID fs_open_file(const char *name, u32 mode);
+ENGINE_PUB File_ID fs_open_file(const char *name, u32 mode);
 // @NOTE The only way to delete the id
-bool fs_close_file(File_ID id);
+ENGINE_PUB bool fs_close_file(File_ID id);
 
 // Return handle for file if it is open, 0 otherwise
-OS_File_Handle *fs_get_handle(File_ID id);
+ENGINE_PUB OS_File_Handle *fs_get_handle(File_ID id);
 // Preferable way of getting file size. Caches result to minimize os calls
-uptr fs_get_file_size(File_ID id);
-uptr fs_fmt_filename(char *bf, uptr bf_sz, File_ID id);
+ENGINE_PUB uptr fs_get_file_size(File_ID id);
+ENGINE_PUB uptr fs_fmt_filename(char *bf, uptr bf_sz, File_ID id);
 
 /* 
 @NOTE(hl): Debugging tool when we need to inspect some binary (or even string) data
 In current debuggers, inspection of buffers of any kind is complicated.
 This may help solve this problem, but still not the best solution
 */
-void DBG_dump_file(const char *filename, const void *data, u64 data_size);
+ENGINE_PUB void DBG_dump_file(const char *filename, const void *data, u64 data_size);

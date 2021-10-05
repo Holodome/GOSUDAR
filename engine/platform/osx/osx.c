@@ -225,7 +225,7 @@ osx_scancode_to_key(u32 scancode) {
 
     return result;
 }
-
+#ifndef COMPILE_GAME
 void 
 os_create_window(Window_State *state, u32 width, u32 height) {
     osx_create_window_internal(state, width, height);
@@ -236,6 +236,7 @@ void
 os_poll_window_events(Window_State *state) {
     osx_poll_window_events_internal(state);
 }
+#endif
 
 uptr 
 os_fmt_executable_path(char *bf, uptr bf_sz) {
@@ -290,7 +291,7 @@ os_copy_file(const char *a, const char *b) {
 
 void *
 os_load_dll(const char *dllname) {
-    void *result = dlopen(dllname, RTLD_LAZY | RTLD_GLOBAL);
+    void *result = dlopen(dllname, RTLD_NOW);
     return result;
 }
 
@@ -312,3 +313,4 @@ os_delete_file(const char *filename) {
         posix_dump_errno();
     }
 }
+

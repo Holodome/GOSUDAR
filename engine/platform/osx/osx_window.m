@@ -1,3 +1,4 @@
+#ifndef COMPILE_GAME
 #include "platform/osx/osx.h"
 
 #include "lib/memory.h"
@@ -225,3 +226,4 @@ osx_poll_window_events_internal(Window_State *state) {
     state->mdelta = v2sub(mouse, state->mpos);
     state->mpos = mouse;
 }
+#endif

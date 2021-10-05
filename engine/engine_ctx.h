@@ -60,5 +60,5 @@ typedef struct {
     Game_Update_Func *update;
 } Game_Module_Functions;
 
-extern const char *GAME_MODULE_FUNCTION_NAMES[];
-extern const uptr GAME_MODULE_FUNCTIONS_COUNT;
+// extern const char *GAME_MODULE_FUNCTION_NAMES[];
+// extern const uptr GAME_MODULE_FUNCTIONS_COUNT;

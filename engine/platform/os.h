@@ -48,24 +48,24 @@ typedef struct {
 // @NOTE(hl): Although in most OSs console output is handled the same 
 // way as files, these are two practically different operations so we have 
 // separate API for them
-u64 os_write_stdout(const void *bf, uptr bf_sz);
-u64 os_write_stderr(const void *bf, uptr bf_sz);
+ENGINE_PUB u64 os_write_stdout(const void *bf, uptr bf_sz);
+ENGINE_PUB u64 os_write_stderr(const void *bf, uptr bf_sz);
 // Files
-void os_open_file(OS_File_Handle *handle, const char *filename, u32 mode);
-void os_close_file(OS_File_Handle *handle);
-u64 os_write_file(OS_File_Handle *file, u64 offset, const void *bf, u64 bf_sz);
-u64 os_read_file(OS_File_Handle *file, u64 offset, void *bf, u64 bf_sz);
-u64 os_get_file_size(OS_File_Handle *handle);
-File_Time os_get_file_write_time(const char *filename);
-int os_cmp_file_write_time(File_Time a, File_Time b);
+ENGINE_PUB void os_open_file(OS_File_Handle *handle, const char *filename, u32 mode);
+ENGINE_PUB void os_close_file(OS_File_Handle *handle);
+ENGINE_PUB u64 os_write_file(OS_File_Handle *file, u64 offset, const void *bf, u64 bf_sz);
+ENGINE_PUB u64 os_read_file(OS_File_Handle *file, u64 offset, void *bf, u64 bf_sz);
+ENGINE_PUB u64 os_get_file_size(OS_File_Handle *handle);
+ENGINE_PUB File_Time os_get_file_write_time(const char *filename);
+ENGINE_PUB int os_cmp_file_write_time(File_Time a, File_Time b);
 
 // General file/directory management
-uptr os_fmt_executable_path(char *bf, uptr bf_sz);
-void os_chdir(const char *dir);
-void os_fmt_cwd(char *bf, uptr bf_sz);
-bool os_copy_file(const char *a, const char *b);
-void os_delete_file(const char *filename);
+ENGINE_PUB uptr os_fmt_executable_path(char *bf, uptr bf_sz);
+ENGINE_PUB void os_chdir(const char *dir);
+ENGINE_PUB void os_fmt_cwd(char *bf, uptr bf_sz);
+ENGINE_PUB bool os_copy_file(const char *a, const char *b);
+ENGINE_PUB void os_delete_file(const char *filename);
 // Dlls
-void *os_load_dll(const char *dllname);
-void os_unload_dll(void *dll);
-void *os_dll_symb(void *dll, const char *symb);
+ENGINE_PUB void *os_load_dll(const char *dllname);
+ENGINE_PUB void os_unload_dll(void *dll);
+ENGINE_PUB void *os_dll_symb(void *dll, const char *symb);

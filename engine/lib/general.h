@@ -113,6 +113,23 @@ typedef _Bool bool;
 #define ATTR(...) 
 #endif 
 
-#define UNUSED(_var) (void)_var;
+#define UNUSED(_var) (void)(_var)
+
+#if COMPILER_LLVM || COMPILER_GCC
+#define EXPORT __attribute__((visibility("default")))
+#define IMPORT 
+#elif COMPILER_MSVC 
+#define EXPORT __declspec(dllexport)
+#define IMPORT __declspec(dllimport)
+#endif
+
+#ifndef COMPILING_ENGINE
+#define COMPILING_ENGINE 0
+#endif 
+#if COMPILING_ENGINE 
+#define ENGINE_PUB EXPORT
+#else 
+#define ENGINE_PUB IMPORT
+#endif
 
 #include "my_assert.h"

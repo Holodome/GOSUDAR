@@ -49,14 +49,13 @@ init_game_hotloading(Game_Module_Functions *game_functions, Code_Hotloading_Modu
     // @LEAK
     module->dll_path = mem_alloc_str(buffer);
     engine_ctx_fmt_local_filepath(buffer, sizeof(buffer),
-        &ctx, "game.tmp");
+        &ctx, "lock.tmp");
     // @LEAK
     module->lock_path = mem_alloc_str(buffer);
     log_info("Game code path %s", module->dll_path);
     log_info("Game code lock path %s", module->lock_path);
     code_hotload(module);
 }
-
 
 int main(void) {
     init_ctx();

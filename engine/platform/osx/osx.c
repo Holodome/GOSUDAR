@@ -289,20 +289,21 @@ os_copy_file(const char *a, const char *b) {
     return result == 0;
 }
 
-void *
+DLL_Handle
 os_load_dll(const char *dllname) {
-    void *result = dlopen(dllname, RTLD_NOW);
+    DLL_Handle result;
+    result.handle = dlopen(dllname, RTLD_NOW);
     return result;
 }
 
 void 
-os_unload_dll(void *dll) {
-    dlclose(dll);
+os_unload_dll(DLL_Handle handle) {
+    dlclose(handle.handle);
 }
 
 void *
-os_dll_symb(void *dll, const char *symb) {
-    void *result = dlsym(dll, symb);
+os_dll_symb(DLL_Handle handle, const char *symb) {
+    void *result = dlsym(handle.handle, symb);
     return result;
 }
 
@@ -314,3 +315,8 @@ os_delete_file(const char *filename) {
     }
 }
 
+bool 
+os_file_exists(const char *filename) {
+    bool result = access(filename, F_OK) == 0;
+    return result;
+}

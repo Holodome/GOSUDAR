@@ -44,6 +44,13 @@ typedef struct {
     u64 storage;
 } File_Time;
 
+// Typedefy-like structure
+// Used only to make code more clear and type-safe, as void * may be confusing
+// handle value of 0 means invalid handle
+typedef struct {
+    void *handle;
+} DLL_Handle;
+
 // Console buffers
 // @NOTE(hl): Although in most OSs console output is handled the same 
 // way as files, these are two practically different operations so we have 
@@ -65,7 +72,8 @@ ENGINE_PUB void os_chdir(const char *dir);
 ENGINE_PUB void os_fmt_cwd(char *bf, uptr bf_sz);
 ENGINE_PUB bool os_copy_file(const char *a, const char *b);
 ENGINE_PUB void os_delete_file(const char *filename);
+ENGINE_PUB bool os_file_exists(const char *filename);
 // Dlls
-ENGINE_PUB void *os_load_dll(const char *dllname);
-ENGINE_PUB void os_unload_dll(void *dll);
-ENGINE_PUB void *os_dll_symb(void *dll, const char *symb);
+ENGINE_PUB DLL_Handle os_load_dll(const char *dllname);
+ENGINE_PUB void os_unload_dll(DLL_Handle handle);
+ENGINE_PUB void *os_dll_symb(DLL_Handle handle, const char *symb);

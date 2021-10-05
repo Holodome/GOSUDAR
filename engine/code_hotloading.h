@@ -12,13 +12,14 @@ Version: 0
 struct Engine_Ctx;
 
 typedef struct {
+    // If this is false, no functions from module should be called
     bool is_valid;
-    u32 temp_dll_number;
     
     const char *dll_path;
+    // @NOTE(hl): Lock is file created while compiling and deleted after compilation is finished.
     const char *lock_path;
     
-    void *dll; 
+    DLL_Handle dll;
     File_Time dll_write_time;
     
     u32 function_count;

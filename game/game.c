@@ -4,5 +4,6 @@
 
 GAME_UPDATE_SIGNATURE(game_update) {
     UNUSED(ctx);
+    // log_debug("Hello");
     return ctx->win_state.is_quit_requested;
 }

@@ -1,8 +1,8 @@
 #include "platform/osx/osx.h"
 
-#include "strings.h"
-#include "memory.h"
-#include "hashing.h"
+#include "lib/strings.h"
+#include "lib/memory.h"
+#include "lib/hashing.h"
 
 #include <sys/syslimits.h>
 #include <sys/stat.h>
@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-OS_OPEN_FILE(osx_open_file) {
+void os_open_file(OS_File_Handle *handle, const char *filename, u32 mode) {
     handle->flags = 0;
     handle->handle = 0;
     
@@ -30,14 +30,14 @@ OS_OPEN_FILE(osx_open_file) {
     }
 }
 
-OS_CLOSE_FILE(osx_close_file) {
+void os_close_file(OS_File_Handle *handle) {
     bool result = close(handle->handle) == 0;
     if (result) {
         handle->flags |= FILE_FLAG_IS_CLOSED;
     }
 }
 
-OS_WRITE_FILE(osx_write_file) {
+u64 os_write_file(OS_File_Handle *file, u64 offset, const void *bf, u64 bf_sz) {
     uptr result = 0;
     if (OS_IS_FILE_VALID(file)) {
         int posix_handle = file->handle;
@@ -53,7 +53,7 @@ OS_WRITE_FILE(osx_write_file) {
     return result;
 }
 
-OS_READ_FILE(osx_read_file) {
+u64 os_read_file(OS_File_Handle *file, u64 offset, void *bf, u64 bf_sz) {
     uptr result = 0;
     if (OS_IS_FILE_VALID(file)) {
         int posix_handle = file->handle;
@@ -68,16 +68,15 @@ OS_READ_FILE(osx_read_file) {
     }
     return result;
 }
-
-OS_WRITE_STDOUT(osx_write_stdout) {
+u64 os_write_stdout(const void *bf, uptr bf_sz) {
     return write(1, bf, bf_sz);
 }
 
-OS_WRITE_STDERR(osx_write_stderr) {
+u64 os_write_stderr(const void *bf, uptr bf_sz) {
     return write(2, bf, bf_sz);
 }
 
-OS_GET_FILE_SIZE(osx_get_file_size) {
+u64 os_get_file_size(OS_File_Handle *handle) {
     uptr result = 0;
     if (OS_IS_FILE_VALID(handle)) {
         int posix_handle = handle->handle;
@@ -210,12 +209,32 @@ osx_scancode_to_key(u32 scancode) {
 }
 
 void 
-osx_create_window(Window_State *state, u32 width, u32 height) {
+os_create_window(Window_State *state, u32 width, u32 height) {
     osx_create_window_internal(state, width, height);
     state->display_size = v2(width, height);
 }
 
 void 
-osx_poll_window_events(Window_State *state) {
+os_poll_window_events(Window_State *state) {
     osx_poll_window_events_internal(state);
+}
+
+uptr 
+os_fmt_executable_path(char *bf, uptr bf_sz) {
+    uptr result = bf_sz;
+    if (_NSGetExecutablePath(bf, &result) != 0) {
+        result = 0;
+    }
+    return result;
+}
+
+void 
+os_chdir(const char *dir) {
+    int result = chdir(dir);    
+    assert(result == 0);
+}
+
+void 
+os_fmt_cwd(char *bf, uptr bf_sz) {
+    getcwd(bf, bf_sz);    
 }

@@ -14,6 +14,7 @@ frameworks="-framework AppKit
             -framework Metal
             -framework Foundation
             -framework IOSurface
+            -framework QuartzCore
             -framework AudioToolbox"
 defines=""
 vulkan_lib="/opt/homebrew/Cellar/molten-vk/1.1.5/lib/libMoltenVK.a"

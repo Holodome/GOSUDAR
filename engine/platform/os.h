@@ -9,7 +9,7 @@
 // it does not do streamed IO, like c standard library does (see stream.h).
 //
 #pragma once
-#include "general.h"
+#include "lib/general.h"
 
 enum {
     // 0 in file id could mean not initialized, but this flag explicitly tells that file had errors
@@ -31,7 +31,7 @@ typedef struct {
     // that is special value for invalid file handle
     u64 handle;
     u32 flags;
-} OSFileHandle;
+} OS_File_Handle;
 
 #define OS_IS_FILE_VALID(_phandle) ((_phandle)->handle && !((_phandle)->flags & FILE_FLAG_HAS_ERRORS))
 
@@ -44,27 +44,14 @@ typedef struct {
     u64 storage;
 } File_Time;
 
-#define OS_OPEN_FILE(_name) void _name(OSFileHandle *handle, const char *filename, u32 mode)
-typedef OS_OPEN_FILE(OSOpenFile);
-#define OS_CLOSE_FILE(_name) void _name(OSFileHandle *handle)
-typedef OS_CLOSE_FILE(OSCLoseFile);
-#define OS_WRITE_FILE(_name) u64 _name(OSFileHandle *file, u64 offset, const void *bf, u64 bf_sz)
-typedef OS_WRITE_FILE(OSWriteFile);
-#define OS_READ_FILE(_name) u64 _name(OSFileHandle *file, u64 offset, void *bf, u64 bf_sz)
-typedef OS_READ_FILE(OSReadFile);
-#define OS_WRITE_STDOUT(_name) u64 _name(const void *bf, uptr bf_sz)
-typedef OS_WRITE_STDOUT(OSWriteStdout);
-#define OS_WRITE_STDERR(_name) u64 _name(const void *bf, uptr bf_sz)
-typedef OS_WRITE_STDERR(OSWriteStderr);
-#define OS_GET_FILE_SIZE(_name) u64 _name(OSFileHandle *handle)
-typedef OS_GET_FILE_SIZE(OSGetFileSize);
+void os_open_file(OS_File_Handle *handle, const char *filename, u32 mode);
+void os_close_file(OS_File_Handle *handle);
+u64 os_write_file(OS_File_Handle *file, u64 offset, const void *bf, u64 bf_sz);
+u64 os_read_file(OS_File_Handle *file, u64 offset, void *bf, u64 bf_sz);
+u64 os_write_stdout(const void *bf, uptr bf_sz);
+u64 os_write_stderr(const void *bf, uptr bf_sz);
+u64 os_get_file_size(OS_File_Handle *handle);
 
-typedef struct {
-    OSOpenFile *open_file;
-    OSCLoseFile *close_file;
-    OSWriteFile *write_file;
-    OSReadFile *read_file;
-    OSGetFileSize *get_file_size;
-    OSWriteStdout *write_stdout;
-    OSWriteStderr *write_stderr;
-} OS_Api;
+uptr os_fmt_executable_path(char *bf, uptr bf_sz);
+void os_chdir(const char *dir);
+void os_fmt_cwd(char *bf, uptr bf_sz);

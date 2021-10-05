@@ -5,7 +5,7 @@ File: src/platform/input.h
 Version: 0
 */
 #pragma once
-#include "general.h"
+#include "lib/general.h"
 
 #include "math/vec.h"
 
@@ -71,3 +71,6 @@ typedef struct {
 } Window_State;
 
 void update_key_state(Window_State *input, u32 key, bool new_down);
+
+void os_create_window(Window_State *state, u32 width, u32 height);
+void os_poll_window_events(Window_State *state);

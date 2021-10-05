@@ -34,18 +34,27 @@ where some platform-specific functions are epxporeted and thus located not in gl
 Otherwise there should be two platform APIs: One for game layer, other for platform
 */
 #pragma once 
-#include "general.h"
+#include "lib/general.h"
 
 #include "platform/os.h"
 #include "platform/window.h"
+#include "logging.h"
 
 typedef struct {
     void *game_data; 
     
-    OS_Api os;
+    struct Logging_State *logging_state;
+    struct FS_Ctx *filesystem;
     Window_State win_state;
 } Engine_Ctx;
 
 #define GAME_UPDATE_SIGNATURE(_name) bool _name(Engine_Ctx *ctx)
 typedef GAME_UPDATE_SIGNATURE(Game_Update_Func);
 
+typedef struct {
+    Game_Update_Func *update;
+} Game_Module_Functions;
+
+const char *GAME_MODULE_FUNCTION_NAMES[] = {
+    "game_update"
+};

@@ -1,8 +1,13 @@
 #include "platform/osx/osx.h"
 
-#include "memory.h"
+#include "lib/memory.h"
 
-#include <AppKit/AppKit.h>
+#include <AppKit/AppKit.h> // all windowing functions & interfaces
+#include <QuartzCore/CAMetalLayer.h> // CAMetalLayer
+
+@interface OSX_Window : NSWindow {
+}
+@end
 
 @interface OSX_Window_Delegate : NSObject<NSWindowDelegate> {
     Window_State *window_state;
@@ -18,11 +23,14 @@
 @end
 
 typedef struct OSX_Window_State_Internal {
-    NSWindow *win;
+    OSX_Window *win;
     OSX_Window_Delegate *win_delegate;
     OSX_Content_View *win_view;
     CALayer *layer;
 } OSX_Window_State_Internal;
+
+@implementation OSX_Window
+@end
 
 @implementation OSX_Window_Delegate
 - (instancetype)init_with_window_state:(Window_State *)window_state_init {
@@ -162,7 +170,7 @@ osx_create_window_internal(Window_State *state, u32 width, u32 height) {
         width,
         height);
 
-    osx_state->win = [[NSWindow alloc]
+    osx_state->win = [[OSX_Window alloc]
         initWithContentRect: window_rect
         styleMask: NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -185,10 +193,11 @@ osx_create_window_internal(Window_State *state, u32 width, u32 height) {
     [osx_state->win setContentView: osx_state->win_view];
     [osx_state->win_view setWantsLayer: YES];
     // @NOTE(hl): Load dll for metal layer
-    // NSBundle *bundle = [NSBundle bundleWithPath:@"/System/Library/Frameworks/QuartzCore.framework"];
-    // assert(bundle);
+    NSBundle *bundle = [NSBundle bundleWithPath:@"/System/Library/Frameworks/QuartzCore.framework"];
+    assert(bundle);
+    osx_state->layer = [[CAMetalLayer alloc] init];
     // osx_state->layer = [[bundle classNamed:@"CAMetalLayer"] layer];
-    // [osx_state->win_view setLayer: osx_state->layer];
+    [osx_state->win_view setLayer: osx_state->layer];
 }
 
 void 

@@ -5,7 +5,7 @@ File: engine/code_hotloading.h
 Version: 0
 */
 #pragma once
-#include "general.h"
+#include "lib/general.h"
 
 #include "platform/os.h"
 
@@ -21,5 +21,5 @@ typedef struct {
     
     u32 function_count;
     void **functions; 
-    char * const *function_names; 
+    const char **function_names; 
 } Code_Hotloading_Module;

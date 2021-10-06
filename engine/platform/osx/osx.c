@@ -227,13 +227,13 @@ osx_scancode_to_key(u32 scancode) {
 }
 #ifndef COMPILE_GAME
 void 
-os_create_window(Window_State *state, u32 width, u32 height) {
+create_window(Window_State *state, u32 width, u32 height) {
     osx_create_window_internal(state, width, height);
     state->display_size = v2(width, height);
 }
 
 void 
-os_poll_window_events(Window_State *state) {
+poll_window_events(Window_State *state) {
     osx_poll_window_events_internal(state);
 }
 #endif

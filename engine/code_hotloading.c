@@ -61,6 +61,8 @@ code_hotload(Code_Hotloading_Module *module) {
     if (!module->is_valid) {
         log_info("Failed to load module '%s'", source_dll_name);
         code_hotload_unload(module);
+    } else {
+        log_info("Module '%s' loaded", source_dll_name);
     }
 }
 

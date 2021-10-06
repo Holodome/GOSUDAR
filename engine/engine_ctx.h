@@ -39,6 +39,7 @@ Otherwise there should be two platform APIs: One for game layer, other for platf
 #include "platform/os.h"
 #include "platform/window.h"
 #include "logging.h"
+#include "renderer/renderer.h"
 
 typedef struct {
     void *game_data; 
@@ -48,6 +49,7 @@ typedef struct {
     struct Logging_State *logging_state;
     struct FS_Ctx *filesystem;
     Window_State win_state;
+    Renderer renderer;
 } Engine_Ctx;
 
 uptr engine_ctx_fmt_local_filepath(char *bf, uptr bf_sz, 

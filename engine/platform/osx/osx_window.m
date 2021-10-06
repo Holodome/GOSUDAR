@@ -1,7 +1,8 @@
-#ifndef COMPILE_GAME
 #include "platform/osx/osx.h"
 
 #include "lib/memory.h"
+
+#include "renderer/vulkan_renderer.h"
 
 #include <AppKit/AppKit.h> // all windowing functions & interfaces
 #include <QuartzCore/CAMetalLayer.h> // CAMetalLayer
@@ -193,11 +194,8 @@ osx_create_window_internal(Window_State *state, u32 width, u32 height) {
         init_with_window_state: state];
     [osx_state->win setContentView: osx_state->win_view];
     [osx_state->win_view setWantsLayer: YES];
-    // @NOTE(hl): Load dll for metal layer
-    NSBundle *bundle = [NSBundle bundleWithPath:@"/System/Library/Frameworks/QuartzCore.framework"];
-    assert(bundle);
+    
     osx_state->layer = [[CAMetalLayer alloc] init];
-    // osx_state->layer = [[bundle classNamed:@"CAMetalLayer"] layer];
     [osx_state->win_view setLayer: osx_state->layer];
 }
 
@@ -226,4 +224,13 @@ osx_poll_window_events_internal(Window_State *state) {
     state->mdelta = v2sub(mouse, state->mpos);
     state->mpos = mouse;
 }
-#endif
+
+void 
+create_vulkan_surface(Window_State *state, struct Vulkan_Ctx *ctx) {
+    OSX_Window_State_Internal *osx_state = (OSX_Window_State_Internal *)state->internal;
+
+    VkMacOSSurfaceCreateInfoMVK surface_create_info = {};
+    surface_create_info.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    surface_create_info.pView = osx_state->win_view;
+    VK_CHECK_CALL(vkCreateMacOSSurfaceMVK, ctx->instance, &surface_create_info, ctx->allocator, &ctx->surface);    
+}

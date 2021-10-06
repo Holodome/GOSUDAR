@@ -19,7 +19,8 @@ frameworks="-framework AppKit
             -framework IOSurface
             -framework QuartzCore
             -framework AudioToolbox"
-vulkan_lib="$vulkan_path/lib/libMoltenVK.a"
+vulkan_lib="$vulkan_path/lib/libMoltenVK.dylib"
+# vulkan_lib="build/libMoltenVK.dylib"
 
 touch build/lock.tmp
 clang -g $build_options $frameworks -DCOMPILE_ENGINE -o build/engine.dylib -dynamiclib $vulkan_lib $engine_filenames

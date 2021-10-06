@@ -47,12 +47,14 @@ enum {
     KEY_COUNT
 };  
 
+struct Vulkan_Ctx;
+
 // A way of platform layer communcating with game.
 // In the begging of the frame platform layer supplies gaem with all information about user input 
 // it needs, during the frame game can modify some values in this struct to make commands to the 
 // platform layer, like go fullscreen or switch vsync
 // The idea of this structure is not to provide api, but simply pass data between modules
-typedef struct {
+typedef struct Window_State {
     void *internal;
     
     Vec2 display_size;
@@ -70,7 +72,8 @@ typedef struct {
     bool vsync;
 } Window_State;
 
-void update_key_state(Window_State *input, u32 key, bool new_down);
+ENGINE_PUB void update_key_state(Window_State *input, u32 key, bool new_down);
 
-void os_create_window(Window_State *state, u32 width, u32 height);
-void os_poll_window_events(Window_State *state);
+ENGINE_PUB void create_window(Window_State *state, u32 width, u32 height);
+ENGINE_PUB void poll_window_events(Window_State *state);
+ENGINE_PUB void create_vulkan_surface(Window_State *state, struct Vulkan_Ctx *ctx);

@@ -132,4 +132,7 @@ typedef _Bool bool;
 #define ENGINE_PUB IMPORT
 #endif
 
+#define SAFE_DIV(_a, _b) (((_b) != 0) ? ((_a) / (_b)) : 0)
+#define MAX_VALUE(_var) ((1llu << (8llu * sizeof(_var))) - 1)
+
 #include "my_assert.h"

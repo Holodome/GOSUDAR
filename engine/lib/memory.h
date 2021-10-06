@@ -16,6 +16,7 @@
 ATTR((malloc))
 void *mem_alloc(uptr size);
 // realloc
+ATTR((malloc))
 void *mem_realloc(void *ptr, uptr old_size, uptr size);
 // strdup
 char *mem_alloc_str(const char *str);

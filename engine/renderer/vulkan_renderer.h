@@ -25,26 +25,87 @@ bool vulkan_result_is_success(VkResult result);
     } \
 } while (0);
 
+typedef struct {
+    VkSurfaceCapabilitiesKHR capabilities;
+    VkSurfaceFormatKHR *formats; // da
+    VkPresentModeKHR *present_modes; // da
+} Vulkan_Swapchain_Support;
 
-typedef struct Vulkan_Ctx {
-    VkAllocationCallbacks* allocator;
+Vulkan_Swapchain_Support get_swapchain_support(VkPhysicalDevice device, VkSurfaceKHR surface);
+void free_swapchain_support(Vulkan_Swapchain_Support support);
+
+enum {
+    VULKAN_PHYSICAL_DEVICE_GRAPHICS_BIT = 0x1,  
+    VULKAN_PHYSICAL_DEVICE_PRESENT_BIT = 0x2, 
+    // VULKAN_PHYSICAL_DEVICE_COMPUTE_BIT = 0x4, 
+    VULKAN_PHYSICAL_DEVICE_TRANSFER_BIT = 0x8,
+    VULKAN_PHYSICAL_DEVICE_SAMPLER_ANISOTROPY_BIT = 0x10,
+};
+
+typedef struct {
+    u32 flags;
+    const char **device_extensions;
+    u32 extension_count;
+} Vulkan_Physical_Device_Requirements;
+
+typedef struct {
+    bool is_valid;
+    VkPhysicalDevice handle;
+    Vulkan_Swapchain_Support swapchain_support;
     
-    VkInstance instance; 
-    VkDebugUtilsMessengerEXT debug_messanger; 
-    
-    VkPhysicalDeviceProperties physical_device_properties;
-    VkPhysicalDeviceFeatures physical_device_features;
-    VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-    VkPhysicalDevice physical_device;
+    VkPhysicalDeviceProperties properties;
+    VkPhysicalDeviceFeatures features;
+    VkPhysicalDeviceMemoryProperties memory_properties;
     u32 graphics_family_idx;
     u32 present_family_idx;
     u32 transfer_family_idx;
-    
-    VkSurfaceKHR surface;
-    VkDevice logical_device;
+} Vulkan_Physical_Device;
+
+Vulkan_Physical_Device pick_physical_device(VkInstance instance, VkSurfaceKHR surface, Vulkan_Physical_Device_Requirements *requirements);
+void log_physical_device_info(Vulkan_Physical_Device *device);
+
+typedef struct {
+    VkDevice handle;
+    VkFormat depth_format;
+    VkCommandPool graphics_command_pool;
+
     VkQueue graphics_queue;
     VkQueue present_queue;
     VkQueue transfer_queue;
+    
+    Vulkan_Swapchain_Support swapchain_support;
+} Vulkan_Device;
+
+Vulkan_Device create_vulkan_device(VkInstance instance, VkSurfaceKHR surface, 
+    Vulkan_Physical_Device *physical_device);
+
+typedef struct {
+    VkImage handle;
+    VkDeviceMemory memory;
+    VkImageView view;
+    u32 width;
+    u32 height;
+} Vulkan_Image;
+
+typedef struct {
+    VkSwapchainKHR handle;
+    VkSurfaceFormatKHR image_format;
+    u8 max_frames_in_flight;
+    VkImage *images; // da
+    VkImageView *image_views; // da
+    
+} Vulkan_Swapchain;
+
+
+typedef struct Vulkan_Ctx {
+    VkAllocationCallbacks* allocator;
+    VkDebugUtilsMessengerEXT debug_messanger; 
+    
+    VkInstance instance; 
+    VkSurfaceKHR surface;
+    
+    Vulkan_Physical_Device physical_device;
+    Vulkan_Device device;
 } Vulkan_Ctx;
 
 typedef Vulkan_Ctx Renderer_Internal;

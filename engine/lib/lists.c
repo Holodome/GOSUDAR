@@ -4,10 +4,13 @@
 
 void *
 da_reserve_(u32 stride, u32 count) {
-    u64 initial_size = sizeof(DArray_Header) + count * stride;
-    DArray_Header *header = mem_alloc(initial_size);
-    header->capacity = count;
-    void *result = header + 1;
+    void *result = 0;
+    if (count) {
+        u64 initial_size = sizeof(DArray_Header) + count * stride;
+        DArray_Header *header = mem_alloc(initial_size);
+        header->capacity = count;
+        result = header + 1;
+    }
     return result;
 }
 void *
